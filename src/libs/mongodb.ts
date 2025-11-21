@@ -1,18 +1,22 @@
 import mongoose from "mongoose";
 
-const {MONGODB_URL } =process.env;
-if(!MONGODB_URL){
-    throw new Error("MONGO DB debe estar definido");
+const MONGODB_URL = process.env.MONGODB_URL as string;
+
+if (!MONGODB_URL) {
+  throw new Error("⚠️ La variable MONGODB_URL no está definida en .env.local");
 }
-export const connectDB= async()=>{
-    try{
-        const {connection}=await mongoose.connect(MONGODB_URL);
-        if(connection.readyState==1){
-            return Promise.resolve(true);
-        }
-    }catch(error){
-        return Promise.resolve(false);
-        
-    }
-    mongoose.connect('')
+
+let cached = (global as any).mongoose || { conn: null, promise: null };
+
+export async function connectDB() {
+  if (cached.conn) return cached.conn;
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGODB_URL).then((mongoose) => mongoose);
+  }
+
+  cached.conn = await cached.promise;
+  (global as any).mongoose = cached;
+
+  return cached.conn;
 }
