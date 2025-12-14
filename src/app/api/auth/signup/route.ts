@@ -1,41 +1,75 @@
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import User from "@/models/user";
+import { connectDB } from "@/libs/mongodb";
 
-import {NextResponse} from 'next/server'
-import User from'@/models/user'
-import bcrypt from 'bcryptjs'
-import {connectDB} from '@/libs/mongodb'
+export async function POST(request: Request) {
+  try {
+    const { email, password, fullname, role } = await request.json();
 
-export function GET(){
-    return NextResponse.json({message: "sign up"});
-}
-export async function POST(request:Request){
-    const {email,password,fullname}= await request.json()
-    if(!password || password.length<6) 
-        return NextResponse.json({
-        message: "Contrasena debe ser al menos de 6 caracteres"
-        },{
-            status:400 
-        });
-    try{
-        await connectDB();
-        const userFound= await User.findOne({email});
-        if(userFound) 
-            return NextResponse.json({
-                message: "Email ya existe",
-            },{
-                status:409,
-            });
-
-        const hashPassword =await bcrypt.hash(password,12)
-        const user=new User({
-            email,
-            fullname,
-            password:hashPassword
-        });
-        const savedUser= await user.save();
-        console.log(savedUser);
-        return NextResponse.json(savedUser);
-    }catch(error){
-        console.log(error);
-        return NextResponse.json({ message: "Error interno" }, { status: 500 });
+    // 🔎 Validaciones básicas
+    if (!email || !password || !fullname) {
+      return NextResponse.json(
+        { message: "Todos los campos son obligatorios" },
+        { status: 400 }
+      );
     }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { message: "La contraseña debe tener al menos 6 caracteres" },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    // 🔐 Normalizar email
+    const emailLower = email.toLowerCase();
+
+    const userFound = await User.findOne({ email: emailLower });
+    if (userFound) {
+      return NextResponse.json(
+        { message: "El email ya está registrado" },
+        { status: 409 }
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // 🧑‍💼 Control de roles
+    const allowedRoles = ["CLIENTE"];
+    const userRole = allowedRoles.includes(role) ? role : "CLIENTE";
+
+    const user = new User({
+      email: emailLower,
+      fullname,
+      password: hashedPassword,
+      role: userRole,
+      isActive: true,
+    });
+
+    await user.save();
+
+    // 🧹 Respuesta limpia
+    return NextResponse.json(
+      {
+        message: "Usuario creado correctamente",
+        user: {
+          id: user._id,
+          email: user.email,
+          fullname: user.fullname,
+          role: user.role,
+          createdAt: user.createdAt,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Signup error:", error);
+    return NextResponse.json(
+      { message: "Error interno del servidor" },
+      { status: 500 }
+    );
+  }
 }

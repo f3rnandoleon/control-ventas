@@ -1,27 +1,51 @@
-import {Schema,model, models} from 'mongoose';
+import { Schema, model, models } from "mongoose";
 
-
-const userSchema =new Schema({
+const userSchema = new Schema(
+  {
     email: {
-        type: String,
-        unique:true,
-        required: true,
-        match:[ 
-            /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-            "Email no valido"
-        ],
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      match: [
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        "Email no válido",
+      ],
     },
+
     password: {
-        type: String,
-        required: true,
-        select: false,
+      type: String,
+      required: true,
+      select: false, // No se devuelve por defecto
     },
-    fullname:{
-        type: String,
-        required: true,
-        minLength:[3, "Fullname debe ser al menos de 3 caracteres"],
-        MaxLength:[50,"Fullname debe ser como maximo de 50 caracteres"],
+
+    fullname: {
+      type: String,
+      required: true,
+      minlength: [3, "El nombre debe tener al menos 3 caracteres"],
+      maxlength: [50, "El nombre debe tener como máximo 50 caracteres"],
+      trim: true,
     },
-});
-const User= models.User || model('User',userSchema)
+
+    role: {
+      type: String,
+      enum: ["ADMIN", "VENDEDOR", "CLIENTE"],
+      default: "CLIENTE",
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    lastLogin: {
+      type: Date,
+    },
+  },
+  {
+    timestamps: true, // createdAt y updatedAt
+  }
+);
+
+const User = models.User || model("User", userSchema);
 export default User;
