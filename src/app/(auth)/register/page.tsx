@@ -154,9 +154,9 @@ export default function RegisterPage() {
               bg-gradient-to-r from-cyan-500 to-blue-600
               hover:from-cyan-400 hover:to-blue-500
               shadow-[0_0_20px_rgba(34,211,238,0.6)]
-              transition disabled:opacity-50"
+              transition disabled:opacity-50 hover:cursor-pointer" 
           >
-            {loading ? "Registrando..." : "REGISTER"}
+            {loading ? "Registrando..." : "Registrarse"}
           </button>
         </form>
 

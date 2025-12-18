@@ -2,14 +2,18 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/product";
-
+type Context = {
+  params: Promise<{ id: string }>;
+};
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: Context
 ) {
   try {
+    const { id } = await context.params;
+
     await connectDB();
-    const producto = await Producto.findById(params.id);
+    const producto = await Producto.findById(id);
 
     if (!producto) {
       return NextResponse.json(
@@ -29,9 +33,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  context: Context
 ) {
   try {
+    const { id } = await context.params;
     const headersList = await headers();
     const role = headersList.get("x-user-role");
 
@@ -47,7 +52,7 @@ export async function PUT(
     await connectDB();
 
     const producto = await Producto.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true }
     );
@@ -72,9 +77,10 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: Context
 ) {
   try {
+    const { id } = await context.params;
     const headersList = await headers();
     const role = headersList.get("x-user-role");
 
@@ -87,7 +93,7 @@ export async function DELETE(
 
     await connectDB();
 
-    const producto = await Producto.findByIdAndDelete(params.id);
+    const producto = await Producto.findByIdAndDelete(id);
 
     if (!producto) {
       return NextResponse.json(

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
+import "@/models/user"; 
+
 import Producto from "@/models/product";
 import Inventario from "@/models/inventario";
 import mongoose from "mongoose";
@@ -147,6 +149,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  console.log(Object.keys(mongoose.models));
   try {
     await connectDB();
     const ventas = await Venta.find()
