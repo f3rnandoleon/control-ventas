@@ -27,8 +27,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const headersList = await headers();
-    const userId = headersList.get("x-user-id");
     const role = headersList.get("x-user-role");
+    const userIdRaw = headersList.get("x-user-id");
 
     if (role !== "ADMIN") {
       return NextResponse.json(
@@ -36,6 +36,15 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
+
+    if (!userIdRaw || !mongoose.Types.ObjectId.isValid(userIdRaw)) {
+      return NextResponse.json(
+        { message: "Usuario no autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const userId = new mongoose.Types.ObjectId(userIdRaw);
 
     const { productoId, color, talla, cantidad, tipo, motivo } =
       await request.json();
@@ -47,8 +56,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const qty = Number(cantidad);
+    if (!qty || qty <= 0) {
+      return NextResponse.json(
+        { message: "Cantidad inválida" },
+        { status: 400 }
+      );
+    }
+
     await connectDB();
 
+    // 1️⃣ Leer producto
     const producto = await Producto.findById(productoId);
     if (!producto) {
       return NextResponse.json(
@@ -57,6 +75,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // 2️⃣ Leer variante real
     const variante = producto.variantes.find(
       (v: any) => v.color === color && v.talla === talla
     );
@@ -68,33 +87,41 @@ export async function POST(request: Request) {
       );
     }
 
+    // 3️⃣ Stock anterior real
     const stockAnterior = variante.stock;
 
-    // 🔄 Aplicar ajuste
+    // 4️⃣ Aplicar movimiento
+    let stockActual = stockAnterior;
+
     if (tipo === "ENTRADA") {
-      variante.stock += cantidad;
+      stockActual += qty;
     } else if (tipo === "SALIDA") {
-      if (variante.stock < cantidad) {
+      if (stockAnterior < qty) {
         return NextResponse.json(
           { message: "Stock insuficiente para salida" },
           { status: 400 }
         );
       }
-      variante.stock -= cantidad;
+      stockActual -= qty;
     } else if (tipo === "AJUSTE") {
-      variante.stock = cantidad;
+      stockActual = qty;
+    } else {
+      return NextResponse.json(
+        { message: "Tipo de movimiento inválido" },
+        { status: 400 }
+      );
     }
 
-    const stockActual = variante.stock;
-
+    // 5️⃣ Guardar producto (CLAVE)
+    variante.stock = stockActual;
     await producto.save();
 
-    // 🧾 Registrar movimiento
+    // 6️⃣ Crear movimiento (MISMO QUE VENTAS)
     const movimiento = await Inventario.create({
-      productoId,
+      productoId: producto._id,
       variante: { color, talla },
       tipo,
-      cantidad,
+      cantidad: qty,
       stockAnterior,
       stockActual,
       motivo,
@@ -103,7 +130,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { message: "Inventario actualizado", movimiento },
+      { message: "Inventario actualizado correctamente", movimiento },
       { status: 201 }
     );
   } catch (error) {

@@ -1,28 +1,72 @@
 "use client";
 
-export default function AdminDashboard() {
-    
-  return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+import { useEffect, useState } from "react";
+import { getVentas } from "@/services/venta.service";
+import { getProductos } from "@/services/producto.service";
+import DashboardStats from "@/components/dashboard/DashboardStats";
+import VentasRecientes from "@/components/dashboard/VentasRecientes";
+import TopProductosDashboard from "@/components/dashboard/TopProductosDashboard";
+import StockCritico from "@/components/dashboard/StockCritico";
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card title="Ventas Totales" value="Bs 0" />
-        <Card title="Ganancia" value="Bs 0" />
-        <Card title="Ventas Hoy" value="0" />
+export default function AdminDashboardPage() {
+  const [ventas, setVentas] = useState<any[]>([]);
+  const [productos, setProductos] = useState<any[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setVentas(await getVentas());
+      setProductos(await getProductos());
+    };
+    load();
+  }, []);
+
+  // Fechas
+  const today = new Date().toDateString();
+  const now = new Date();
+
+  const ventasHoy = ventas
+    .filter(
+      (v) => new Date(v.createdAt).toDateString() === today
+    )
+    .reduce((s, v) => s + v.total, 0);
+
+  const ventasMes = ventas
+    .filter(
+      (v) =>
+        new Date(v.createdAt).getMonth() === now.getMonth() &&
+        new Date(v.createdAt).getFullYear() === now.getFullYear()
+    )
+    .reduce((s, v) => s + v.total, 0);
+
+  const gananciaMes = ventas
+    .filter(
+      (v) =>
+        new Date(v.createdAt).getMonth() === now.getMonth()
+    )
+    .reduce((s, v) => s + (v.gananciaTotal || 0), 0);
+
+  const ventasRecientes = ventas.slice(0, 5);
+
+  const topProductos = [...productos]
+    .sort((a, b) => b.totalVendidos - a.totalVendidos)
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+
+      <DashboardStats
+        ventasHoy={ventasHoy}
+        ventasMes={ventasMes}
+        gananciaMes={gananciaMes}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <VentasRecientes ventas={ventasRecientes} />
+        <TopProductosDashboard productos={topProductos} />
       </div>
-    </div>
-  );
-}
 
-function Card({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-6 
-      shadow-[0_0_20px_rgba(0,180,255,0.15)]">
-      <p className="text-gray-400 text-sm">{title}</p>
-      <p className="text-2xl font-bold text-cyan-400 mt-2">
-        {value}
-      </p>
+      <StockCritico productos={productos} />
     </div>
   );
 }
