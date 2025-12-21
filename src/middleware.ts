@@ -7,9 +7,10 @@ const protectedRoutes = [
   "/api/ventas",
   "/api/inventario",
   "/api/reportes",
+  "/api/usuarios",
 ];
 
-const adminRoutes = ["/api/reportes"];
+const adminRoutes = ["/api/reportes","/api/usuarios",];
 const staffRoutes = [
   "/api/productos",
   "/api/ventas",

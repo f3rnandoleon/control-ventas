@@ -19,6 +19,7 @@ export default function VarianteForm({
     codigoBarra: initialData?.codigoBarra || "",
     qrCode: initialData?.qrCode || "",
   });
+  const isEdit = Boolean(initialData);
 
   return (
     <div className="space-y-4">
@@ -46,28 +47,38 @@ export default function VarianteForm({
           setForm({ ...form, stock: Number(e.target.value) })
         }
       />
+      {isEdit && (
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="label">Código de barras</label>
+            <input
+              className="input bg-white/5 text-gray-400 cursor-not-allowed"
+              value={form.codigoBarra}
+              disabled
+            />
+          </div>
 
-      <input
-        className="input"
-        placeholder="Código de barras"
-        value={form.codigoBarra}
-        onChange={(e) =>
-          setForm({ ...form, codigoBarra: e.target.value })
-        }
-      />
+          <div>
+            <label className="label">QR</label>
+            <input
+              className="input bg-white/5 text-gray-400 cursor-not-allowed"
+              value={form.qrCode}
+              disabled
+            />
+          </div>
+        </div>
+      )}
 
-      <input
-        className="input"
-        placeholder="QR Code"
-        value={form.qrCode}
-        onChange={(e) =>
-          setForm({ ...form, qrCode: e.target.value })
-        }
-      />
+      
 
       <div className="flex gap-3">
         <button
-          onClick={() => onSave(form)}
+          onClick={() => {onSave({
+                              color: form.color,
+                              talla: form.talla,
+                              stock: form.stock,
+                            });
+                          }}
           className="btn-primary flex-1"
         >
           Guardar

@@ -4,6 +4,8 @@ import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/product";
 import mongoose from "mongoose";
 import Inventario from "@/models/inventario";
+import { generarSKU } from "@/utils/generarSKU";
+import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -69,12 +71,72 @@ export async function PUT(request: Request, context: Context) {
       );
     }
 
+    let nuevoSKU = productoAntes.sku;
+
+    // 🔄 Regenerar SKU solo si cambia nombre o modelo
+    if (
+      (data.nombre && data.nombre !== productoAntes.nombre) ||
+      (data.modelo && data.modelo !== productoAntes.modelo)
+    ) {
+      const nombreFinal = data.nombre || productoAntes.nombre;
+      const modeloFinal = data.modelo || productoAntes.modelo;
+
+      nuevoSKU = generarSKU(nombreFinal, modeloFinal);
+
+      const existe = await Producto.findOne({
+        sku: nuevoSKU,
+        _id: { $ne: id },
+      });
+
+      if (existe) {
+        return NextResponse.json(
+          { message: "Ya existe un producto con ese SKU" },
+          { status: 409 }
+        );
+      }
+    }
+    let variantesProcesadas = data.variantes;
+
+    if (Array.isArray(data.variantes)) {
+      variantesProcesadas = data.variantes.map((v: any) => {
+        // Si ya tiene códigos, no tocar
+        if (v.codigoBarra && v.qrCode) return v;
+
+        // Contar cuántas variantes iguales existen
+        const existentes = productoAntes.variantes.filter(
+          (va: any) =>
+            va.color === v.color && va.talla === v.talla
+        );
+
+        const correlativo = existentes.length + 1;
+
+        const { codigoBarra, qrCode } = generarCodigoVariante({
+          sku: nuevoSKU,
+          color: v.color,
+          talla: v.talla,
+          correlativo,
+        });
+
+        return {
+          ...v,
+          codigoBarra,
+          qrCode,
+        };
+      });
+    }
+
     // 2️⃣ Actualizar producto
     const productoDespues = await Producto.findByIdAndUpdate(
       id,
-      data,
+      {
+        ...data,
+        sku: nuevoSKU,
+        variantes: variantesProcesadas,
+      },
       { new: true }
     );
+
+
 
     if (!productoDespues) {
       return NextResponse.json(
@@ -128,7 +190,7 @@ export async function PUT(request: Request, context: Context) {
         });
       }
     }
-
+    
     return NextResponse.json({
       message: "Producto actualizado correctamente",
       producto: productoDespues,

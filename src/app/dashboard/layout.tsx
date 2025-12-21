@@ -1,7 +1,8 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import Sidebar from "@/components/dashboard/Sidebar";
 
 export default function DashboardLayout({
@@ -12,17 +13,26 @@ export default function DashboardLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  if (loading) return null;
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
 
-  if (!user) {
-    router.push("/login");
-    return null;
+  // ⏳ Mientras carga auth o redirige
+  if (loading || !user) {
+    return (
+      <div className="h-screen flex items-center justify-center text-gray-400">
+        Cargando...
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-900 text-white">
+    <div className="flex h-screen bg-slate-900">
       <Sidebar role={user.role} />
-      <main className="flex-1 p-6 overflow-y-auto">
+
+      <main className="flex-1 overflow-y-auto p-6">
         {children}
       </main>
     </div>

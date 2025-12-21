@@ -1,6 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const menu = {
   ADMIN: [
@@ -9,6 +14,7 @@ const menu = {
     { label: "Ventas", href: "/dashboard/admin/ventas" },
     { label: "Inventario", href: "/dashboard/admin/inventario" },
     { label: "Reportes", href: "/dashboard/admin/reportes" },
+    { label: "Usuarios", href: "/dashboard/admin/usuarios" },
   ],
   VENDEDOR: [
     { label: "Dashboard", href: "/dashboard/vendedor" },
@@ -18,25 +24,103 @@ const menu = {
 
 export default function Sidebar({ role }: { role: string }) {
   const items = menu[role as "ADMIN" | "VENDEDOR"] || [];
+  const { logout, user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
 
-  return (
-    <aside className="w-64 bg-slate-950 border-r border-white/10 p-6">
-      <h2 className="text-xl font-bold mb-8 text-cyan-400">
-        Control Ventas
-      </h2>
+  const [openLogout, setOpenLogout] = useState(false);
+  const [openMobile, setOpenMobile] = useState(false);
 
-      <nav className="space-y-4">
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  const SidebarContent = (
+    <aside
+      className="w-64 bg-slate-950 dark:bg-slate-950
+      border-r border-white/10 p-6 flex flex-col h-full"
+    >
+      {/* Usuario */}
+      {user && (
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-full bg-cyan-500/20
+            flex items-center justify-center text-cyan-400 font-bold">
+            {user.fullname.charAt(0).toUpperCase()}
+          </div>
+          <div className="text-sm">
+            <p className="font-semibold">{user.fullname}</p>
+            <p className="text-xs text-gray-400">{user.email}</p>
+            <span className="text-[10px] text-cyan-400">
+              {user.role}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Menu */}
+      <nav className="space-y-3 flex-1">
         {items.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className="block px-4 py-2 rounded-lg 
+            onClick={() => setOpenMobile(false)}
+            className="block px-4 py-2 rounded-lg
               hover:bg-cyan-500/10 hover:text-cyan-400 transition"
           >
             {item.label}
           </Link>
         ))}
       </nav>
+
+      
+      {/* Logout */}
+      <button
+        onClick={() => setOpenLogout(true)}
+        className="px-4 py-2 rounded-lg text-left
+          text-red-400 hover:bg-red-500/10 transition
+          border border-red-500/20"
+      >
+        Cerrar sesión
+      </button>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Mobile button */}
+      <button
+        onClick={() => setOpenMobile(true)}
+        className="md:hidden fixed top-4 left-4 z-40
+        bg-slate-950 border border-white/10 rounded-lg px-3 py-2"
+      >
+        ☰
+      </button>
+
+      {/* Desktop */}
+      <div className="hidden md:block">{SidebarContent}</div>
+
+      {/* Mobile overlay */}
+      {openMobile && (
+        <div className="fixed inset-0 z-50 flex">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setOpenMobile(false)}
+          />
+          <div className="relative z-50 animate-slide-in">
+            {SidebarContent}
+          </div>
+        </div>
+      )}
+
+      {/* Logout modal */}
+      <ConfirmModal
+        open={openLogout}
+        title="¿Cerrar sesión?"
+        description="Se cerrará tu sesión actual."
+        onCancel={() => setOpenLogout(false)}
+        onConfirm={handleLogout}
+      />
+    </>
   );
 }

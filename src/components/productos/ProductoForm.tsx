@@ -13,7 +13,6 @@ export default function ProductoForm({
   const [form, setForm] = useState({
     nombre: initialData?.nombre || "",
     modelo: initialData?.modelo || "",
-    sku: initialData?.sku || "",
     precioVenta: initialData?.precioVenta || 0,
     precioCosto: initialData?.precioCosto || 0,
   });
@@ -78,12 +77,10 @@ export default function ProductoForm({
         <div>
           <label className="label">SKU</label>
           <input
-            className="input"
-            placeholder="SKU-INV-001"
-            value={form.sku}
-            onChange={(e) => setForm({ ...form, sku: e.target.value })}
-            required
-          />
+              className="input bg-white/5 text-gray-400"
+              value={initialData?.sku || ""}
+              disabled
+            />
         </div>
 
       </div>
