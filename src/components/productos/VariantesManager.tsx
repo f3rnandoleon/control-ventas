@@ -5,6 +5,9 @@ import { Variante, Producto } from "@/types/producto";
 import VarianteForm from "./VarianteForm";
 import VarianteRow from "./VarianteRow";
 import { updateProducto } from "@/services/producto.service";
+import { getQRUrl } from "@/utils/qr";
+import { generarPDFQrs } from "@/utils/generarPDFQrs";
+import { generarPDFCodigosBarras } from "@/utils/generarPDFCodigosBarras";
 
 type Mode = "LIST" | "ADD" | "EDIT";
 
@@ -87,12 +90,55 @@ export default function VariantesManager({
           Variantes
         </h3>
 
-        <button
-          className="btn-primary px-4 py-2"
-          onClick={() => setMode("ADD")}
-        >
-          + Agregar variante
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="btn-primary px-4 py-2"
+            onClick={() => setMode("ADD")}
+          >
+            + Agregar variante
+          </button>
+
+          <button
+            className="btn-primary px-4 py-2"
+            onClick={() => {
+              const variantesConQR = producto.variantes
+                .filter((v) => v.qrCode)
+                .map((v) => ({
+                  codigo: v.qrCode!,
+                }));
+
+              if (variantesConQR.length === 0) return;
+
+              generarPDFQrs(
+                variantesConQR,
+                `QR Variantes - ${producto.nombre}`
+              );
+            }}
+          >
+            Generar QR de todas
+          </button>
+          <button
+            className="btn-primary px-4 py-2"
+            onClick={() => {
+              const variantesConCodigo = producto.variantes
+                .filter((v) => v.codigoBarra)
+                .map((v) => ({
+                  codigo: v.codigoBarra!,
+                }));
+
+              if (variantesConCodigo.length === 0) return;
+
+              generarPDFCodigosBarras(
+                variantesConCodigo,
+                `Códigos de barras - ${producto.nombre}`
+              );
+            }}
+          >
+            Generar códigos de barras
+          </button>
+
+        </div>
+
       </div>
 
       {/* Empty state */}
