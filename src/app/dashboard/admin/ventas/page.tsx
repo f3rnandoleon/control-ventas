@@ -8,12 +8,13 @@ import VentaPOS from "@/components/ventas/VentaPOS";
 import { useAuth } from "@/context/AuthContext";
 import VentaTable from "@/components/ventas/VentaTable";
 import VentaDetalleModal from "@/components/ventas/VentaDetalleModal";
+import { Producto } from "@/types/producto";
 
 export default function AdminVentasPage() {
   const { loading: authLoading } = useAuth();
 
   const [ventas, setVentas] = useState<Venta[]>([]);
-  const [productos, setProductos] = useState<any[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(null);
   const load = async () => {

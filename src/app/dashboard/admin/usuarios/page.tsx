@@ -8,13 +8,12 @@ import {
 } from "@/services/usuario.service";
 import UsuarioTable from "@/components/usuarios/UsuarioTable";
 import UsuarioModal from "@/components/usuarios/UsuarioModal";
-import { Usuario } from "@/types/usuario";
+import { Usuario,CreateUsuarioDTO,UpdateUsuarioDTO } from "@/types/usuario";
 
 export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editing, setEditing] = useState<Usuario | null>(null);
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
   const load = async () => {
@@ -25,29 +24,35 @@ export default function AdminUsuariosPage() {
     load();
   }, []);
 
-  const handleSave = async (data: any) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const handleSave = async (
+      data: CreateUsuarioDTO | UpdateUsuarioDTO
+    ) => {
+      try {
+        setLoading(true);
 
-      if (editing) {
-        await updateUsuario(editing._id, data);
-        toast.success("Usuario actualizado correctamente");
-      } else {
-        await createUsuario(data);
-        toast.success("Usuario creado correctamente");
+        if (editing) {
+          await updateUsuario(editing._id, data);
+          toast.success("Usuario actualizado correctamente");
+        } else {
+          await createUsuario(data as CreateUsuarioDTO);
+          toast.success("Usuario creado correctamente");
+        }
+
+        setOpen(false);
+        setEditing(null);
+        load();
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Error al guardar usuario";
+
+        toast.error(message);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setOpen(false);
-      setEditing(null);
-      load();
-    } catch (err: any) {
-      toast.error(err.message || "Error al guardar usuario");
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
 
   return (
@@ -59,7 +64,6 @@ export default function AdminUsuariosPage() {
         onClick={() => {
           setEditing(null);
           setOpen(true);
-          setError(null);
         }}
       >
         + Nuevo usuario
@@ -70,7 +74,6 @@ export default function AdminUsuariosPage() {
         onEdit={(u) => {
           setEditing(u);
           setOpen(true);
-          setError(null);
         }}
       />
 
@@ -80,10 +83,8 @@ export default function AdminUsuariosPage() {
         onClose={() => {
           setOpen(false);
           setEditing(null);
-          setError(null);
         }}
         onSave={handleSave}
-        error={error}
         loading={loading}
       />
     </div>

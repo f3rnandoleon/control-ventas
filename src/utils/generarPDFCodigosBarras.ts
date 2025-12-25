@@ -30,7 +30,7 @@ export function generarPDFCodigosBarras(
 
   doc.setFontSize(9);
 
-  variantes.forEach((v, index) => {
+  variantes.forEach((v) => {
     // Texto encima
     doc.text(v.codigo, x, y - 4);
 

@@ -34,7 +34,28 @@ export interface Venta {
   createdAt: string;
 
   vendedor?: {
+    _id: string;
     fullname: string;
     email: string;
   };
+}
+export interface VentaFormItem {
+  productoId: string;
+  productoNombre?: string;
+  color: string;
+  talla: string;
+  stockDisponible: number;
+  cantidad: number;
+}
+export interface CreateVentaItemDTO {
+  productoId: string;
+  color: string;
+  talla: string;
+  cantidad: number;
+}
+
+export interface CreateVentaDTO {
+  items: CreateVentaItemDTO[];
+  metodoPago: "EFECTIVO" | "QR";
+  tipoVenta: "WEB" | "APP_QR" | "TIENDA";
 }

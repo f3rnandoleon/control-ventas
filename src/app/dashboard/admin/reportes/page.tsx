@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { getVentas } from "@/services/venta.service";
-import { getProductos } from "@/services/producto.service";
 import ReportesResumen from "@/components/reportes/ReportesResumen";
 import VentasPorFechaChart from "@/components/reportes/VentasPorFechaChart";
-import ProductosMasVendidos from "@/components/reportes/ProductosMasVendidos";
 import ReportesFiltros from "@/components/reportes/ReportesFiltros";
 import ComparativaMensualChart from "@/components/reportes/ComparativaMensualChart";
+import { Venta } from "@/types/venta";
 
 export default function AdminReportesPage() {
-  const [ventas, setVentas] = useState<any[]>([]);
-  const [productos, setProductos] = useState<any[]>([]);
+  const [ventas, setVentas] = useState<Venta[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [metodo, setMetodo] = useState("");
@@ -19,7 +17,6 @@ export default function AdminReportesPage() {
   useEffect(() => {
     const load = async () => {
       setVentas(await getVentas());
-      setProductos(await getProductos());
     };
     load();
   }, []);
@@ -44,7 +41,7 @@ export default function AdminReportesPage() {
   `${date.getFullYear()}-${date.getMonth()}`;
 
   // Ventas por fecha
-  const ventasPorFecha = ventas.reduce((acc: any, v) => {
+  const ventasPorFecha = ventas.reduce<Record<string, number>>((acc, v) => {
     const fecha = new Date(v.createdAt).toLocaleDateString();
     acc[fecha] = (acc[fecha] || 0) + v.total;
     return acc;
@@ -56,13 +53,7 @@ export default function AdminReportesPage() {
   }));
 
   // Top productos
-  const topProductos = [...productos]
-    .sort((a, b) => b.totalVendidos - a.totalVendidos)
-    .slice(0, 5)
-    .map((p) => ({
-      nombre: p.nombre,
-      totalVendidos: p.totalVendidos,
-    }));
+  
     const now = new Date();
     const currentMonthKey = getMonthKey(now);
 
@@ -74,7 +65,7 @@ export default function AdminReportesPage() {
     const lastMonthKey = getMonthKey(lastMonthDate);
 
     const mensual = ventas.reduce(
-      (acc: any, v) => {
+      (acc: { actual: number; anterior: number }, v) => {
         const key = getMonthKey(new Date(v.createdAt));
         if (key === currentMonthKey) acc.actual += v.total;
         if (key === lastMonthKey) acc.anterior += v.total;

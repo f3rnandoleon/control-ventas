@@ -1,4 +1,4 @@
-import { Usuario } from "@/types/usuario";
+import { Usuario,CreateUsuarioDTO,UpdateUsuarioDTO } from "@/types/usuario";
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
@@ -25,63 +25,36 @@ export async function getUsuarios(): Promise<Usuario[]> {
 /* ============================
    Crear usuario
 ============================ */
-export async function createUsuario(data: {
-  fullname: string;
-  email: string;
-  role: string;
-  password: string;
-  isActive?: boolean;
-}) {
-  if (!data.password || data.password.trim() === "") {
-    throw new Error("La contraseña es obligatoria");
-  }
-
+export async function createUsuario(data: CreateUsuarioDTO) {
   const res = await fetch("/api/usuarios", {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
 
-  const result = await res.json();
-
   if (!res.ok) {
-    throw new Error(result.message || "Error al crear usuario");
+    const err = await res.json();
+    throw new Error(err.message || "Error al crear usuario");
   }
 
-  return result;
+  return res.json();
 }
 
 /* ============================
    Actualizar usuario
 ============================ */
-export async function updateUsuario(
-  id: string,
-  data: Partial<{
-    fullname: string;
-    email: string;
-    role: string;
-    isActive: boolean;
-    password: string;
-  }>
-): Promise<Usuario> {
-  // 🔐 eliminar password vacío si existe
-  const payload: any = { ...data };
-
-  if (!payload.password || payload.password.trim() === "") {
-    delete payload.password;
-  }
-
+export async function updateUsuario(id: string, data: UpdateUsuarioDTO) {
   const res = await fetch(`/api/usuarios/${id}`, {
     method: "PUT",
     headers: authHeaders(),
-    body: JSON.stringify(payload),
+    body: JSON.stringify(data),
   });
 
-  const result = await res.json();
-
   if (!res.ok) {
-    throw new Error(result.message || "Error al actualizar usuario");
+    const err = await res.json();
+    throw new Error(err.message || "Error al actualizar usuario");
   }
 
-  return result;
+  return res.json();
 }
+

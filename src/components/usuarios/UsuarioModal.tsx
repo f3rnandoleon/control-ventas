@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Usuario, UserRole } from "@/types/usuario";
+import { Usuario, UserRole,CreateUsuarioDTO,UpdateUsuarioDTO } from "@/types/usuario";
 
 interface FormState {
   fullname: string;
   email: string;
   role: UserRole;
   isActive: boolean;
-  password?: string;
+  password: string;
 }
 
 export default function UsuarioModal({
@@ -16,14 +16,12 @@ export default function UsuarioModal({
   onClose,
   initialData,
   onSave,
-  error,
   loading,
 }: {
   open: boolean;
   onClose: () => void;
   initialData?: Usuario | null;
-  onSave: (data: FormState) => void;
-  error?: string | null;
+  onSave: (data: CreateUsuarioDTO | UpdateUsuarioDTO) => void;
   loading?: boolean;
 
 }) {
@@ -66,12 +64,24 @@ export default function UsuarioModal({
   const handleSave = () => {
     if (!validate()) return;
 
-    const payload: any = {
-      fullname: form.fullname,
-      email: form.email,
-      role: form.role,
-      isActive: form.isActive,
-    };
+    const payload: CreateUsuarioDTO | UpdateUsuarioDTO = initialData
+      ? {
+          fullname: form.fullname,
+          email: form.email,
+          role: form.role,
+          isActive: form.isActive,
+          ...(form.password
+            ? { password: form.password }
+            : {}),
+        }
+      : {
+          fullname: form.fullname,
+          email: form.email,
+          role: form.role,
+          isActive: form.isActive,
+          password: form.password!, // 🔑 obligatorio al crear
+        };
+
 
     if (form.password && form.password.trim() !== "") {
       payload.password = form.password;

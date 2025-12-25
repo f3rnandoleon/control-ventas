@@ -45,10 +45,16 @@ export default function VentaPOS({
       setLoading(true);
 
       await createVenta({
-        items,
+        items: items.map(({ productoId, color, talla, cantidad }) => ({
+          productoId,
+          color,
+          talla,
+          cantidad,
+        })),
         metodoPago,
         tipoVenta: "TIENDA",
       });
+
 
       setItems([]);
       setToast({
@@ -57,9 +63,14 @@ export default function VentaPOS({
       });
 
       onSuccess();
-    } catch (error: any) {
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Error al registrar venta";
+
       setToast({
-        message: error.message || "Error al registrar venta",
+        message,
         type: "error",
       });
     } finally {

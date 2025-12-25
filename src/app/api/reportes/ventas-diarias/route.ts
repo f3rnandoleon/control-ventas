@@ -21,7 +21,8 @@ export async function GET() {
     ]);
 
     return NextResponse.json(ventas);
-  } catch (error) {
+  } catch (err) {
+    console.error("ERROR:", err);
     return NextResponse.json(
       { message: "Error en reporte diario" },
       { status: 500 }

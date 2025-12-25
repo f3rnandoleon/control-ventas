@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
 import "@/models/user"; 
-
+import type { Variante } from "@/types/producto";
 import Producto from "@/models/product";
 import Inventario from "@/models/inventario";
 import mongoose from "mongoose";
@@ -51,8 +51,8 @@ export async function POST(request: Request) {
         );
       }
 
-      const variante = producto.variantes.find(
-        (v: any) =>
+      const variante = (producto.variantes as Variante[]).find(
+        (v) =>
           v.color === item.color && v.talla === item.talla
       );
 
@@ -139,8 +139,8 @@ export async function POST(request: Request) {
       { message: "Venta registrada correctamente", venta },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("VENTA ERROR:", error);
+  } catch (err) {
+    console.error("VENTA ERROR:", err);
     return NextResponse.json(
       { message: "Error al registrar la venta" },
       { status: 500 }
@@ -157,7 +157,8 @@ export async function GET() {
       .sort({ createdAt: -1 });
 
     return NextResponse.json(ventas);
-  } catch (error) {
+  } catch (err) {
+    console.error("ERROR:", err);
     return NextResponse.json(
       { message: "Error al obtener ventas" },
       { status: 500 }

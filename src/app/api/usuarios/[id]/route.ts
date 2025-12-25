@@ -3,49 +3,68 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
+import type { Usuario, UserRole } from "@/types/usuario";
+
+type UpdateUsuarioDTO = {
+  fullname?: string;
+  email?: string;
+  role?: UserRole;
+  isActive?: boolean;
+  password?: string;
+};
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const headersList = await headers();
-  const role = headersList.get("x-user-role");
+  try {
+    const { id } = await params;
 
-  if (role !== "ADMIN") {
+    const headersList = await headers();
+    const role = headersList.get("x-user-role");
+
+    if (role !== "ADMIN") {
+      return NextResponse.json(
+        { message: "No autorizado" },
+        { status: 403 }
+      );
+    }
+
+    const data: UpdateUsuarioDTO = await request.json();
+
+    await connectDB();
+
+    const updateData: Partial<Usuario & { password: string }> = {
+      fullname: data.fullname,
+      email: data.email,
+      role: data.role,
+      isActive: data.isActive,
+    };
+
+    // 🔐 SOLO actualizar password si viene y no está vacío
+    if (data.password && data.password.trim() !== "") {
+      updateData.password = await bcrypt.hash(data.password, 12);
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(user);
+  } catch (err) {
+    console.error("PUT usuario error:", err);
     return NextResponse.json(
-      { message: "No autorizado" },
-      { status: 403 }
+      { message: "Error al actualizar usuario" },
+      { status: 500 }
     );
   }
-
-  const data = await request.json();
-
-  await connectDB();
-
-  const updateData: any = {
-    fullname: data.fullname,
-    email: data.email,
-    role: data.role,
-    isActive: data.isActive,
-  };
-
-  // 🔐 SOLO actualizar password si viene y no está vacío
-  if (data.password && data.password.trim() !== "") {
-    updateData.password = await bcrypt.hash(data.password, 12);
-  }
-
-  const user = await User.findByIdAndUpdate(
-    params.id,
-    updateData,
-    { new: true }
-  ).select("-password");
-
-  if (!user) {
-    return NextResponse.json(
-      { message: "Usuario no encontrado" },
-      { status: 404 }
-    );
-  }
-
-  return NextResponse.json(user);
 }

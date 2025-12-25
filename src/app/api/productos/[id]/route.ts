@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import Inventario from "@/models/inventario";
 import { generarSKU } from "@/utils/generarSKU";
 import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
+import type { Variante } from "@/types/producto";
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -28,7 +29,8 @@ export async function GET(
     }
 
     return NextResponse.json(producto);
-  } catch (error) {
+  } catch (err) {
+    console.error("ERROR:", err);
     return NextResponse.json(
       { message: "Error al obtener producto" },
       { status: 500 }
@@ -98,13 +100,13 @@ export async function PUT(request: Request, context: Context) {
     let variantesProcesadas = data.variantes;
 
     if (Array.isArray(data.variantes)) {
-      variantesProcesadas = data.variantes.map((v: any) => {
+      variantesProcesadas = (data.variantes as Variante[]).map((v) => {
         // Si ya tiene códigos, no tocar
         if (v.codigoBarra && v.qrCode) return v;
 
         // Contar cuántas variantes iguales existen
-        const existentes = productoAntes.variantes.filter(
-          (va: any) =>
+        const existentes = (productoAntes.variantes as Variante[]).filter(
+          (va) =>
             va.color === v.color && va.talla === v.talla
         );
 
@@ -147,8 +149,8 @@ export async function PUT(request: Request, context: Context) {
 
     // 3️⃣ Comparar variantes (MISMO PATRÓN QUE VENTAS)
     for (const vNueva of productoDespues.variantes) {
-      const vAnterior = productoAntes.variantes.find(
-        (v: any) =>
+      const vAnterior = (productoAntes.variantes as Variante[]).find(
+        (v) =>
           v.color === vNueva.color && v.talla === vNueva.talla
       );
 
@@ -195,8 +197,8 @@ export async function PUT(request: Request, context: Context) {
       message: "Producto actualizado correctamente",
       producto: productoDespues,
     });
-  } catch (error) {
-    console.error("PUT productos error:", error);
+  } catch (err) {
+    console.error("PUT productos error:", err);
     return NextResponse.json(
       { message: "Error al actualizar producto" },
       { status: 500 }
@@ -234,7 +236,8 @@ export async function DELETE(
     return NextResponse.json(
       { message: "Producto eliminado correctamente" }
     );
-  } catch (error) {
+  } catch (err) {
+    console.error("ERROR:", err);
     return NextResponse.json(
       { message: "Error al eliminar producto" },
       { status: 500 }

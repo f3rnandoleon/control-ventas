@@ -2,12 +2,15 @@
 
 import { Producto } from "@/types/producto";
 
+import type { VentaFormItem } from "@/types/venta";
+
 interface Props {
-  item: any;
+  item: VentaFormItem;
   productos: Producto[];
-  onChange: (data: any) => void;
+  onChange: (data: VentaFormItem) => void;
   onRemove: () => void;
 }
+
 
 export default function VentaItemRow({
   item,

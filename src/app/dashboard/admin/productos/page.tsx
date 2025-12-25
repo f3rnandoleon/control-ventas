@@ -32,14 +32,17 @@ export default function AdminProductosPage() {
   }, []);
 
   const handleSave = async (data: Partial<Producto>) => {
-    editing
-      ? await updateProducto(editing._id, data)
-      : await createProducto(data);
+    if (editing) {
+      await updateProducto(editing._id, data);
+    } else {
+      await createProducto(data);
+    }
 
     setModalOpen(false);
     setEditing(null);
-    loadProductos();
+    await loadProductos();
   };
+
 
   return (
     <div className="space-y-6">

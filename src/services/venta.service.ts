@@ -1,11 +1,11 @@
-import { Venta } from "@/types/venta";
+import { CreateVentaDTO, Venta } from "@/types/venta";
 
 const authHeaders = () => ({
   "Content-Type": "application/json",
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
 
-export async function createVenta(data: any) {
+export async function createVenta(data: CreateVentaDTO) {
   const res = await fetch("/api/ventas", {
     method: "POST",
     headers: authHeaders(),

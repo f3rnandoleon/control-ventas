@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import Inventario from "@/models/inventario";
 import Producto from "@/models/product";
+import type { Variante } from "@/types/producto";
 
 export async function GET() {
   try {
@@ -76,9 +77,10 @@ export async function POST(request: Request) {
     }
 
     // 2️⃣ Leer variante real
-    const variante = producto.variantes.find(
-      (v: any) => v.color === color && v.talla === talla
+    const variante = (producto.variantes as Variante[]).find(
+      (v) => v.color === color && v.talla === talla
     );
+
 
     if (!variante) {
       return NextResponse.json(

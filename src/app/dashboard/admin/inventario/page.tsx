@@ -6,17 +6,16 @@ import { InventarioItem } from "@/types/inventario";
 import InventarioTable from "@/components/inventario/InventarioTable";
 import InventarioResumen from "@/components/inventario/InventarioResumen";
 import StockPorProductoChart from "@/components/inventario/StockPorProductoChart";
-import { getProductos } from "@/services/producto.service";
+import { getProductosInventario } from "@/services/inventario.service";
+import type { ProductoInventario } from "@/types/inventario";
 
 export default function AdminInventarioPage() {
   const [items, setItems] = useState<InventarioItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [productos, setProductos] = useState<any[]>([]);
-
+  const [productos, setProductos] = useState<ProductoInventario[]>([]);
   const load = async () => {
-    
     setLoading(true);
-    setProductos(await getProductos());
+    setProductos(await getProductosInventario());
     setItems(await getInventario());
     setLoading(false);
   };

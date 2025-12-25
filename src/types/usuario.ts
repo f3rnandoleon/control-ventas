@@ -8,3 +8,20 @@ export interface Usuario {
   isActive: boolean;
   createdAt: string;
 }
+
+export type CreateUsuarioDTO = {
+  fullname: string;
+  email: string;
+  role: UserRole;
+  isActive?: boolean;
+  password: string; // 🔴 OBLIGATORIO
+};
+
+export type UpdateUsuarioDTO = {
+  fullname?: string;
+  email?: string;
+  role?: UserRole;
+  isActive?: boolean;
+  password?: string; // 🟢 OPCIONAL
+};
+

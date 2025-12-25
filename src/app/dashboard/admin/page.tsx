@@ -2,20 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { getVentas } from "@/services/venta.service";
-import { getProductos } from "@/services/producto.service";
 import DashboardStats from "@/components/dashboard/DashboardStats";
 import VentasRecientes from "@/components/dashboard/VentasRecientes";
 import TopProductosDashboard from "@/components/dashboard/TopProductosDashboard";
 import StockCritico from "@/components/dashboard/StockCritico";
+import { ProductoInventario } from "@/types/inventario";
+import { getProductosInventario } from "@/services/inventario.service";
+import { Venta } from "@/types/venta";
+
 
 export default function AdminDashboardPage() {
-  const [ventas, setVentas] = useState<any[]>([]);
-  const [productos, setProductos] = useState<any[]>([]);
+  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [productos, setProductos] = useState<ProductoInventario[]>([]);
 
   useEffect(() => {
     const load = async () => {
       setVentas(await getVentas());
-      setProductos(await getProductos());
+      setProductos(await getProductosInventario());
     };
     load();
   }, []);

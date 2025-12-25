@@ -4,11 +4,12 @@ import Venta from "@/models/venta";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
-    const venta = await Venta.findById(params.id)
+    const { id } = await params;
+    const venta = await Venta.findById(id)
       .populate("vendedor", "fullname email");
 
     if (!venta) {
@@ -19,7 +20,8 @@ export async function GET(
     }
 
     return NextResponse.json(venta);
-  } catch (error) {
+  } catch (err) {
+    console.error("ERROR:", err);
     return NextResponse.json(
       { message: "Error al obtener venta" },
       { status: 500 }

@@ -16,7 +16,7 @@ export default function VendedorDashboardPage() {
     const load = async () => {
       const allVentas = await getVentas();
       const propias = allVentas.filter(
-        (v: any) => v.vendedor?._id === user?.id
+        (v) => v.vendedor?._id === user?.id
       );
       setVentas(propias);
     };

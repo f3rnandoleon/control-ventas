@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const menu = {
@@ -25,7 +24,6 @@ const menu = {
 export default function Sidebar({ role }: { role: string }) {
   const items = menu[role as "ADMIN" | "VENDEDOR"] || [];
   const { logout, user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
 
   const [openLogout, setOpenLogout] = useState(false);

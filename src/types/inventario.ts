@@ -1,3 +1,4 @@
+import type { Producto } from "./producto";
 export interface InventarioItem {
   _id: string;
 
@@ -27,4 +28,8 @@ export interface InventarioItem {
   };
 
   createdAt: string;
+}
+export interface ProductoInventario extends Producto {
+  stockTotal: number;
+  stockMinimo: number;
 }

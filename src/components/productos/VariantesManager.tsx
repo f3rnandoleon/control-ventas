@@ -5,7 +5,6 @@ import { Variante, Producto } from "@/types/producto";
 import VarianteForm from "./VarianteForm";
 import VarianteRow from "./VarianteRow";
 import { updateProducto } from "@/services/producto.service";
-import { getQRUrl } from "@/utils/qr";
 import { generarPDFQrs } from "@/utils/generarPDFQrs";
 import { generarPDFCodigosBarras } from "@/utils/generarPDFCodigosBarras";
 
