@@ -19,26 +19,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Error al iniciar sesión");
-        return;
-      }
-
-      login(data);
-
-      if (data.user.role === "ADMIN") router.push("/dashboard/admin");
-      else if (data.user.role === "VENDEDOR") router.push("/dashboard/vendedor");
-      else router.push("/");
-    } catch {
-      setError("Error de conexión");
+      await login(email, password);
+      // La redirección se maneja en AuthContext
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
       setLoading(false);
     }

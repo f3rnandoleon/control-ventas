@@ -1,14 +1,9 @@
 import { CreateVentaDTO, Venta } from "@/types/venta";
 
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-});
-
 export async function createVenta(data: CreateVentaDTO) {
   const res = await fetch("/api/ventas", {
     method: "POST",
-    headers: authHeaders(),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 
@@ -21,9 +16,7 @@ export async function createVenta(data: CreateVentaDTO) {
 }
 
 export async function getVentas(): Promise<Venta[]> {
-  const res = await fetch("/api/ventas", {
-    headers: authHeaders(),
-  });
+  const res = await fetch("/api/ventas");
 
   if (!res.ok) throw new Error("Error al obtener ventas");
   return res.json();
