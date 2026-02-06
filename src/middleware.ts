@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose";
+import { getToken } from "next-auth/jwt";
 
 const protectedRoutes = [
   "/api/productos",
@@ -10,18 +10,15 @@ const protectedRoutes = [
   "/api/usuarios",
 ];
 
-const adminRoutes = ["/api/reportes","/api/usuarios",];
-const staffRoutes = [
-  "/api/productos",
-  "/api/ventas",
-  "/api/inventario",
-];
+const adminRoutes = ["/api/reportes", "/api/usuarios"];
+const staffRoutes = ["/api/productos", "/api/ventas", "/api/inventario"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Permitir rutas de autenticación de NextAuth
   if (
-    pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/auth/signup")
   ) {
     return NextResponse.next();
@@ -33,69 +30,51 @@ export async function middleware(request: NextRequest) {
 
   if (!isProtected) return NextResponse.next();
 
-  const authHeader = request.headers.get("authorization");
+  // 🔐 Obtener token de NextAuth desde cookies httpOnly
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
-  if (!authHeader?.startsWith("Bearer ")) {
+  if (!token) {
     return NextResponse.json(
-      { message: "Token no proporcionado" },
+      { message: "No autenticado. Por favor inicia sesión." },
       { status: 401 }
     );
   }
 
-  const token = authHeader.split(" ")[1];
+  const role = token.role as string;
+  const userId = token.id as string;
 
-  try {
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-      throw new Error("JWT_SECRET no definido");
-    }
-
-    // 🔐 Verificar JWT (EDGE compatible)
-    const { payload } = await jwtVerify(
-      token,
-      new TextEncoder().encode(secret)
-    );
-
-    const role = payload.role as string;
-    const userId = payload.id as string;
-
-    // 🧑‍💼 Roles
-    if (
-      adminRoutes.some((route) => pathname.startsWith(route)) &&
-      role !== "ADMIN"
-    ) {
-      return NextResponse.json(
-        { message: "Acceso solo para ADMIN" },
-        { status: 403 }
-      );
-    }
-
-    if (
-      staffRoutes.some((route) => pathname.startsWith(route)) &&
-      !["ADMIN", "VENDEDOR"].includes(role)
-    ) {
-      return NextResponse.json(
-        { message: "Acceso no autorizado" },
-        { status: 403 }
-      );
-    }
-
-    // 🔄 Pasar datos al backend
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-user-id", userId);
-    requestHeaders.set("x-user-role", role);
-
-    return NextResponse.next({
-      request: { headers: requestHeaders },
-    });
-  } catch (error) {
-    console.error("JWT ERROR:", error);
+  // 🧑‍💼 Verificar permisos por rol
+  if (
+    adminRoutes.some((route) => pathname.startsWith(route)) &&
+    role !== "ADMIN"
+  ) {
     return NextResponse.json(
-      { message: "Token inválido o expirado" },
-      { status: 401 }
+      { message: "Acceso solo para ADMIN" },
+      { status: 403 }
     );
   }
+
+  if (
+    staffRoutes.some((route) => pathname.startsWith(route)) &&
+    !["ADMIN", "VENDEDOR"].includes(role)
+  ) {
+    return NextResponse.json(
+      { message: "Acceso no autorizado" },
+      { status: 403 }
+    );
+  }
+
+  // 🔄 Pasar datos del usuario a los API routes
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-user-id", userId);
+  requestHeaders.set("x-user-role", role);
+
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 }
 
 export const config = {

@@ -51,16 +51,15 @@ export async function POST(request: Request) {
 
     await user.save();
 
-    // 🧹 Respuesta limpia
+    // 🧹 Respuesta limpia (sin token - debe hacer login después)
     return NextResponse.json(
       {
-        message: "Usuario creado correctamente",
+        message: "Usuario creado correctamente. Por favor inicia sesión.",
         user: {
           id: user._id,
           email: user.email,
           fullname: user.fullname,
           role: user.role,
-          createdAt: user.createdAt,
         },
       },
       { status: 201 }
