@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
-import "@/models/user"; 
+import "@/models/user";
 import type { Variante } from "@/types/producto";
 import Producto from "@/models/product";
 import Inventario from "@/models/inventario";
 import mongoose from "mongoose";
+import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import { createVentaSchema } from "@/schemas/venta.schema";
 export async function POST(request: Request) {
   try {
     const headersList = await headers();
@@ -20,15 +22,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    const { items, metodoPago, tipoVenta, descuento = 0, impuesto = 0 } = body;
+    // Validar datos con Zod
+    const validation = await validateRequest(createVentaSchema, request);
 
-    if (!items || items.length === 0) {
-      return NextResponse.json(
-        { message: "La venta debe tener al menos un producto" },
-        { status: 400 }
-      );
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors);
     }
+
+    const { items, metodoPago, tipoVenta, descuento = 0 } = validation.data;
+    const impuesto = 0; // Puedes agregar esto al schema si lo necesitas
 
     await connectDB();
 
@@ -37,12 +39,12 @@ export async function POST(request: Request) {
 
     // 🔹 Validar productos y calcular totales
     for (const item of items) {
-        if (!mongoose.Types.ObjectId.isValid(item.productoId)) {
+      if (!mongoose.Types.ObjectId.isValid(item.productoId)) {
         return NextResponse.json(
-            { message: "ID de producto inválido" },
-            { status: 400 }
+          { message: "ID de producto inválido" },
+          { status: 400 }
         );
-        }
+      }
       const producto = await Producto.findById(item.productoId);
       if (!producto) {
         return NextResponse.json(
@@ -100,20 +102,20 @@ export async function POST(request: Request) {
       producto.totalVendidos += item.cantidad;
       await producto.save();
 
-      // Guardar datos calculados en el item
-        item.variante = {
+      // Guardar datos calculados en el item (usar any para evitar errores de tipo)
+      (item as any).variante = {
         color: item.color,
         talla: item.talla,
-        };
+      };
 
-        item.precioUnitario = precioUnitario;
-        item.precioCosto = precioCosto;
-        item.ganancia =
+      (item as any).precioUnitario = precioUnitario;
+      (item as any).precioCosto = precioCosto;
+      (item as any).ganancia =
         (precioUnitario - precioCosto) * item.cantidad;
 
-        // Limpieza opcional (recomendado)
-        delete item.color;
-        delete item.talla;
+      // Limpieza opcional (recomendado)
+      delete (item as any).color;
+      delete (item as any).talla;
     }
 
     const total = subtotal - descuento + impuesto;

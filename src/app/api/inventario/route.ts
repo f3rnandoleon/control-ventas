@@ -6,6 +6,8 @@ import { connectDB } from "@/libs/mongodb";
 import Inventario from "@/models/inventario";
 import Producto from "@/models/product";
 import type { Variante } from "@/types/producto";
+import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import { ajusteStockSchema } from "@/schemas/inventario.schema";
 
 export async function GET() {
   try {
@@ -47,23 +49,15 @@ export async function POST(request: Request) {
 
     const userId = new mongoose.Types.ObjectId(userIdRaw);
 
-    const { productoId, color, talla, cantidad, tipo, motivo } =
-      await request.json();
+    // Validar datos con Zod
+    const validation = await validateRequest(ajusteStockSchema, request);
 
-    if (!mongoose.Types.ObjectId.isValid(productoId)) {
-      return NextResponse.json(
-        { message: "ID de producto inválido" },
-        { status: 400 }
-      );
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors);
     }
 
-    const qty = Number(cantidad);
-    if (!qty || qty <= 0) {
-      return NextResponse.json(
-        { message: "Cantidad inválida" },
-        { status: 400 }
-      );
-    }
+    const { productoId, color, talla, cantidad, tipo, motivo } = validation.data;
+    const qty = Math.abs(cantidad); // Usar valor absoluto
 
     await connectDB();
 
