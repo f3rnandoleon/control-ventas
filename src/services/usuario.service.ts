@@ -1,17 +1,10 @@
-import { Usuario,CreateUsuarioDTO,UpdateUsuarioDTO } from "@/types/usuario";
-
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-});
+import { Usuario, CreateUsuarioDTO, UpdateUsuarioDTO } from "@/types/usuario";
 
 /* ============================
    Obtener usuarios
 ============================ */
 export async function getUsuarios(): Promise<Usuario[]> {
-  const res = await fetch("/api/usuarios", {
-    headers: authHeaders(),
-  });
+  const res = await fetch("/api/usuarios");
 
   const data = await res.json();
 
@@ -28,7 +21,7 @@ export async function getUsuarios(): Promise<Usuario[]> {
 export async function createUsuario(data: CreateUsuarioDTO) {
   const res = await fetch("/api/usuarios", {
     method: "POST",
-    headers: authHeaders(),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 
@@ -46,7 +39,7 @@ export async function createUsuario(data: CreateUsuarioDTO) {
 export async function updateUsuario(id: string, data: UpdateUsuarioDTO) {
   const res = await fetch(`/api/usuarios/${id}`, {
     method: "PUT",
-    headers: authHeaders(),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 

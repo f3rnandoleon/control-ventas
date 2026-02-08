@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
+import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import { createUsuarioSchema } from "@/schemas/usuario.schema";
 
 export async function GET() {
   const headersList = await headers();
@@ -34,18 +36,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
-  const { email, fullname, role: userRole, password } = body;
+  // Validar datos con Zod
+  const validation = await validateRequest(createUsuarioSchema, request);
 
-  if (!password || password.trim() === "") {
-    return NextResponse.json(
-      { message: "La contraseña es obligatoria" },
-      { status: 400 }
-    );
+  if (!validation.success) {
+    return validationErrorResponse(validation.errors);
   }
+
+  const { email, fullname, role: userRole, password, isActive } = validation.data;
 
   await connectDB();
 
+  // Verificar si el email ya existe
   const exists = await User.findOne({ email });
   if (exists) {
     return NextResponse.json(
@@ -54,13 +56,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // Hash de la contraseña
   const hash = await bcrypt.hash(password, 12);
 
+  // Crear usuario
   const user = await User.create({
     email,
     fullname,
     role: userRole,
     password: hash,
+    isActive,
   });
 
   return NextResponse.json(

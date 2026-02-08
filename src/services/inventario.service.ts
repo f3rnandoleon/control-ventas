@@ -1,14 +1,7 @@
 import type { ProductoInventario } from "@/types/inventario";
 
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-});
-
 export async function getInventario() {
-  const res = await fetch("/api/inventario", {
-    headers: authHeaders(),
-  });
+  const res = await fetch("/api/inventario");
 
   if (!res.ok) {
     throw new Error("Error al obtener inventario");
@@ -18,9 +11,7 @@ export async function getInventario() {
 }
 
 export async function getProductosInventario(): Promise<ProductoInventario[]> {
-  const res = await fetch("/api/productos?withStock=true", {
-    headers: authHeaders(),
-  });
+  const res = await fetch("/api/productos?withStock=true");
 
   if (!res.ok) {
     throw new Error("Error al obtener productos con stock");

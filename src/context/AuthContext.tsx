@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 interface User {
   id: string;
@@ -11,47 +13,63 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: (data: { token: string; user: User }) => void;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
+  const loading = status === "loading";
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+  const user: User | null = session?.user
+    ? {
+      id: session.user.id,
+      email: session.user.email,
+      fullname: session.user.fullname,
+      role: session.user.role,
+    }
+    : null;
+
+  const login = async (email: string, password: string) => {
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      throw new Error(result.error);
     }
 
-    setLoading(false);
-  }, []);
+    if (result?.ok) {
+      // Esperar un momento para que la sesión se actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-  const login = (data: { token: string; user: User }) => {
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
-    setToken(data.token);
-    setUser(data.user);
+      // Obtener la sesión actualizada para determinar el rol
+      const response = await fetch("/api/auth/session");
+      const sessionData = await response.json();
+
+      if (sessionData?.user?.role === "ADMIN") {
+        router.push("/dashboard/admin");
+      } else if (sessionData?.user?.role === "VENDEDOR") {
+        router.push("/dashboard/vendedor");
+      } else {
+        router.push("/dashboard");
+      }
+    }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
-    setToken(null);
+  const logout = async () => {
+    await signOut({ redirect: true, callbackUrl: "/login" });
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -40,21 +40,17 @@ export default function Sidebar({ role }: { role: string }) {
       border-r border-white/10 p-6 flex flex-col h-full"
     >
       {/* Usuario */}
-      {user && (
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-cyan-500/20
+      {/* User Info */}
+      <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-lg mb-6">
+        <div className="w-10 h-10 rounded-full bg-cyan-500/20
             flex items-center justify-center text-cyan-400 font-bold">
-            {user.fullname.charAt(0).toUpperCase()}
-          </div>
-          <div className="text-sm">
-            <p className="font-semibold">{user.fullname}</p>
-            <p className="text-xs text-gray-400">{user.email}</p>
-            <span className="text-[10px] text-cyan-400">
-              {user.role}
-            </span>
-          </div>
+          {user?.fullname?.charAt(0).toUpperCase() || "U"}
         </div>
-      )}
+        <div className="text-sm">
+          <p className="font-semibold">{user?.fullname || "Usuario"}</p>
+          <p className="text-gray-400 text-xs">{user?.role || "..."}</p>
+        </div>
+      </div>
 
       {/* Menu */}
       <nav className="space-y-3 flex-1">
@@ -71,7 +67,7 @@ export default function Sidebar({ role }: { role: string }) {
         ))}
       </nav>
 
-      
+
       {/* Logout */}
       <button
         onClick={() => setOpenLogout(true)}
