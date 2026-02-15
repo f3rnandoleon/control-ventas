@@ -44,7 +44,8 @@ export const createProductoSchema = z.object({
 
     variantes: z
         .array(varianteSchema)
-        .min(1, "Debe agregar al menos una variante"),
+        .optional()
+        .default([]),
 }).refine(
     (data) => data.precioVenta > data.precioCosto,
     {
