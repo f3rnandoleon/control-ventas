@@ -22,7 +22,7 @@ export default function ProductoModal({
         bg-white/10 backdrop-blur-xl
         border border-white/20
         shadow-[0_0_50px_rgba(0,180,255,0.35)]
-        p-8 animate-fade-in"
+        p-8 animate-fade-in  overflow-y-auto max-h-screen"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

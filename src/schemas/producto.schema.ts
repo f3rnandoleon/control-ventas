@@ -72,6 +72,7 @@ export const updateProductoSchema = z.object({
 
     precioCosto: positiveNumberSchema.optional(),
 
+
     variantes: z
         .array(varianteSchema)
         .min(1, "Debe agregar al menos una variante")

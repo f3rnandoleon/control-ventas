@@ -151,7 +151,6 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  console.log(Object.keys(mongoose.models));
   try {
     await connectDB();
     const ventas = await Venta.find()
