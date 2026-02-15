@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { Variante } from "@/types/producto";
 
 export default function VarianteForm({
@@ -16,10 +16,34 @@ export default function VarianteForm({
     color: initialData?.color || "",
     talla: initialData?.talla || "",
     stock: initialData?.stock || 0,
+    imagen: initialData?.imagen || "",
     codigoBarra: initialData?.codigoBarra || "",
     qrCode: initialData?.qrCode || "",
   });
   const isEdit = Boolean(initialData);
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    const maxSizeBytes = 2 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setForm((prev) => ({ ...prev, imagen: result }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="space-y-4">
@@ -47,6 +71,36 @@ export default function VarianteForm({
           setForm({ ...form, stock: Number(e.target.value) })
         }
       />
+
+      
+
+      <div className="space-y-2">
+        <label className="label">Subir imagen (opcional)</label>
+        <input
+          type="file"
+          accept="image/*"
+          className="input"
+          onChange={handleImageUpload}
+        />
+      </div>
+
+      {form.imagen && (
+        <div className="space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={form.imagen}
+            alt="Preview variante"
+            className="h-24 w-24 rounded object-cover border border-white/10"
+          />
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={() => setForm({ ...form, imagen: "" })}
+          >
+            Quitar imagen
+          </button>
+        </div>
+      )}
       {isEdit && (
         <div className="grid grid-cols-1 gap-4">
           <div>
@@ -73,12 +127,16 @@ export default function VarianteForm({
 
       <div className="flex gap-3">
         <button
-          onClick={() => {onSave({
-                              color: form.color,
-                              talla: form.talla,
-                              stock: form.stock,
-                            });
-                          }}
+          onClick={() => {
+            onSave({
+              color: form.color,
+              talla: form.talla,
+              stock: form.stock,
+              imagen: form.imagen?.trim() || undefined,
+              codigoBarra: form.codigoBarra || undefined,
+              qrCode: form.qrCode || undefined,
+            });
+          }}
           className="btn-primary flex-1"
         >
           Guardar

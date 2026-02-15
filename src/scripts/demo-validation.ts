@@ -53,15 +53,53 @@ async function runDemo() {
     const parsed3 = createProductoSchema.safeParse(productoInvalido);
     printResult("Resultado", parsed3);
 
-    // CASO 4: Venta sin items
+    // CASO 4: Venta inválida
     const ventaInvalida = {
         items: [], // Error: Array vacío
         metodoPago: "BITCOIN", // Error: Método inválido
-        tipoVenta: "WEB"
+        tipoVenta: "WEB" as any // Tipo inválido si solo se permite TIENDA/MAYORISTA
     };
-    console.log("\n🧪 CASO 4: Venta inválida");
+    console.log("\n🧪 CASO 4: Venta inválida (sin items, pago incorrecto)");
     const parsed4 = createVentaSchema.safeParse(ventaInvalida);
     printResult("Resultado", parsed4);
+
+    // CASO 5: Producto Válido SIN Variantes (Nuevo soporte)
+    const productoSinVariantes = {
+        nombre: "Bufanda Simple",
+        modelo: "BUF-001",
+        precioVenta: 50,
+        precioCosto: 20
+        // variantes es opcional ahora, se asume []
+    };
+    console.log("\n🧪 CASO 5: Producto válido sin variantes (Soporte Frontend)");
+    const parsed5 = createProductoSchema.safeParse(productoSinVariantes);
+    printResult("Resultado", parsed5);
+
+    // CASO 6: Venta Válida Completa
+    const ventaValida = {
+        items: [
+            { productoId: "507f1f77bcf86cd799439011", color: "Rojo", talla: "M", cantidad: 2 },
+            { productoId: "507f1f77bcf86cd799439012", color: "Azul", talla: "L", cantidad: 1 }
+        ],
+        metodoPago: "QR",
+        tipoVenta: "TIENDA",
+        descuento: 0
+    };
+    console.log("\n🧪 CASO 6: Venta válida completa");
+    const parsed6 = createVentaSchema.safeParse(ventaValida);
+    printResult("Resultado", parsed6);
+
+    // CASO 7: Venta con item inválido (cantidad negativa)
+    const ventaItemNegativo = {
+        items: [
+            { productoId: "507f1f77bcf86cd799439011", color: "Rojo", talla: "M", cantidad: -5 }
+        ],
+        metodoPago: "EFECTIVO",
+        tipoVenta: "TIENDA"
+    };
+    console.log("\n🧪 CASO 7: Venta con cantidad negativa");
+    const parsed7 = createVentaSchema.safeParse(ventaItemNegativo);
+    printResult("Resultado", parsed7);
 
     console.log("\n🏁 FIN DE LA DEMOSTRACIÓN");
 }

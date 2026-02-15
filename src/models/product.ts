@@ -5,6 +5,7 @@ const varianteSchema = new Schema(
     color: { type: String, required: true },
     talla: { type: String, required: true },
     stock: { type: Number, required: true, min: 0 },
+    imagen: { type: String, trim: true },
     codigoBarra: { type: String, unique: true },
     qrCode: { type: String, unique: true },
   },
@@ -65,11 +66,7 @@ const productoSchema = new Schema(
       max: 100,
     },
 
-    imagenes: [
-      {
-        type: String,
-      },
-    ],
+
 
     variantes: {
       type: [varianteSchema],
