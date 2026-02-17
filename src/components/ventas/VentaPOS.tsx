@@ -1,12 +1,10 @@
 "use client";
-
+import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createVentaSchema, CreateVentaInput } from "@/schemas/venta.schema";
-import { useState } from "react";
 import { createVenta } from "@/services/venta.service";
 import { Producto } from "@/types/producto";
-import Toast from "../ui/Toast";
 
 // Tipo extendido para incluir stock disponible en el formulario (no se envía al backend)
 type VentaFormValues = CreateVentaInput & {
@@ -43,7 +41,6 @@ export default function VentaPOS({
     name: "items",
   });
 
-  const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
 
   const agregarItem = () => {
     append({
@@ -58,7 +55,7 @@ export default function VentaPOS({
   const onSubmit = async (data: VentaFormValues) => {
     try {
       if (data.items.length === 0) {
-        setToast({ message: "Agrega al menos un producto", type: "error" });
+        toast.error("Agrega al menos un producto");
         return;
       }
 
@@ -74,15 +71,12 @@ export default function VentaPOS({
       });
 
       reset({ items: [], metodoPago: "EFECTIVO", tipoVenta: "TIENDA" });
-      setToast({
-        message: "Venta registrada correctamente",
-        type: "success",
-      });
 
+      toast.success("Venta registrada correctamente");
       onSuccess();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al registrar venta";
-      setToast({ message, type: "error" });
+      toast.error(message)
     }
   };
 
@@ -111,7 +105,8 @@ export default function VentaPOS({
 
       {/* Header de la tabla */}
       {fields.length > 0 && (
-        <div className="grid grid-cols-[3fr_2fr_1fr_1fr_1fr_auto] gap-4 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="grid grid-cols-[auto_3fr_2fr_1fr_1fr_1fr_auto] gap-4 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div>Imagen</div>
           <div>Producto</div>
           <div>Variante</div>
           <div className="text-center">Cant</div>
@@ -125,14 +120,34 @@ export default function VentaPOS({
         {fields.map((field, index) => {
           const currentItem = watchedItems?.[index] || {};
           const productoSeleccionado = productos.find(p => p._id === currentItem.productoId);
+          const varianteSeleccionada = productoSeleccionado?.variantes.find(
+            (v) => v.color === currentItem.color && v.talla === currentItem.talla
+          );
           const precio = productoSeleccionado?.precioVenta || 0;
           const subtotalItem = precio * (currentItem.cantidad || 0);
 
           return (
             <div
               key={field.id}
-              className="grid grid-cols-[3fr_2fr_1fr_1fr_1fr_auto] gap-4 items-center bg-white/5 p-3 rounded-lg border border-white/5 hover:border-white/10 transition-colors group"
+              className="grid grid-cols-[auto_3fr_2fr_1fr_1fr_1fr_auto] gap-4 items-center bg-white/5 p-3 rounded-lg border border-white/5 hover:border-white/10 transition-colors group"
             >
+              {/* 0. Imagen de Variante */}
+              <div className="flex items-center justify-center">
+                {varianteSeleccionada?.imagen ? (
+                  <img
+                    src={varianteSeleccionada.imagen}
+                    alt={`${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`}
+                    className="w-16 h-16 object-cover rounded-lg border border-white/20 shadow-md"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-800/50 border border-white/10 rounded-lg flex items-center justify-center text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
               {/* 1. Producto */}
               <select
                 {...register(`items.${index}.productoId` as const)}
@@ -292,15 +307,15 @@ export default function VentaPOS({
             <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Método de Pago</label>
             <div className="grid grid-cols-2 gap-3">
               <label className={`cursor-pointer border rounded-lg p-3 text-center transition-all flex items-center justify-center gap-2 ${watch("metodoPago") === "EFECTIVO"
-                  ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-                  : "bg-white/5 border-white/10 hover:border-white/20 text-gray-400"
+                ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                : "bg-white/5 border-white/10 hover:border-white/20 text-gray-400"
                 }`}>
                 <input type="radio" {...register("metodoPago")} value="EFECTIVO" className="hidden" />
                 <span>💵</span> <span className="font-medium">Efectivo</span>
               </label>
               <label className={`cursor-pointer border rounded-lg p-3 text-center transition-all flex items-center justify-center gap-2 ${watch("metodoPago") === "QR"
-                  ? "bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
-                  : "bg-white/5 border-white/10 hover:border-white/20 text-gray-400"
+                ? "bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                : "bg-white/5 border-white/10 hover:border-white/20 text-gray-400"
                 }`}>
                 <input type="radio" {...register("metodoPago")} value="QR" className="hidden" />
                 <span>📱</span> <span className="font-medium">QR</span>
@@ -341,13 +356,7 @@ export default function VentaPOS({
         </div>
       </div>
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+
     </div>
   );
 }
