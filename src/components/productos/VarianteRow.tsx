@@ -14,14 +14,14 @@ export default function VarianteRow({
   onDelete: () => void;
 }) {
   return (
-    <tr className="border-b border-white/5 hover:bg-white/5">
+    <tr className="border-b border-white/5 hover:bg-white/5 text-center">
       <td className="py-2">
         {variante.imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={variante.imagen}
             alt={`${variante.color}-${variante.talla}`}
-            className="h-10 w-10 rounded object-cover border border-white/10"
+            className="h-20 w-20 rounded object-cover border border-white/10"
           />
         ) : (
           <span className="text-xs text-gray-500">Sin imagen</span>
