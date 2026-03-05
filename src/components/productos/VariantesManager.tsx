@@ -37,7 +37,7 @@ export default function VariantesManager({
     return (
       <div
         className="bg-white/5 border border-white/10 rounded-2xl p-6
-        shadow-[0_0_20px_rgba(0,180,255,0.2)] space-y-4"
+        shadow-[0_0_20px_rgba(0,180,255,0.2)] space-y-4 "
       >
         <h3 className="text-lg font-semibold text-cyan-400">
           {mode === "ADD" ? "Agregar variante" : "Editar variante"}
@@ -81,7 +81,7 @@ export default function VariantesManager({
   return (
     <div
       className="bg-white/5 border border-white/10 rounded-2xl p-6
-      shadow-[0_0_20px_rgba(0,180,255,0.15)] space-y-4"
+      shadow-[0_0_20px_rgba(0,180,255,0.15)] space-y-4 w-3xl"
     >
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -91,14 +91,14 @@ export default function VariantesManager({
 
         <div className="flex gap-2">
           <button
-            className="btn-primary px-4 py-2"
+            className="btn-primary px-4 py-2  cursor-pointer"
             onClick={() => setMode("ADD")}
           >
             + Agregar variante
           </button>
 
           <button
-            className="btn-primary px-4 py-2"
+            className="btn-primary px-4 py-2  cursor-pointer"
             onClick={() => {
               const variantesConQR = producto.variantes
                 .filter((v) => v.qrCode)
@@ -117,7 +117,7 @@ export default function VariantesManager({
             Generar QR de todas
           </button>
           <button
-            className="btn-primary px-4 py-2"
+            className="btn-primary px-4 py-2  cursor-pointer"
             onClick={() => {
               const variantesConCodigo = producto.variantes
                 .filter((v) => v.codigoBarra)
@@ -133,7 +133,7 @@ export default function VariantesManager({
               );
             }}
           >
-            Generar códigos de barras
+            Generar BarCodes
           </button>
 
         </div>
@@ -149,13 +149,14 @@ export default function VariantesManager({
 
       {/* Table */}
       {producto.variantes.length > 0 && (
-        <table className="w-full text-sm text-gray-300">
+        <table className="w-full  text-gray-300">
           <thead className="border-b border-white/10 text-gray-400">
             <tr>
+              <th className="py-3">Imagen</th>
               <th className="py-3">Color</th>
               <th>Talla</th>
               <th>Stock</th>
-              <th className="text-right">Acciones</th>
+              <th className="">Acciones</th>
             </tr>
           </thead>
           <tbody>

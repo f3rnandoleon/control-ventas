@@ -2,47 +2,71 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
-import "@/models/user"; 
+import "@/models/user";
 import type { Variante } from "@/types/producto";
 import Producto from "@/models/product";
 import Inventario from "@/models/inventario";
 import mongoose from "mongoose";
+import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import { createVentaSchema } from "@/schemas/venta.schema";
+
+type VentaItemProcesado = {
+  productoId: string;
+  variante: {
+    color: string;
+    talla: string;
+  };
+  cantidad: number;
+  precioUnitario: number;
+  precioCosto: number;
+  ganancia: number;
+};
+
 export async function POST(request: Request) {
   try {
     const headersList = await headers();
     const userId = headersList.get("x-user-id");
     const role = headersList.get("x-user-role");
 
-    if (!userId || !["ADMIN", "VENDEDOR"].includes(role || "")) {
+    if (!userId || !["ADMIN", "VENDEDOR", "CLIENTE"].includes(role || "")) {
       return NextResponse.json(
         { message: "No autorizado para realizar ventas" },
         { status: 403 }
       );
     }
 
-    const body = await request.json();
-    const { items, metodoPago, tipoVenta, descuento = 0, impuesto = 0 } = body;
+    // Validar datos con Zod
+    const validation = await validateRequest(createVentaSchema, request);
 
-    if (!items || items.length === 0) {
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors);
+    }
+
+    const { items, metodoPago, tipoVenta, descuento = 0 } = validation.data;
+
+    if (role === "CLIENTE" && tipoVenta !== "WEB") {
       return NextResponse.json(
-        { message: "La venta debe tener al menos un producto" },
-        { status: 400 }
+        { message: "CLIENTE solo puede registrar ventas tipo WEB" },
+        { status: 403 }
       );
     }
+
+    const impuesto = 0; // Puedes agregar esto al schema si lo necesitas
 
     await connectDB();
 
     let subtotal = 0;
     let gananciaTotal = 0;
+    const itemsProcesados: VentaItemProcesado[] = [];
 
     // 🔹 Validar productos y calcular totales
     for (const item of items) {
-        if (!mongoose.Types.ObjectId.isValid(item.productoId)) {
+      if (!mongoose.Types.ObjectId.isValid(item.productoId)) {
         return NextResponse.json(
-            { message: "ID de producto inválido" },
-            { status: 400 }
+          { message: "ID de producto inválido" },
+          { status: 400 }
         );
-        }
+      }
       const producto = await Producto.findById(item.productoId);
       if (!producto) {
         return NextResponse.json(
@@ -100,20 +124,17 @@ export async function POST(request: Request) {
       producto.totalVendidos += item.cantidad;
       await producto.save();
 
-      // Guardar datos calculados en el item
-        item.variante = {
-        color: item.color,
-        talla: item.talla,
-        };
-
-        item.precioUnitario = precioUnitario;
-        item.precioCosto = precioCosto;
-        item.ganancia =
-        (precioUnitario - precioCosto) * item.cantidad;
-
-        // Limpieza opcional (recomendado)
-        delete item.color;
-        delete item.talla;
+      itemsProcesados.push({
+        productoId: item.productoId,
+        variante: {
+          color: item.color,
+          talla: item.talla,
+        },
+        cantidad: item.cantidad,
+        precioUnitario,
+        precioCosto,
+        ganancia: (precioUnitario - precioCosto) * item.cantidad,
+      });
     }
 
     const total = subtotal - descuento + impuesto;
@@ -121,9 +142,9 @@ export async function POST(request: Request) {
     // 🔢 Número de venta simple (mejorable luego)
     const numeroVenta = `V-${Date.now()}`;
 
-    const venta = await Venta.create({
+    const ventaPayload: Record<string, unknown> = {
       numeroVenta,
-      items,
+      items: itemsProcesados,
       subtotal,
       descuento,
       impuesto,
@@ -131,9 +152,16 @@ export async function POST(request: Request) {
       gananciaTotal,
       metodoPago,
       tipoVenta,
-      vendedor: userId,
       estado: "PAGADA",
-    });
+    };
+
+    if (role === "CLIENTE") {
+      ventaPayload.cliente = userId;
+    } else {
+      ventaPayload.vendedor = userId;
+    }
+
+    const venta = await Venta.create(ventaPayload);
 
     return NextResponse.json(
       { message: "Venta registrada correctamente", venta },
@@ -149,7 +177,6 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  console.log(Object.keys(mongoose.models));
   try {
     await connectDB();
     const ventas = await Venta.find()

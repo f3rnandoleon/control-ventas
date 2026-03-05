@@ -64,6 +64,7 @@ export async function GET(
         color: variante.color,
         talla: variante.talla,
         stock: variante.stock,
+        imagen: variante.imagen,
         codigoBarra: variante.codigoBarra,
         qrCode: variante.qrCode,
       },

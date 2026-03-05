@@ -18,11 +18,11 @@ export default function ProductoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
-        className="relative w-full max-w-lg rounded-3xl
+        className="relative  rounded-3xl
         bg-white/10 backdrop-blur-xl
         border border-white/20
         shadow-[0_0_50px_rgba(0,180,255,0.35)]
-        p-8 animate-fade-in"
+        p-8 animate-fade-in  overflow-y-auto max-h-screen"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

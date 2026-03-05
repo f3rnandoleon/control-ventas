@@ -3,15 +3,9 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
-import type { Usuario, UserRole } from "@/types/usuario";
-
-type UpdateUsuarioDTO = {
-  fullname?: string;
-  email?: string;
-  role?: UserRole;
-  isActive?: boolean;
-  password?: string;
-};
+import type { Usuario } from "@/types/usuario";
+import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import { updateUsuarioSchema } from "@/schemas/usuario.schema";
 
 export async function PUT(
   request: Request,
@@ -30,7 +24,14 @@ export async function PUT(
       );
     }
 
-    const data: UpdateUsuarioDTO = await request.json();
+    // Validar datos con Zod
+    const validation = await validateRequest(updateUsuarioSchema, request);
+
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors);
+    }
+
+    const data = validation.data;
 
     await connectDB();
 

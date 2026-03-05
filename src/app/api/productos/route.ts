@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/product";
 import { generarSKU } from "@/utils/generarSKU";
+import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import { createProductoSchema } from "@/schemas/producto.schema";
 
 export async function GET() {
   try {
@@ -31,15 +33,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = await request.json();
-    const { nombre, modelo } = data;
+    // Validar datos con Zod
+    const validation = await validateRequest(createProductoSchema, request);
 
-    if (!nombre || !modelo) {
-      return NextResponse.json(
-        { message: "Nombre y modelo son obligatorios" },
-        { status: 400 }
-      );
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors);
     }
+
+    const data = validation.data;
+    const { nombre, modelo } = data;
 
     await connectDB();
 
