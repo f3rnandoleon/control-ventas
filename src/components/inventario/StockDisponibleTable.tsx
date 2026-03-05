@@ -99,6 +99,7 @@ export default function StockDisponibleTable({
                                     {/* Imagen */}
                                     <td className="px-4 py-3">
                                         {v.imagen ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
                                             <img
                                                 src={v.imagen}
                                                 alt={`${v.color} - ${v.talla}`}

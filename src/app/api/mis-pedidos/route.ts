@@ -3,18 +3,12 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
 
-type PedidoItemCliente = Record<string, unknown> & {
-  precioCosto?: number;
-  ganancia?: number;
-};
+function sanitizeVentaForCliente(venta: Record<string, unknown>) {
+  const items = Array.isArray(venta.items)
+    ? (venta.items as Record<string, unknown>[])
+    : [];
 
-type PedidoCliente = Record<string, unknown> & {
-  gananciaTotal?: number;
-  items: PedidoItemCliente[];
-};
-
-function sanitizeVentaForCliente(venta: PedidoCliente) {
-  const itemsPublicos = venta.items.map((item) => {
+  const itemsPublicos = items.map((item) => {
     const itemPublico = { ...item };
     delete itemPublico.precioCosto;
     delete itemPublico.ganancia;
@@ -50,7 +44,7 @@ export async function GET() {
       .lean();
 
     return NextResponse.json(
-      (ventas as PedidoCliente[]).map(sanitizeVentaForCliente)
+      (ventas as Record<string, unknown>[]).map(sanitizeVentaForCliente)
     );
   } catch (error) {
     console.error("GET mis-pedidos error:", error);

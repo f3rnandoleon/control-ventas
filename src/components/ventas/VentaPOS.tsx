@@ -25,7 +25,7 @@ export default function VentaPOS({
     watch,
     setValue,
     reset,
-    formState: { errors, isSubmitting, isValid },
+    formState: { isSubmitting },
   } = useForm<VentaFormValues>({
     resolver: zodResolver(createVentaSchema),
     defaultValues: {
@@ -134,6 +134,7 @@ export default function VentaPOS({
               {/* 0. Imagen de Variante */}
               <div className="flex items-center justify-center">
                 {varianteSeleccionada?.imagen ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={varianteSeleccionada.imagen}
                     alt={`${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`}

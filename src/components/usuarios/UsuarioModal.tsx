@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Usuario, UserRole, CreateUsuarioDTO, UpdateUsuarioDTO } from "@/types/usuario";
+import { Usuario, CreateUsuarioDTO, UpdateUsuarioDTO } from "@/types/usuario";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUsuarioSchema, updateUsuarioSchema, CreateUsuarioInput, UpdateUsuarioInput } from "@/schemas/usuario.schema";
@@ -28,7 +28,6 @@ export default function UsuarioModal({
     register,
     handleSubmit,
     reset,
-    setValue,
     formState: { errors },
   } = useForm<CreateUsuarioInput | UpdateUsuarioInput>({
     resolver: zodResolver(Schema),
