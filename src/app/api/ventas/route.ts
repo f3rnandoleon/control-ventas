@@ -9,13 +9,26 @@ import Inventario from "@/models/inventario";
 import mongoose from "mongoose";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { createVentaSchema } from "@/schemas/venta.schema";
+
+type VentaItemProcesado = {
+  productoId: string;
+  variante: {
+    color: string;
+    talla: string;
+  };
+  cantidad: number;
+  precioUnitario: number;
+  precioCosto: number;
+  ganancia: number;
+};
+
 export async function POST(request: Request) {
   try {
     const headersList = await headers();
     const userId = headersList.get("x-user-id");
     const role = headersList.get("x-user-role");
 
-    if (!userId || !["ADMIN", "VENDEDOR"].includes(role || "")) {
+    if (!userId || !["ADMIN", "VENDEDOR", "CLIENTE"].includes(role || "")) {
       return NextResponse.json(
         { message: "No autorizado para realizar ventas" },
         { status: 403 }
@@ -30,12 +43,21 @@ export async function POST(request: Request) {
     }
 
     const { items, metodoPago, tipoVenta, descuento = 0 } = validation.data;
+
+    if (role === "CLIENTE" && tipoVenta !== "WEB") {
+      return NextResponse.json(
+        { message: "CLIENTE solo puede registrar ventas tipo WEB" },
+        { status: 403 }
+      );
+    }
+
     const impuesto = 0; // Puedes agregar esto al schema si lo necesitas
 
     await connectDB();
 
     let subtotal = 0;
     let gananciaTotal = 0;
+    const itemsProcesados: VentaItemProcesado[] = [];
 
     // 🔹 Validar productos y calcular totales
     for (const item of items) {
@@ -102,20 +124,17 @@ export async function POST(request: Request) {
       producto.totalVendidos += item.cantidad;
       await producto.save();
 
-      // Guardar datos calculados en el item (usar any para evitar errores de tipo)
-      (item as any).variante = {
-        color: item.color,
-        talla: item.talla,
-      };
-
-      (item as any).precioUnitario = precioUnitario;
-      (item as any).precioCosto = precioCosto;
-      (item as any).ganancia =
-        (precioUnitario - precioCosto) * item.cantidad;
-
-      // Limpieza opcional (recomendado)
-      delete (item as any).color;
-      delete (item as any).talla;
+      itemsProcesados.push({
+        productoId: item.productoId,
+        variante: {
+          color: item.color,
+          talla: item.talla,
+        },
+        cantidad: item.cantidad,
+        precioUnitario,
+        precioCosto,
+        ganancia: (precioUnitario - precioCosto) * item.cantidad,
+      });
     }
 
     const total = subtotal - descuento + impuesto;
@@ -123,9 +142,9 @@ export async function POST(request: Request) {
     // 🔢 Número de venta simple (mejorable luego)
     const numeroVenta = `V-${Date.now()}`;
 
-    const venta = await Venta.create({
+    const ventaPayload: Record<string, unknown> = {
       numeroVenta,
-      items,
+      items: itemsProcesados,
       subtotal,
       descuento,
       impuesto,
@@ -133,9 +152,16 @@ export async function POST(request: Request) {
       gananciaTotal,
       metodoPago,
       tipoVenta,
-      vendedor: userId,
       estado: "PAGADA",
-    });
+    };
+
+    if (role === "CLIENTE") {
+      ventaPayload.cliente = userId;
+    } else {
+      ventaPayload.vendedor = userId;
+    }
+
+    const venta = await Venta.create(ventaPayload);
 
     return NextResponse.json(
       { message: "Venta registrada correctamente", venta },

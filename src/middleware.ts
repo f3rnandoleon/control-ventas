@@ -5,6 +5,7 @@ import { getToken } from "next-auth/jwt";
 const protectedRoutes = [
   "/api/productos",
   "/api/ventas",
+  "/api/mis-pedidos",
   "/api/inventario",
   "/api/reportes",
   "/api/usuarios",
@@ -15,11 +16,15 @@ const staffRoutes = ["/api/productos", "/api/ventas", "/api/inventario"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const { method } = request;
+
+  const isPublicProductosRoute = pathname.startsWith("/api/productos/publicos");
 
   // Permitir rutas de autenticación de NextAuth
   if (
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/auth/signup")
+    pathname.startsWith("/api/auth/signup") ||
+    isPublicProductosRoute
   ) {
     return NextResponse.next();
   }
@@ -61,6 +66,17 @@ export async function middleware(request: NextRequest) {
     staffRoutes.some((route) => pathname.startsWith(route)) &&
     !["ADMIN", "VENDEDOR"].includes(role)
   ) {
+    if (pathname.startsWith("/api/ventas") && role === "CLIENTE" && method === "POST") {
+      // Permitir que CLIENTE registre ventas WEB en /api/ventas
+    } else {
+      return NextResponse.json(
+        { message: "Acceso no autorizado" },
+        { status: 403 }
+      );
+    }
+  }
+
+  if (pathname.startsWith("/api/mis-pedidos") && role !== "CLIENTE") {
     return NextResponse.json(
       { message: "Acceso no autorizado" },
       { status: 403 }
