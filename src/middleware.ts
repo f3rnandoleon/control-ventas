@@ -4,6 +4,7 @@ import { getToken } from "next-auth/jwt";
 
 const protectedRoutes = [
   "/api/productos",
+  "/api/uploads",
   "/api/ventas",
   "/api/mis-pedidos",
   "/api/inventario",
@@ -11,7 +12,7 @@ const protectedRoutes = [
   "/api/usuarios",
 ];
 
-const adminRoutes = ["/api/reportes", "/api/usuarios"];
+const adminRoutes = ["/api/reportes", "/api/usuarios", "/api/uploads"];
 const staffRoutes = ["/api/productos", "/api/ventas", "/api/inventario"];
 
 export async function middleware(request: NextRequest) {

@@ -16,7 +16,7 @@ Base URL en desarrollo: `/api`
 - Rutas protegidas:
   - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`
   - `CLIENTE`: `POST /api/ventas` (solo `tipoVenta: WEB`), `/api/mis-pedidos/**`
-  - Solo `ADMIN`: `/api/reportes/**`, `/api/usuarios/**`
+  - Solo `ADMIN`: `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`
 
 ## Formato de error de validacion (Zod)
 
@@ -32,6 +32,37 @@ Status: `400`
 ```
 
 ## Endpoints
+
+### Uploads (solo ADMIN)
+
+#### `POST /api/uploads/variantes`
+Sube una imagen de variante a Cloudinary y devuelve la URL segura.
+
+Content-Type:
+- `multipart/form-data`
+
+Body:
+- `file`: archivo de imagen obligatorio
+
+Validaciones:
+- Solo acepta archivos `image/*`
+- Tamano maximo: `5 MB`
+
+Respuesta `201`:
+
+```json
+{
+  "url": "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/archivo.jpg"
+}
+```
+
+Respuestas:
+- `201`
+- `400`: archivo faltante, tipo invalido o tamano excedido
+- `403`: no autorizado
+- `500`: error al subir a Cloudinary
+
+---
 
 ### Auth
 
@@ -142,6 +173,11 @@ Respuestas:
 #### `POST /api/productos` (solo ADMIN)
 Crea producto y genera SKU.
 
+Notas:
+- Las imagenes de variantes se guardan como URL en `variantes[].imagen`.
+- El flujo recomendado es subir primero el archivo a `POST /api/uploads/variantes` y luego enviar esa URL al crear el producto.
+- Si por compatibilidad llega una imagen en formato base64 (`data:image/...`), el backend la sube a Cloudinary y guarda solo la URL resultante.
+
 Body:
 
 ```json
@@ -154,7 +190,8 @@ Body:
     {
       "color": "Negro",
       "talla": "M",
-      "stock": 10
+      "stock": 10,
+      "imagen": "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m.jpg"
     }
   ]
 }
@@ -171,6 +208,7 @@ Validaciones:
   - `color`: requerido, max 50
   - `talla`: requerido, max 20
   - `stock`: entero >= 0
+  - `imagen?`: URL valida de Cloudinary o `data:image/...` valida para migracion/compatibilidad
   - `codigoBarra?`, `qrCode?`
 
 Respuestas:
@@ -221,12 +259,20 @@ Comportamiento:
 - Recalcula SKU si cambia `nombre` o `modelo`.
 - Si el SKU nuevo ya existe en otro producto, devuelve `409`.
 - Procesa variantes:
+  - Si `imagen` llega como base64, la sube a Cloudinary y guarda solo la URL.
   - Si variante no tiene `codigoBarra`/`qrCode`, los genera.
   - Si se agrega variante nueva con stock > 0, registra movimiento de inventario (`ENTRADA`).
   - Si aumenta stock de variante existente, registra movimiento de inventario (`ENTRADA`).
+  - Si una variante elimina o reemplaza una imagen previa de Cloudinary, intenta borrar el recurso anterior en Cloudinary.
+
+Body:
+- Todos los campos son opcionales.
+- `variantes` puede enviarse completo para reemplazar el arreglo actual.
+- Si no se envia `variantes`, el endpoint no modifica las variantes existentes.
 
 Respuestas:
 - `200`
+- `400`: validacion.
 - `401`: usuario no autenticado (header `x-user-id` invalido).
 - `403`: no autorizado.
 - `404`: producto no encontrado.
@@ -235,6 +281,9 @@ Respuestas:
 
 #### `DELETE /api/productos/:id` (solo ADMIN)
 Elimina producto.
+
+Notas:
+- Antes de eliminar el producto, intenta eliminar de Cloudinary las imagenes asociadas a las variantes.
 
 Respuestas:
 - `200`

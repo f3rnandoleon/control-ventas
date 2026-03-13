@@ -3,8 +3,13 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/product";
 import { generarSKU } from "@/utils/generarSKU";
+import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { createProductoSchema } from "@/schemas/producto.schema";
+import { normalizeVariantImages } from "@/libs/cloudinary";
+import type { Variante } from "@/types/producto";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   try {
@@ -55,10 +60,34 @@ export async function POST(request: Request) {
       );
     }
 
+    const variantesNormalizadas = await normalizeVariantImages(
+      (data.variantes ?? []) as Variante[]
+    );
+
+    const variantesProcesadas = variantesNormalizadas.map((variante, index) => {
+      if (variante.codigoBarra && variante.qrCode) {
+        return variante;
+      }
+
+      const { codigoBarra, qrCode } = generarCodigoVariante({
+        sku,
+        color: variante.color,
+        talla: variante.talla,
+        correlativo: index + 1,
+      });
+
+      return {
+        ...variante,
+        codigoBarra: variante.codigoBarra || codigoBarra,
+        qrCode: variante.qrCode || qrCode,
+      };
+    });
+
     const producto = new Producto({
       ...data,
       sku,
       creadoPor: userId,
+      variantes: variantesProcesadas,
     });
 
     await producto.save();

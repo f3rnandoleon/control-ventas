@@ -1,7 +1,9 @@
 "use client";
 
 import { ChangeEvent, useState } from "react";
+import { toast } from "sonner";
 import { Variante } from "@/types/producto";
+import { uploadVarianteImage } from "@/services/upload.service";
 
 export default function VarianteForm({
   initialData,
@@ -20,29 +22,41 @@ export default function VarianteForm({
     codigoBarra: initialData?.codigoBarra || "",
     qrCode: initialData?.qrCode || "",
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const isEdit = Boolean(initialData);
 
-  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
+      toast.error("Selecciona un archivo de imagen valido");
+      event.target.value = "";
       return;
     }
 
-    const maxSizeBytes = 2 * 1024 * 1024;
+    const maxSizeBytes = 5 * 1024 * 1024;
     if (file.size > maxSizeBytes) {
+      toast.error("La imagen no puede superar los 5 MB");
+      event.target.value = "";
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setForm((prev) => ({ ...prev, imagen: result }));
-      }
-    };
-    reader.readAsDataURL(file);
+    setUploadingImage(true);
+
+    try {
+      const imageUrl = await uploadVarianteImage(file);
+      setForm((prev) => ({ ...prev, imagen: imageUrl }));
+      toast.success("Imagen subida a Cloudinary");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "No se pudo subir la imagen";
+
+      toast.error(message);
+    } finally {
+      setUploadingImage(false);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -75,13 +89,17 @@ export default function VarianteForm({
       
 
       <div className="space-y-2">
-        <label className="label">Subir imagen (opcional)</label>
+        <label className="label">Subir imagen a Cloudinary (opcional)</label>
         <input
           type="file"
           accept="image/*"
           className="input"
           onChange={handleImageUpload}
+          disabled={uploadingImage}
         />
+        {uploadingImage && (
+          <p className="text-sm text-gray-400">Subiendo imagen...</p>
+        )}
       </div>
 
       {form.imagen && (
@@ -127,6 +145,7 @@ export default function VarianteForm({
 
       <div className="flex gap-3">
         <button
+          type="button"
           onClick={() => {
             onSave({
               color: form.color,
@@ -138,12 +157,15 @@ export default function VarianteForm({
             });
           }}
           className="btn-primary flex-1"
+          disabled={uploadingImage}
         >
           Guardar
         </button>
         <button
+          type="button"
           onClick={onCancel}
           className="btn-danger flex-1"
+          disabled={uploadingImage}
         >
           Cancelar
         </button>

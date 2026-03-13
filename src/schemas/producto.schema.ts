@@ -5,6 +5,24 @@ import {
     nonNegativeIntegerSchema,
 } from "./common.schema";
 
+const varianteImageSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    },
+    z.union([
+        z.string().url("La imagen debe ser una URL valida"),
+        z.string().regex(
+            /^data:image\/[a-zA-Z0-9.+-]+;base64,/,
+            "La imagen debe ser una URL valida o una imagen base64 valida"
+        ),
+    ]).optional()
+);
+
 // ============================================
 // SCHEMAS DE PRODUCTO
 // ============================================
@@ -20,6 +38,8 @@ export const varianteSchema = z.object({
         .max(20, "La talla no puede exceder 20 caracteres"),
 
     stock: nonNegativeIntegerSchema,
+
+    imagen: varianteImageSchema,
 
     codigoBarra: z.string().optional(),
 
@@ -75,7 +95,6 @@ export const updateProductoSchema = z.object({
 
     variantes: z
         .array(varianteSchema)
-        .min(1, "Debe agregar al menos una variante")
         .optional(),
 }).refine(
     (data) => {

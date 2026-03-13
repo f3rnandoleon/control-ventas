@@ -1,18 +1,30 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/product";
-import mongoose from "mongoose";
 import Inventario from "@/models/inventario";
 import { generarSKU } from "@/utils/generarSKU";
 import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
+import { updateProductoSchema } from "@/schemas/producto.schema";
+import {
+  cleanupRemovedVariantImages,
+  normalizeVariantImages,
+} from "@/libs/cloudinary";
+import {
+  validateRequest,
+  validationErrorResponse,
+} from "@/middleware/validate.middleware";
 import type { Variante } from "@/types/producto";
+
+export const runtime = "nodejs";
 
 type Context = {
   params: Promise<{ id: string }>;
 };
+
 export async function GET(
-  request: Request,
+  _request: Request,
   context: Context
 ) {
   try {
@@ -59,12 +71,17 @@ export async function PUT(request: Request, context: Context) {
       );
     }
 
+    const validation = await validateRequest(updateProductoSchema, request);
+
+    if (!validation.success) {
+      return validationErrorResponse(validation.errors);
+    }
+
     const userId = new mongoose.Types.ObjectId(userIdRaw);
-    const data = await request.json();
+    const data = validation.data;
 
     await connectDB();
 
-    // 1️⃣ Producto ANTES
     const productoAntes = await Producto.findById(id);
     if (!productoAntes) {
       return NextResponse.json(
@@ -75,7 +92,6 @@ export async function PUT(request: Request, context: Context) {
 
     let nuevoSKU = productoAntes.sku;
 
-    // 🔄 Regenerar SKU solo si cambia nombre o modelo
     if (
       (data.nombre && data.nombre !== productoAntes.nombre) ||
       (data.modelo && data.modelo !== productoAntes.modelo)
@@ -97,48 +113,53 @@ export async function PUT(request: Request, context: Context) {
         );
       }
     }
+
     let variantesProcesadas = data.variantes;
 
     if (Array.isArray(data.variantes)) {
-      variantesProcesadas = (data.variantes as Variante[]).map((v) => {
-        // Si ya tiene códigos, no tocar
-        if (v.codigoBarra && v.qrCode) return v;
+      const variantesNormalizadas = await normalizeVariantImages(
+        data.variantes as Variante[]
+      );
 
-        // Contar cuántas variantes iguales existen
+      variantesProcesadas = variantesNormalizadas.map((variante) => {
+        if (variante.codigoBarra && variante.qrCode) {
+          return variante;
+        }
+
         const existentes = (productoAntes.variantes as Variante[]).filter(
-          (va) =>
-            va.color === v.color && va.talla === v.talla
+          (actual) =>
+            actual.color === variante.color && actual.talla === variante.talla
         );
 
         const correlativo = existentes.length + 1;
-
         const { codigoBarra, qrCode } = generarCodigoVariante({
           sku: nuevoSKU,
-          color: v.color,
-          talla: v.talla,
+          color: variante.color,
+          talla: variante.talla,
           correlativo,
         });
 
         return {
-          ...v,
-          codigoBarra,
-          qrCode,
+          ...variante,
+          codigoBarra: variante.codigoBarra || codigoBarra,
+          qrCode: variante.qrCode || qrCode,
         };
       });
     }
 
-    // 2️⃣ Actualizar producto
+    const updatePayload = {
+      ...data,
+      sku: nuevoSKU,
+      ...(Array.isArray(variantesProcesadas)
+        ? { variantes: variantesProcesadas }
+        : {}),
+    };
+
     const productoDespues = await Producto.findByIdAndUpdate(
       id,
-      {
-        ...data,
-        sku: nuevoSKU,
-        variantes: variantesProcesadas,
-      },
+      updatePayload,
       { new: true }
     );
-
-
 
     if (!productoDespues) {
       return NextResponse.json(
@@ -147,14 +168,18 @@ export async function PUT(request: Request, context: Context) {
       );
     }
 
-    // 3️⃣ Comparar variantes (MISMO PATRÓN QUE VENTAS)
+    if (Array.isArray(variantesProcesadas)) {
+      await cleanupRemovedVariantImages(
+        productoAntes.variantes as Variante[],
+        productoDespues.variantes as Variante[]
+      );
+    }
+
     for (const vNueva of productoDespues.variantes) {
       const vAnterior = (productoAntes.variantes as Variante[]).find(
-        (v) =>
-          v.color === vNueva.color && v.talla === vNueva.talla
+        (v) => v.color === vNueva.color && v.talla === vNueva.talla
       );
 
-      // 🟢 Variante NUEVA → ENTRADA
       if (!vAnterior && vNueva.stock > 0) {
         await Inventario.create({
           productoId: productoDespues._id,
@@ -172,7 +197,6 @@ export async function PUT(request: Request, context: Context) {
         });
       }
 
-      // 🟡 Variante existente → AUMENTO DE STOCK
       if (vAnterior && vNueva.stock > vAnterior.stock) {
         const diff = vNueva.stock - vAnterior.stock;
 
@@ -192,7 +216,7 @@ export async function PUT(request: Request, context: Context) {
         });
       }
     }
-    
+
     return NextResponse.json({
       message: "Producto actualizado correctamente",
       producto: productoDespues,
@@ -207,7 +231,7 @@ export async function PUT(request: Request, context: Context) {
 }
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   context: Context
 ) {
   try {
@@ -224,7 +248,7 @@ export async function DELETE(
 
     await connectDB();
 
-    const producto = await Producto.findByIdAndDelete(id);
+    const producto = await Producto.findById(id);
 
     if (!producto) {
       return NextResponse.json(
@@ -232,6 +256,13 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    await cleanupRemovedVariantImages(
+      producto.variantes as Variante[],
+      []
+    );
+
+    await Producto.findByIdAndDelete(id);
 
     return NextResponse.json(
       { message: "Producto eliminado correctamente" }
