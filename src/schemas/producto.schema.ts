@@ -5,7 +5,7 @@ import {
     nonNegativeIntegerSchema,
 } from "./common.schema";
 
-const varianteImageSchema = z.preprocess(
+const varianteImageValueSchema = z.preprocess(
     (value) => {
         if (typeof value !== "string") {
             return value;
@@ -20,7 +20,7 @@ const varianteImageSchema = z.preprocess(
             /^data:image\/[a-zA-Z0-9.+-]+;base64,/,
             "La imagen debe ser una URL valida o una imagen base64 valida"
         ),
-    ]).optional()
+    ])
 );
 
 // ============================================
@@ -39,7 +39,9 @@ export const varianteSchema = z.object({
 
     stock: nonNegativeIntegerSchema,
 
-    imagen: varianteImageSchema,
+    imagenes: z.array(varianteImageValueSchema).optional().default([]),
+
+    imagen: varianteImageValueSchema.optional(),
 
     codigoBarra: z.string().optional(),
 

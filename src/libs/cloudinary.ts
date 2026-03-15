@@ -1,8 +1,10 @@
 import crypto from "crypto";
+import { getVarianteImagenes } from "@/utils/varianteImagen";
 
 const DEFAULT_VARIANTES_FOLDER = "control-ventas/variantes";
 
 type VariantImageLike = {
+  imagenes?: string[];
   imagen?: string;
 };
 
@@ -127,10 +129,25 @@ export async function normalizeVariantImages<T extends VariantImageLike>(
   variantes: T[] = []
 ) {
   return Promise.all(
-    variantes.map(async (variante) => ({
-      ...variante,
-      imagen: await normalizeVariantImage(variante.imagen),
-    }))
+    variantes.map(async (variante) => {
+      const rest = { ...variante };
+      delete rest.imagen;
+      const imageInputs = getVarianteImagenes(variante);
+      const normalizedImages = await Promise.all(
+        imageInputs.map((image) => normalizeVariantImage(image))
+      );
+
+      return {
+        ...rest,
+        imagenes: [
+          ...new Set(
+            normalizedImages.filter(
+              (image): image is string => Boolean(image)
+            )
+          ),
+        ],
+      };
+    })
   );
 }
 
@@ -216,14 +233,14 @@ export async function cleanupRemovedVariantImages(
 ) {
   const nextUrls = new Set(
     nextVariantes
-      .map((variante) => variante.imagen?.trim())
+      .flatMap((variante) => getVarianteImagenes(variante))
       .filter((value): value is string => Boolean(value))
   );
 
   const previousUrls = [
     ...new Set(
       previousVariantes
-        .map((variante) => variante.imagen?.trim())
+        .flatMap((variante) => getVarianteImagenes(variante))
         .filter((value): value is string => Boolean(value))
     ),
   ];

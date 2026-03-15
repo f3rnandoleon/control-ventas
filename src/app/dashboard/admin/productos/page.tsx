@@ -23,8 +23,23 @@ export default function AdminProductosPage() {
 
   const loadProductos = async () => {
     setLoading(true);
-    setProductos(await getProductos());
-    setLoading(false);
+
+    try {
+      const fetchedProductos = await getProductos();
+      setProductos(fetchedProductos);
+      setEditing((currentEditing) => {
+        if (!currentEditing) {
+          return currentEditing;
+        }
+
+        return (
+          fetchedProductos.find((producto) => producto._id === currentEditing._id) ||
+          currentEditing
+        );
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -148,7 +163,10 @@ export default function AdminProductosPage() {
       {/* Modal */}
       <ProductoModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setEditing(null);
+        }}
         title={
             view === "PRODUCTO"
             ? "Editar producto"

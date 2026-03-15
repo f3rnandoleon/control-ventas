@@ -3,7 +3,9 @@
 import { ChangeEvent, useState } from "react";
 import { toast } from "sonner";
 import { Variante } from "@/types/producto";
-import { uploadVarianteImage } from "@/services/upload.service";
+import { uploadVarianteImages } from "@/services/upload.service";
+import { getVarianteImagenes } from "@/utils/varianteImagen";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 export default function VarianteForm({
   initialData,
@@ -18,7 +20,7 @@ export default function VarianteForm({
     color: initialData?.color || "",
     talla: initialData?.talla || "",
     stock: initialData?.stock || 0,
-    imagen: initialData?.imagen || "",
+    imagenes: getVarianteImagenes(initialData),
     codigoBarra: initialData?.codigoBarra || "",
     qrCode: initialData?.qrCode || "",
   });
@@ -26,18 +28,21 @@ export default function VarianteForm({
   const isEdit = Boolean(initialData);
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files ?? []);
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecciona un archivo de imagen valido");
+    if (files.length === 0) return;
+
+    const invalidFile = files.find((file) => !file.type.startsWith("image/"));
+    if (invalidFile) {
+      toast.error("Todos los archivos deben ser imagenes validas");
       event.target.value = "";
       return;
     }
 
     const maxSizeBytes = 5 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      toast.error("La imagen no puede superar los 5 MB");
+    const oversizedFile = files.find((file) => file.size > maxSizeBytes);
+    if (oversizedFile) {
+      toast.error("Cada imagen debe pesar como maximo 5 MB");
       event.target.value = "";
       return;
     }
@@ -45,18 +50,34 @@ export default function VarianteForm({
     setUploadingImage(true);
 
     try {
-      const imageUrl = await uploadVarianteImage(file);
-      setForm((prev) => ({ ...prev, imagen: imageUrl }));
-      toast.success("Imagen subida a Cloudinary");
+      const uploadedImages = await uploadVarianteImages(files);
+
+      setForm((prev) => ({
+        ...prev,
+        imagenes: [...new Set([...(prev.imagenes ?? []), ...uploadedImages])],
+      }));
+
+      toast.success(
+        files.length === 1
+          ? "Imagen subida a Cloudinary"
+          : "Imagenes subidas a Cloudinary"
+      );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "No se pudo subir la imagen";
+        error instanceof Error ? error.message : "No se pudieron subir las imagenes";
 
       toast.error(message);
     } finally {
       setUploadingImage(false);
       event.target.value = "";
     }
+  };
+
+  const removeImage = (imageUrl: string) => {
+    setForm((prev) => ({
+      ...prev,
+      imagenes: (prev.imagenes ?? []).filter((image) => image !== imageUrl),
+    }));
   };
 
   return (
@@ -86,43 +107,56 @@ export default function VarianteForm({
         }
       />
 
-      
-
       <div className="space-y-2">
-        <label className="label">Subir imagen a Cloudinary (opcional)</label>
+        <label className="label">Subir imagenes a Cloudinary (opcional)</label>
         <input
           type="file"
           accept="image/*"
+          multiple
           className="input"
           onChange={handleImageUpload}
           disabled={uploadingImage}
         />
         {uploadingImage && (
-          <p className="text-sm text-gray-400">Subiendo imagen...</p>
+          <p className="text-sm text-gray-400">Subiendo imagenes...</p>
         )}
       </div>
 
-      {form.imagen && (
-        <div className="space-y-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={form.imagen}
-            alt="Preview variante"
-            className="h-24 w-24 rounded object-cover border border-white/10"
-          />
-          <button
-            type="button"
-            className="btn-danger"
-            onClick={() => setForm({ ...form, imagen: "" })}
-          >
-            Quitar imagen
-          </button>
+      {(form.imagenes?.length ?? 0) > 0 && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {form.imagenes?.map((imageUrl, index) => (
+              <div
+                key={`${imageUrl}-${index}`}
+                className="rounded-xl border border-white/10 bg-white/5 p-2"
+              >
+                <CloudinaryImage
+                  src={imageUrl}
+                  alt={`Preview variante ${index + 1}`}
+                  width={192}
+                  height={96}
+                  className="h-24 w-full rounded object-cover border border-white/10"
+                />
+                <button
+                  type="button"
+                  className="btn-danger mt-2 w-full"
+                  onClick={() => removeImage(imageUrl)}
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">
+            La primera imagen se usara como portada en las vistas de listado.
+          </p>
         </div>
       )}
+
       {isEdit && (
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="label">Código de barras</label>
+            <label className="label">CÃ³digo de barras</label>
             <input
               className="input bg-white/5 text-gray-400 cursor-not-allowed"
               value={form.codigoBarra}
@@ -141,8 +175,6 @@ export default function VarianteForm({
         </div>
       )}
 
-      
-
       <div className="flex gap-3">
         <button
           type="button"
@@ -151,7 +183,7 @@ export default function VarianteForm({
               color: form.color,
               talla: form.talla,
               stock: form.stock,
-              imagen: form.imagen?.trim() || undefined,
+              imagenes: form.imagenes || [],
               codigoBarra: form.codigoBarra || undefined,
               qrCode: form.qrCode || undefined,
             });

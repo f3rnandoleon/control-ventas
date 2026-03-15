@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createVentaSchema, CreateVentaInput } from "@/schemas/venta.schema";
 import { createVenta } from "@/services/venta.service";
 import { Producto } from "@/types/producto";
+import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 // Tipo extendido para incluir stock disponible en el formulario (no se envía al backend)
 type VentaFormValues = CreateVentaInput & {
@@ -123,6 +125,7 @@ export default function VentaPOS({
           const varianteSeleccionada = productoSeleccionado?.variantes.find(
             (v) => v.color === currentItem.color && v.talla === currentItem.talla
           );
+          const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
           const precio = productoSeleccionado?.precioVenta || 0;
           const subtotalItem = precio * (currentItem.cantidad || 0);
 
@@ -133,11 +136,12 @@ export default function VentaPOS({
             >
               {/* 0. Imagen de Variante */}
               <div className="flex items-center justify-center">
-                {varianteSeleccionada?.imagen ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={varianteSeleccionada.imagen}
+                {imagenVariante ? (
+                  <CloudinaryImage
+                    src={imagenVariante}
                     alt={`${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`}
+                    width={64}
+                    height={64}
                     className="w-16 h-16 object-cover rounded-lg border border-white/20 shadow-md"
                   />
                 ) : (

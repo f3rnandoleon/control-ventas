@@ -2,6 +2,7 @@ export interface Variante {
   color: string;
   talla: string;
   stock: number;
+  imagenes?: string[];
   imagen?: string;
   codigoBarra?: string;
   qrCode?: string;

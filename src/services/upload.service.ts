@@ -30,3 +30,7 @@ export async function uploadVarianteImage(file: File) {
   const data = (await response.json()) as { url: string };
   return data.url;
 }
+
+export async function uploadVarianteImages(files: File[]) {
+  return Promise.all(files.map((file) => uploadVarianteImage(file)));
+}

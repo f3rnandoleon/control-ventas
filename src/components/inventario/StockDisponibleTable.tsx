@@ -2,6 +2,8 @@
 
 import { ProductoInventario } from "@/types/inventario";
 import { useState } from "react";
+import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 export default function StockDisponibleTable({
     productos,
@@ -18,7 +20,7 @@ export default function StockDisponibleTable({
             color: variante.color,
             talla: variante.talla,
             stock: variante.stock,
-            imagen: variante.imagen,
+            imagen: getVarianteImagenPrincipal(variante),
             stockMinimo: producto.stockMinimo || 5,
         }))
     );
@@ -99,10 +101,11 @@ export default function StockDisponibleTable({
                                     {/* Imagen */}
                                     <td className="px-4 py-3">
                                         {v.imagen ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img
+                                            <CloudinaryImage
                                                 src={v.imagen}
                                                 alt={`${v.color} - ${v.talla}`}
+                                                width={48}
+                                                height={48}
                                                 className="w-12 h-12 object-cover rounded-lg border border-white/20"
                                             />
                                         ) : (
