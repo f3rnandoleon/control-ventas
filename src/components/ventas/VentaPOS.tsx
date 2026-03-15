@@ -126,6 +126,9 @@ export default function VentaPOS({
             (v) => v.color === currentItem.color && v.talla === currentItem.talla
           );
           const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
+          const varianteLabel = varianteSeleccionada
+            ? `${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`
+            : "Variante sin seleccionar";
           const precio = productoSeleccionado?.precioVenta || 0;
           const subtotalItem = precio * (currentItem.cantidad || 0);
 
@@ -139,7 +142,7 @@ export default function VentaPOS({
                 {imagenVariante ? (
                   <CloudinaryImage
                     src={imagenVariante}
-                    alt={`${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`}
+                    alt={varianteLabel}
                     width={64}
                     height={64}
                     className="w-16 h-16 object-cover rounded-lg border border-white/20 shadow-md"

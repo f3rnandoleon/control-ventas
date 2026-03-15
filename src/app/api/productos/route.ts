@@ -28,7 +28,10 @@ export async function GET(request: Request) {
       stockTotal:
         producto.stockTotal ??
         (producto.variantes ?? []).reduce(
-          (total, variante) => total + (variante.stock || 0),
+          (
+            total: number,
+            variante: { stock?: number | null }
+          ) => total + (variante.stock || 0),
           0
         ),
       stockMinimo: producto.stockMinimo ?? 5,
