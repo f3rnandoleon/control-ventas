@@ -8,6 +8,10 @@ Base URL en desarrollo: `/api`
 - Middleware protege rutas y agrega headers internos:
   - `x-user-id`
   - `x-user-role`
+- El mismo middleware controla tambien rutas web:
+  - `/dashboard/**` requiere sesion valida y redirige segun rol.
+  - `/dashboard` redirige a `/dashboard/admin` o `/dashboard/vendedor`.
+  - `/login` y `/register` siguen siendo publicas; solo redirigen al dashboard correspondiente si ya existe sesion.
 - Rutas publicas:
   - `POST /api/auth/signup`
   - `GET|POST /api/auth/[...nextauth]`
@@ -173,6 +177,8 @@ Lista todos los productos.
 Notas:
 - Cada variante puede incluir `imagenes[]`.
 - Por compatibilidad pueden existir registros antiguos con `imagen`, pero el backend migra ese valor a `imagenes[]` al guardar.
+- Query params opcionales:
+  - `withStock=true`: devuelve productos listos para paneles de inventario, asegurando `stockTotal` y `stockMinimo` en la respuesta.
 
 Respuestas:
 - `200`

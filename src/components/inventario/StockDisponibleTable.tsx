@@ -7,8 +7,10 @@ import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 export default function StockDisponibleTable({
     productos,
+    searchTerm = "",
 }: {
     productos: ProductoInventario[];
+    searchTerm?: string;
 }) {
     const [ordenarPor, setOrdenarPor] = useState<"nombre" | "stock">("nombre");
 
@@ -25,8 +27,21 @@ export default function StockDisponibleTable({
         }))
     );
 
+    const query = searchTerm.trim().toLowerCase();
+
+    const variantesFiltradas = variantes.filter((variante) => {
+        if (!query) {
+            return true;
+        }
+
+        return [variante.productoNombre, variante.color, variante.talla]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+    });
+
     // Ordenar
-    const variantesOrdenadas = [...variantes].sort((a, b) => {
+    const variantesOrdenadas = [...variantesFiltradas].sort((a, b) => {
         if (ordenarPor === "stock") {
             return a.stock - b.stock;
         }
@@ -160,7 +175,9 @@ export default function StockDisponibleTable({
                         {variantesOrdenadas.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="py-8 text-center text-gray-400">
-                                    No hay productos en el inventario
+                                    {query
+                                        ? "No hay variantes que coincidan con la busqueda"
+                                        : "No hay productos en el inventario"}
                                 </td>
                             </tr>
                         )}

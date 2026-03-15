@@ -1,30 +1,93 @@
-/* Importar las utilidades de Tailwind */
 @import "tailwindcss";
 
-/* Variables globales para colores y fuentes */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef8ff;
+  --foreground: #0f172a;
+  --muted: #475569;
+  --card: rgba(255, 255, 255, 0.82);
+  --card-strong: rgba(255, 255, 255, 0.94);
+  --border: rgba(14, 116, 144, 0.14);
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+  --accent-soft: rgba(14, 165, 233, 0.12);
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --shadow-soft: 0 18px 40px rgba(14, 116, 144, 0.1);
+  --input-background: #ffffff;
+  --subcard: rgba(255, 255, 255, 0.72);
+  --chip-bg: #dbe4f0;
+  --placeholder-bg: #d6e5f5;
+  --page-background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 30%),
+    radial-gradient(circle at top right, rgba(191, 219, 254, 0.7), transparent 34%),
+    linear-gradient(180deg, #f4fbff 0%, #eef7ff 50%, #e0f2fe 100%);
+  --page-glow-background:
+    radial-gradient(circle at top, rgba(56, 189, 248, 0.22), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(239, 246, 255, 0.92));
   --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: "Courier New", monospace;
 }
 
-/* Tema oscuro y claro */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+  --background: #020617;
+  --foreground: #f8fafc;
+  --muted: #cbd5e1;
+  --card: rgba(15, 23, 42, 0.82);
+  --card-strong: rgba(15, 23, 42, 0.94);
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #22d3ee;
+  --accent-strong: #67e8f9;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+  --danger-soft: rgba(248, 113, 113, 0.16);
+  --shadow-soft: 0 22px 44px rgba(2, 8, 23, 0.34);
+  --input-background: rgba(0, 0, 0, 0.3);
+  --subcard: rgba(15, 23, 42, 0.72);
+  --chip-bg: rgba(71, 85, 105, 0.88);
+  --placeholder-bg: rgba(51, 65, 85, 0.9);
+  --page-background:
+    linear-gradient(135deg, #020617, #082f49, #020617);
+  --page-glow-background:
+    radial-gradient(circle at top, rgba(34, 211, 238, 0.2), transparent 32%),
+    linear-gradient(135deg, rgba(2, 6, 23, 0.9), rgba(8, 47, 73, 0.92), rgba(2, 6, 23, 0.94));
+}
+
+body {
+  min-height: 100vh;
+  background: var(--page-background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+::selection {
+  background: rgba(14, 165, 233, 0.22);
+  color: var(--foreground);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--foreground);
+  }
+
+  p,
+  li,
+  span,
+  label,
+  td,
+  th {
+    color: inherit;
   }
 }
 
-/* Estilo de fondo y texto para toda la app */
-body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-}
-
-/* Personalización de clases para fondos y texto */
 @layer utilities {
   .bg-primary {
     background-color: var(--background);
@@ -33,29 +96,170 @@ body {
   .text-primary {
     color: var(--foreground);
   }
+
+  .surface-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(12px);
+  }
+
+  .surface-card-strong {
+    background: var(--card-strong);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(12px);
+  }
+
+  .page-glow {
+    background: var(--page-glow-background);
+  }
+
+  .surface-subcard {
+    background: var(--subcard);
+    border: 1px solid var(--border);
+  }
+
+  .surface-chip {
+    background: var(--chip-bg);
+    color: var(--muted);
+    border: 1px solid transparent;
+  }
+
+  .surface-placeholder {
+    background: var(--placeholder-bg);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
 }
+
 .input {
-  @apply w-full rounded-lg px-4 py-3
-  bg-black/30 text-white placeholder-gray-400
-  border border-white/20
-  focus:outline-none focus:ring-2 focus:ring-cyan-400;
+  @apply w-full rounded-xl border px-4 py-3 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-sky-300;
+  border-color: var(--border);
+  background: var(--input-background);
+  color: var(--foreground);
 }
 
 .label {
-  @apply text-sm text-gray-300 mb-1 block;
+  @apply mb-1 block text-sm font-medium;
+  color: var(--muted);
 }
 
 .btn-primary {
-  @apply w-full py-3 rounded-lg font-semibold
-  bg-gradient-to-r from-cyan-500 to-blue-600
-  hover:from-cyan-400 hover:to-blue-500
-  text-black transition;
+  @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-sky-600 to-cyan-500 px-5 py-3 font-semibold text-white shadow-[0_12px_30px_rgba(14,116,144,0.22)] transition hover:from-sky-500 hover:to-cyan-400;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-xl border px-5 py-3 font-semibold shadow-sm transition;
+  border-color: var(--border);
+  background: var(--card-strong);
+  color: var(--accent-strong);
+}
+
+.btn-secondary:hover {
+  background: var(--accent-soft);
 }
 
 .btn-danger {
-  @apply text-red-400 hover:text-red-300 transition;
+  @apply text-red-600 transition hover:text-red-500;
 }
 
 .btn-link {
-  @apply text-cyan-400 hover:underline;
+  @apply transition hover:underline;
+  color: var(--accent-strong);
+}
+
+.btn-link:hover {
+  color: var(--accent);
+}
+
+.text-white,
+.text-gray-300,
+.text-gray-400 {
+  color: inherit;
+}
+
+.text-slate-200,
+.text-slate-300 {
+  color: var(--muted);
+}
+
+.text-cyan-300,
+.text-cyan-400 {
+  color: var(--accent-strong);
+}
+
+.hover\:text-cyan-300:hover,
+.hover\:text-cyan-400:hover {
+  color: var(--accent-strong);
+}
+
+.bg-white\/5,
+.bg-white\/10,
+.bg-slate-900,
+.bg-slate-950,
+.bg-gray-800\/50,
+.bg-gray-900\/50,
+.bg-black\/30,
+.bg-black\/20 {
+  background-color: var(--card);
+}
+
+input[class*="bg-white"],
+input[class*="bg-black"],
+select[class*="bg-white"],
+select[class*="bg-black"],
+textarea[class*="bg-white"],
+textarea[class*="bg-black"] {
+  background-color: var(--input-background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+input[class*="text-white"],
+select[class*="text-white"],
+textarea[class*="text-white"] {
+  color: var(--foreground);
+}
+
+.border-white\/5,
+.border-white\/10,
+.border-white\/15,
+.border-white\/20 {
+  border-color: var(--border);
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: var(--foreground) !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: var(--muted) !important;
+}
+
+html.dark .text-sky-900 {
+  color: var(--foreground) !important;
+}
+
+html.dark .text-sky-800,
+html.dark .text-sky-700 {
+  color: var(--accent-strong) !important;
+}
+
+html.dark .bg-white,
+html.dark .bg-white\/80,
+html.dark .bg-white\/90,
+html.dark .bg-sky-50,
+html.dark .bg-sky-50\/80,
+html.dark .bg-red-50 {
+  background-color: var(--card) !important;
+}
+
+html.dark .border-sky-100,
+html.dark .border-sky-200,
+html.dark .border-red-200 {
+  border-color: var(--border) !important;
 }

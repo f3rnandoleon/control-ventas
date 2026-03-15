@@ -11,11 +11,30 @@ import type { Variante } from "@/types/producto";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const withStock = searchParams.get("withStock") === "true";
+
     await connectDB();
-    const productos = await Producto.find().sort({ createdAt: -1 });
-    return NextResponse.json(productos);
+    const productos = await Producto.find().sort({ createdAt: -1 }).lean();
+
+    if (!withStock) {
+      return NextResponse.json(productos);
+    }
+
+    const productosConStock = productos.map((producto) => ({
+      ...producto,
+      stockTotal:
+        producto.stockTotal ??
+        (producto.variantes ?? []).reduce(
+          (total, variante) => total + (variante.stock || 0),
+          0
+        ),
+      stockMinimo: producto.stockMinimo ?? 5,
+    }));
+
+    return NextResponse.json(productosConStock);
   } catch (error) {
     console.error("GET productos error:", error);
     return NextResponse.json(
