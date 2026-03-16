@@ -13,7 +13,11 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    callbackUrl?: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
 }
@@ -28,14 +32,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const user: User | null = session?.user
     ? {
-      id: session.user.id,
-      email: session.user.email,
-      fullname: session.user.fullname,
-      role: session.user.role,
-    }
+        id: session.user.id,
+        email: session.user.email,
+        fullname: session.user.fullname,
+        role: session.user.role,
+      }
     : null;
 
-  const login = async (email: string, password: string) => {
+  const login = async (
+    email: string,
+    password: string,
+    callbackUrl?: string
+  ) => {
     const result = await signIn("credentials", {
       email,
       password,
@@ -47,19 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (result?.ok) {
-      // Esperar un momento para que la sesión se actualice
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Obtener la sesión actualizada para determinar el rol
       const response = await fetch("/api/auth/session");
       const sessionData = await response.json();
 
       if (sessionData?.user?.role === "ADMIN") {
-        router.push("/dashboard/admin");
+        router.push(callbackUrl || "/dashboard/admin");
       } else if (sessionData?.user?.role === "VENDEDOR") {
-        router.push("/dashboard/vendedor");
+        router.push(callbackUrl || "/dashboard/vendedor");
       } else {
-        router.push("/dashboard");
+        router.push("/");
       }
     }
   };

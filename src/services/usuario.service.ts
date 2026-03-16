@@ -1,11 +1,13 @@
-import { Usuario, CreateUsuarioDTO, UpdateUsuarioDTO } from "@/types/usuario";
+import {
+  Usuario,
+  CreateUsuarioDTO,
+  UpdateUsuarioDTO,
+  PerfilUsuario,
+  UpdatePerfilDTO,
+} from "@/types/usuario";
 
-/* ============================
-   Obtener usuarios
-============================ */
 export async function getUsuarios(): Promise<Usuario[]> {
   const res = await fetch("/api/usuarios");
-
   const data = await res.json();
 
   if (!res.ok) {
@@ -15,9 +17,6 @@ export async function getUsuarios(): Promise<Usuario[]> {
   return data;
 }
 
-/* ============================
-   Crear usuario
-============================ */
 export async function createUsuario(data: CreateUsuarioDTO) {
   const res = await fetch("/api/usuarios", {
     method: "POST",
@@ -33,9 +32,6 @@ export async function createUsuario(data: CreateUsuarioDTO) {
   return res.json();
 }
 
-/* ============================
-   Actualizar usuario
-============================ */
 export async function updateUsuario(id: string, data: UpdateUsuarioDTO) {
   const res = await fetch(`/api/usuarios/${id}`, {
     method: "PUT",
@@ -51,3 +47,28 @@ export async function updateUsuario(id: string, data: UpdateUsuarioDTO) {
   return res.json();
 }
 
+export async function getPerfil(): Promise<PerfilUsuario> {
+  const res = await fetch("/api/perfil");
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Error al obtener perfil");
+  }
+
+  return data;
+}
+
+export async function updatePerfil(data: UpdatePerfilDTO) {
+  const res = await fetch("/api/perfil", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const responseData = await res.json();
+
+  if (!res.ok) {
+    throw new Error(responseData.message || "Error al actualizar perfil");
+  }
+
+  return responseData;
+}

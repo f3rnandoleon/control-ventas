@@ -1,9 +1,14 @@
 "use client";
 
+import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Producto } from "@/types/producto";
-import { createProductoSchema, updateProductoSchema, CreateProductoInput, UpdateProductoInput } from "@/schemas/producto.schema";
+import {
+  createProductoSchema,
+} from "@/schemas/producto.schema";
+
+type ProductoFormValues = z.input<typeof createProductoSchema>;
 
 export default function ProductoForm({
   initialData,
@@ -12,18 +17,12 @@ export default function ProductoForm({
   initialData?: Partial<Producto>;
   onSubmit: (data: Partial<Producto>) => void;
 }) {
-  const isEditing = !!initialData?._id;
-
-  // Usamos createProductoSchema (base) o updateProductoSchema según el caso
-  // Nota: Para la edición, updateProductoSchema hace todos los campos opcionales
-  const Schema = isEditing ? updateProductoSchema : createProductoSchema;
-
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<CreateProductoInput | UpdateProductoInput>({
-    resolver: zodResolver(Schema),
+  } = useForm<ProductoFormValues>({
+    resolver: zodResolver(createProductoSchema),
     defaultValues: {
       nombre: initialData?.nombre || "",
       modelo: initialData?.modelo || "",
@@ -45,9 +44,7 @@ export default function ProductoForm({
           placeholder="Chompa Invierno"
         />
         {errors.nombre && (
-          <p className="text-xs text-red-400 mt-1">
-            {errors.nombre.message}
-          </p>
+          <p className="mt-1 text-xs text-red-400">{errors.nombre.message}</p>
         )}
       </div>
 
@@ -59,9 +56,7 @@ export default function ProductoForm({
           placeholder="INV-2025"
         />
         {errors.modelo && (
-          <p className="text-xs text-red-400 mt-1">
-            {errors.modelo.message}
-          </p>
+          <p className="mt-1 text-xs text-red-400">{errors.modelo.message}</p>
         )}
       </div>
 
@@ -74,10 +69,8 @@ export default function ProductoForm({
             className="input w-full"
             step="0.01"
           />
-          {/* El error puede venir del campo o del refine (root) si es complejo, 
-              pero Zod suele mapear refine a path si se especifica */}
           {errors.precioVenta && (
-            <p className="text-xs text-red-400 mt-1">
+            <p className="mt-1 text-xs text-red-400">
               {errors.precioVenta.message}
             </p>
           )}
@@ -92,7 +85,7 @@ export default function ProductoForm({
             step="0.01"
           />
           {errors.precioCosto && (
-            <p className="text-xs text-red-400 mt-1">
+            <p className="mt-1 text-xs text-red-400">
               {errors.precioCosto.message}
             </p>
           )}
@@ -101,12 +94,11 @@ export default function ProductoForm({
         <div>
           <label className="label">SKU</label>
           <input
-            className="input bg-white/5 text-gray-400 w-full"
-            value={initialData?.sku || "Generado automáticamente"}
+            className="input w-full cursor-not-allowed text-gray-400"
+            value={initialData?.sku || "Generado automaticamente"}
             disabled
           />
         </div>
-
       </div>
 
       <button type="submit" className="btn-primary">
