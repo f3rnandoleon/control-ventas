@@ -102,6 +102,38 @@ Respuestas:
 #### `GET|POST /api/auth/[...nextauth]`
 Ruta interna de NextAuth para login/sesion (`credentials`: email + password).
 
+#### `POST /api/auth/login`
+Endpoint explícito para sistemas de terceros. Devuelve tokens fijos y datos del usuario.
+
+Body:
+
+```json
+{
+  "email": "usuario@correo.com",
+  "password": "mi-password"
+}
+```
+
+Respuestas:
+- `200`: Login exitoso. Retorna:
+
+```json
+{
+  "message": "Login exitoso",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "user": {
+    "id": "64abcdef1234567890abcdef",
+    "email": "usuario@correo.com",
+    "fullname": "Nombre Completo",
+    "role": "CLIENTE"
+  }
+}
+```
+- `400`: faltan credenciales.
+- `401`: credenciales incorrectas o usuario inactivo.
+- `500`: error interno.
+
 ---
 
 ### Usuarios (solo ADMIN)
