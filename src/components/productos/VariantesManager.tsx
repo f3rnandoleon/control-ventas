@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Variante, Producto } from "@/types/producto";
 import VarianteForm from "./VarianteForm";
 import VarianteRow from "./VarianteRow";
@@ -23,11 +24,23 @@ export default function VariantesManager({
 
   const saveVariantes = async (variantes: Variante[]) => {
     setLoading(true);
-    await updateProducto(producto._id, { variantes });
-    await onUpdated();
-    setMode("LIST");
-    setEditingIndex(null);
-    setLoading(false);
+
+    try {
+      await updateProducto(producto._id, { variantes });
+      await onUpdated();
+      setMode("LIST");
+      setEditingIndex(null);
+      toast.success("Variantes actualizadas correctamente");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudieron guardar las variantes";
+
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* =========================

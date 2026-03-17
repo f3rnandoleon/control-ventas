@@ -16,17 +16,12 @@ export default function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center">
-      <div
-        className="w-full max-w-md rounded-2xl bg-white/10 backdrop-blur-xl
-        border border-white/20 p-6 shadow-[0_0_40px_rgba(255,0,0,0.35)]"
-      >
-        <h2 className="text-lg font-semibold text-red-400 mb-2">
-          {title}
-        </h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-sky-950/20 backdrop-blur-sm">
+      <div className="surface-card-strong w-full max-w-md rounded-2xl p-6">
+        <h2 className="mb-2 text-lg font-semibold text-red-700">{title}</h2>
 
         {description && (
-          <p className="text-sm text-gray-300 mb-6">
+          <p className="mb-6 text-sm text-slate-600">
             {description}
           </p>
         )}
@@ -34,18 +29,16 @@ export default function ConfirmModal({
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg border border-white/20
-              text-gray-300 hover:bg-white/10 transition"
+            className="btn-secondary px-4 py-2 text-sm"
           >
             Cancelar
           </button>
 
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-lg bg-red-500
-              hover:bg-red-600 text-white transition"
+            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
           >
-            Cerrar sesión
+            Cerrar sesion
           </button>
         </div>
       </div>

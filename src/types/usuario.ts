@@ -9,12 +9,17 @@ export interface Usuario {
   createdAt: string;
 }
 
+export interface PerfilUsuario extends Usuario {
+  updatedAt: string;
+  lastLogin?: string;
+}
+
 export type CreateUsuarioDTO = {
   fullname: string;
   email: string;
   role: UserRole;
   isActive?: boolean;
-  password: string; // 🔴 OBLIGATORIO
+  password: string;
 };
 
 export type UpdateUsuarioDTO = {
@@ -22,6 +27,11 @@ export type UpdateUsuarioDTO = {
   email?: string;
   role?: UserRole;
   isActive?: boolean;
-  password?: string; // 🟢 OPCIONAL
+  password?: string;
 };
 
+export type UpdatePerfilDTO = {
+  fullname: string;
+  email: string;
+  password?: string;
+};

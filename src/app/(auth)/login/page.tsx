@@ -1,126 +1,121 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || undefined;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      await login(email, password);
-      // La redirección se maneja en AuthContext
+      await login(email, password, callbackUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al iniciar sesión");
+      setError(err instanceof Error ? err.message : "Error al iniciar sesion");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center 
-      bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-
-      {/* Card */}
-      <div
-        className="relative w-full max-w-md rounded-[32px]
-        bg-white/10 backdrop-blur-xl
-        border border-white/20
-        shadow-[0_0_40px_rgba(0,180,255,0.35)]
-        p-10"
-      >
-        {/* Icon */}
-        <div className="flex justify-center mb-8">
-          <div
-            className="w-20 h-20 rounded-full border border-cyan-400
-            flex items-center justify-center text-cyan-400 text-3xl
-            shadow-[0_0_20px_rgba(34,211,238,0.7)]"
-          >
-            📷
+    <div className="page-glow min-h-screen px-6 py-10">
+      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="space-y-6 text-slate-900">
+          <span className="inline-flex rounded-full border border-sky-200 bg-white/80 px-4 py-1 text-sm font-medium text-sky-700 shadow-sm">
+            Acceso seguro
+          </span>
+          <h1 className="text-4xl font-black leading-tight md:text-5xl">
+            Ingresa a tu panel y continua donde te quedaste.
+          </h1>
+          <p className="max-w-xl text-base leading-8 text-slate-600">
+            El sistema de administracion mantiene acceso por rol y una interfaz
+            clara en tonos azul, celeste y blanco.
+          </p>
+          <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+            <Link href="/" className="font-medium transition hover:text-sky-700">
+              Volver al inicio
+            </Link>
+            <Link
+              href="https://www.youtube.com"
+              className="font-medium transition hover:text-sky-700"
+            >
+              Ver pagina web
+            </Link>
           </div>
+        </section>
+
+        <div className="surface-card-strong rounded-[32px] p-8 sm:p-10">
+          <div className="mb-8">
+            <p className="text-sm uppercase tracking-[0.3em] text-sky-700">
+              Iniciar sesion
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-slate-900">
+              Bienvenido de nuevo
+            </h2>
+            {callbackUrl && (
+              <p className="mt-2 text-sm text-slate-600">
+                Al entrar te llevaremos a tu ruta solicitada.
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="label">Correo electronico</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="correo@ejemplo.com"
+                className="input"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label">Contrasena</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="********"
+                className="input"
+                required
+              />
+            </div>
+
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/80 px-4 py-3 text-sm text-slate-600">
+              Acceso restringido para administradores y vendedores registrados por
+              el sistema.
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </form>
         </div>
-
-        <h1 className="text-center text-white text-xl font-semibold mb-8 tracking-widest">
-          INICIAR SESION
-        </h1>
-
-        {error && (
-          <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-400/30 rounded-lg px-4 py-2">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Email */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300">
-              👤
-            </span>
-            <input
-              type="email"
-              placeholder="Correo Electronico"
-              className="w-full bg-black/30 text-white placeholder-gray-300
-                px-4 py-3 pl-11 rounded-lg
-                border border-white/20
-                focus:outline-none focus:ring-2 focus:ring-cyan-400"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          {/* Password */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300">
-              🔒
-            </span>
-            <input
-              type="password"
-              placeholder="************"
-              className="w-full bg-black/30 text-white placeholder-gray-300
-                px-4 py-3 pl-11 rounded-lg
-                border border-white/20
-                focus:outline-none focus:ring-2 focus:ring-cyan-400"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          {/* Options */}
-          <div className="flex justify-between items-center text-sm text-gray-300">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="accent-cyan-400" />
-              Mantener Sesion
-            </label>
-            <a href="/register" className="hover:text-cyan-400 transition">
-              Registrarse
-            </a>
-          </div>
-
-          {/* Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-lg font-semibold text-white
-              bg-gradient-to-r from-cyan-500 to-blue-600
-              hover:from-cyan-400 hover:to-blue-500
-              shadow-[0_0_20px_rgba(34,211,238,0.6)]
-              transition disabled:opacity-50 hover:cursor-pointer"
-          >
-            {loading ? "Ingresando..." : "Ingresar"}
-          </button>
-        </form>
       </div>
     </div>
   );

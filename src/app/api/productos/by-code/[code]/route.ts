@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/product";
 import { Variante } from "@/types/producto";
+import {
+  getVarianteImagenPrincipal,
+  getVarianteImagenes,
+} from "@/utils/varianteImagen";
 
 export async function GET(
   req: Request,
@@ -64,7 +68,8 @@ export async function GET(
         color: variante.color,
         talla: variante.talla,
         stock: variante.stock,
-        imagen: variante.imagen,
+        imagen: getVarianteImagenPrincipal(variante),
+        imagenes: getVarianteImagenes(variante),
         codigoBarra: variante.codigoBarra,
         qrCode: variante.qrCode,
       },

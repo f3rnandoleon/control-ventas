@@ -8,6 +8,10 @@ Base URL en desarrollo: `/api`
 - Middleware protege rutas y agrega headers internos:
   - `x-user-id`
   - `x-user-role`
+- El mismo middleware controla tambien rutas web:
+  - `/dashboard/**` requiere sesion valida y redirige segun rol.
+  - `/dashboard` redirige a `/dashboard/admin` o `/dashboard/vendedor`.
+  - `/login` y `/register` siguen siendo publicas; solo redirigen al dashboard correspondiente si ya existe sesion.
 - Rutas publicas:
   - `POST /api/auth/signup`
   - `GET|POST /api/auth/[...nextauth]`
@@ -16,7 +20,7 @@ Base URL en desarrollo: `/api`
 - Rutas protegidas:
   - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`
   - `CLIENTE`: `POST /api/ventas` (solo `tipoVenta: WEB`), `/api/mis-pedidos/**`
-  - Solo `ADMIN`: `/api/reportes/**`, `/api/usuarios/**`
+  - Solo `ADMIN`: `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`
 
 ## Formato de error de validacion (Zod)
 
@@ -32,6 +36,41 @@ Status: `400`
 ```
 
 ## Endpoints
+
+### Uploads (solo ADMIN)
+
+#### `POST /api/uploads/variantes`
+Sube una imagen de variante a Cloudinary y devuelve la URL segura.
+
+Content-Type:
+- `multipart/form-data`
+
+Body:
+- `file`: archivo de imagen obligatorio
+
+Validaciones:
+- Solo acepta archivos `image/*`
+- Tamano maximo: `5 MB`
+
+Respuesta `201`:
+
+```json
+{
+  "url": "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/archivo.jpg"
+}
+```
+
+Respuestas:
+- `201`
+- `400`: archivo faltante, tipo invalido o tamano excedido
+- `403`: no autorizado
+- `500`: error al subir a Cloudinary
+
+Notas:
+- El endpoint recibe un solo archivo por request.
+- Para variantes con varias imagenes, el frontend realiza multiples uploads y luego guarda las URLs resultantes en `variantes[].imagenes[]`.
+
+---
 
 ### Auth
 
@@ -135,12 +174,23 @@ Respuestas:
 #### `GET /api/productos`
 Lista todos los productos.
 
+Notas:
+- Cada variante puede incluir `imagenes[]`.
+- Por compatibilidad pueden existir registros antiguos con `imagen`, pero el backend migra ese valor a `imagenes[]` al guardar.
+- Query params opcionales:
+  - `withStock=true`: devuelve productos listos para paneles de inventario, asegurando `stockTotal` y `stockMinimo` en la respuesta.
+
 Respuestas:
 - `200`
 - `500`
 
 #### `POST /api/productos` (solo ADMIN)
 Crea producto y genera SKU.
+
+Notas:
+- Las imagenes de variantes se guardan como URL en `variantes[].imagenes[]`.
+- El flujo recomendado es subir los archivos necesarios a `POST /api/uploads/variantes` y luego enviar las URLs al crear o actualizar el producto.
+- Si por compatibilidad llega una imagen en formato base64 (`data:image/...`) o el campo legado `imagen`, el backend la sube a Cloudinary y la migra a `imagenes[]`.
 
 Body:
 
@@ -154,7 +204,11 @@ Body:
     {
       "color": "Negro",
       "talla": "M",
-      "stock": 10
+      "stock": 10,
+      "imagenes": [
+        "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m-1.jpg",
+        "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m-2.jpg"
+      ]
     }
   ]
 }
@@ -171,6 +225,8 @@ Validaciones:
   - `color`: requerido, max 50
   - `talla`: requerido, max 20
   - `stock`: entero >= 0
+  - `imagenes?`: arreglo de URLs validas de Cloudinary o valores `data:image/...` validos para migracion/compatibilidad
+  - `imagen?`: campo legado aceptado por compatibilidad; se migra a `imagenes[]`
   - `codigoBarra?`, `qrCode?`
 
 Respuestas:
@@ -221,12 +277,20 @@ Comportamiento:
 - Recalcula SKU si cambia `nombre` o `modelo`.
 - Si el SKU nuevo ya existe en otro producto, devuelve `409`.
 - Procesa variantes:
+  - Si `imagenes[]` o `imagen` llegan con valores base64, los sube a Cloudinary y guarda solo URLs.
   - Si variante no tiene `codigoBarra`/`qrCode`, los genera.
   - Si se agrega variante nueva con stock > 0, registra movimiento de inventario (`ENTRADA`).
   - Si aumenta stock de variante existente, registra movimiento de inventario (`ENTRADA`).
+  - Si una variante elimina o reemplaza una imagen previa de Cloudinary, intenta borrar el recurso anterior en Cloudinary.
+
+Body:
+- Todos los campos son opcionales.
+- `variantes` puede enviarse completo para reemplazar el arreglo actual.
+- Si no se envia `variantes`, el endpoint no modifica las variantes existentes.
 
 Respuestas:
 - `200`
+- `400`: validacion.
 - `401`: usuario no autenticado (header `x-user-id` invalido).
 - `403`: no autorizado.
 - `404`: producto no encontrado.
@@ -235,6 +299,9 @@ Respuestas:
 
 #### `DELETE /api/productos/:id` (solo ADMIN)
 Elimina producto.
+
+Notas:
+- Antes de eliminar el producto, intenta eliminar de Cloudinary las imagenes asociadas a las variantes.
 
 Respuestas:
 - `200`
@@ -258,7 +325,11 @@ Respuestas:
     "color": "Negro",
     "talla": "M",
     "stock": 5,
-    "imagen": "url-opcional",
+    "imagen": "url-portada-opcional",
+    "imagenes": [
+      "url-1-opcional",
+      "url-2-opcional"
+    ],
     "codigoBarra": "xxx",
     "qrCode": "yyy"
   }
