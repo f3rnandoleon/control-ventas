@@ -4,8 +4,10 @@ Base URL en desarrollo: `/api`
 
 ## Autenticacion y autorizacion
 
-- La API usa NextAuth (JWT en cookie httpOnly).
-- Middleware protege rutas y agrega headers internos:
+- La API usa un modelo **híbrido**:
+  - NextAuth (JWT en cookie httpOnly) para el panel interno.
+  - Token JWT tradicional (`Authorization: Bearer <token>`) emitido por `/api/auth/login` para acceso desde clientes externos o web.
+- Middleware protege rutas, rechaza spoofing de headers y agrega info interna confiable:
   - `x-user-id`
   - `x-user-role`
 - El mismo middleware controla tambien rutas web:
@@ -492,7 +494,12 @@ Body:
   ],
   "metodoPago": "EFECTIVO",
   "tipoVenta": "TIENDA",
-  "descuento": 0
+  "descuento": 0,
+  "delivery": {
+    "method": "HOME_DELIVERY",
+    "address": "Zona Sur, Calle 10, casa 123",
+    "phone": "76543210"
+  }
 }
 ```
 
@@ -506,6 +513,11 @@ Validaciones:
 - `metodoPago`: `EFECTIVO | QR`
 - `tipoVenta`: `WEB | APP_QR | TIENDA`
 - `descuento?`: numero >= 0 y <= 100
+- `delivery?`: objeto opcional
+  - `method`: `WHATSAPP | PICKUP_LAPAZ | HOME_DELIVERY`
+  - `pickupPoint`: requerido para PICKUP (`TELEFERICO_MORADO | TELEFERICO_ROJO | CORREOS`)
+  - `address`: requerido para HOME_DELIVERY
+  - `phone`: requerido para PICKUP y HOME_DELIVERY
 
 Comportamiento:
 - Valida existencia de producto y variante.
@@ -528,7 +540,7 @@ Regla de rol `CLIENTE`:
 - Puede usar `POST /api/ventas` solo cuando `tipoVenta` es `WEB`.
 
 Respuestas:
-- `201`
+- `201`: Retorna objeto estable con campos principales (`_id`, `numeroVenta`, `estado`, `totales`, `items` y `delivery` si aplica).
 - `400`: validacion/stock insuficiente/ID invalido.
 - `403`: no autorizado.
 - `404`: producto o variante no encontrada.

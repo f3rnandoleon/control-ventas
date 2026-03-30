@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
 
@@ -24,18 +23,20 @@ function sanitizeVentaForCliente(venta: Record<string, unknown>) {
   return pedidoPublico;
 }
 
-export async function GET() {
-  try {
-    const headersList = await headers();
-    const userId = headersList.get("x-user-id");
-    const role = headersList.get("x-user-role");
+import { resolveApiAuth } from "@/libs/resolveApiAuth";
 
-    if (!userId || role !== "CLIENTE") {
+export async function GET(request: Request) {
+  try {
+    const userAuth = await resolveApiAuth(request);
+
+    if (!userAuth || userAuth.role !== "CLIENTE") {
       return NextResponse.json(
         { message: "No autorizado" },
         { status: 403 }
       );
     }
+
+    const userId = userAuth.id;
 
     await connectDB();
     const ventas = await Venta.find({ cliente: userId })

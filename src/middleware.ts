@@ -98,7 +98,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const requestHeaders = new Headers(request.headers);
+  // PREVENCIÓN DE SPOOFING: Limpiamos los headers internos por si alguien intenta inyectarlos desde afuera
+  requestHeaders.delete("x-user-id");
+  requestHeaders.delete("x-user-role");
+
   if (!token) {
+    // Si no hay sesión NextAuth, verificar si tiene token Bearer para APIs
+    const authHeader = request.headers.get("authorization");
+    if (pathname.startsWith("/api/") && authHeader?.startsWith("Bearer ")) {
+      // Permitimos el paso; la ruta en sí usará `resolveApiAuth`
+      return NextResponse.next({ request: { headers: requestHeaders } });
+    }
+
     return NextResponse.json(
       { message: "No autenticado. Por favor inicia sesion." },
       { status: 401 }
@@ -136,7 +148,8 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  const requestHeaders = new Headers(request.headers);
+  // Si llegamos hasta aquí, hay un token válido de NextAuth.
+  // Inyectamos la información del usuario en los headers (Fallback para APIs)
   if (userId) {
     requestHeaders.set("x-user-id", userId);
   }

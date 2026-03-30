@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
@@ -9,17 +8,20 @@ import {
 } from "@/middleware/validate.middleware";
 import { updatePerfilSchema } from "@/schemas/perfil.schema";
 
-export async function GET() {
-  try {
-    const headersList = await headers();
-    const userId = headersList.get("x-user-id");
+import { resolveApiAuth } from "@/libs/resolveApiAuth";
 
-    if (!userId) {
+export async function GET(request: Request) {
+  try {
+    const userAuth = await resolveApiAuth(request);
+
+    if (!userAuth) {
       return NextResponse.json(
         { message: "No autenticado" },
         { status: 401 }
       );
     }
+
+    const userId = userAuth.id;
 
     await connectDB();
 
@@ -44,15 +46,16 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const headersList = await headers();
-    const userId = headersList.get("x-user-id");
+    const userAuth = await resolveApiAuth(request);
 
-    if (!userId) {
+    if (!userAuth) {
       return NextResponse.json(
         { message: "No autenticado" },
         { status: 401 }
       );
     }
+
+    const userId = userAuth.id;
 
     const validation = await validateRequest(updatePerfilSchema, request);
 

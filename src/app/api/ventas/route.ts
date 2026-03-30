@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
 import "@/models/user";
@@ -24,11 +24,19 @@ type VentaItemProcesado = {
 
 export async function POST(request: Request) {
   try {
-    const headersList = await headers();
-    const userId = headersList.get("x-user-id");
-    const role = headersList.get("x-user-role");
+    const userAuth = await resolveApiAuth(request);
 
-    if (!userId || !["ADMIN", "VENDEDOR", "CLIENTE"].includes(role || "")) {
+    if (!userAuth) {
+      return NextResponse.json(
+        { message: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const userId = userAuth.id;
+    const role = userAuth.role;
+
+    if (!["ADMIN", "VENDEDOR", "CLIENTE"].includes(role)) {
       return NextResponse.json(
         { message: "No autorizado para realizar ventas" },
         { status: 403 }
@@ -42,7 +50,7 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const { items, metodoPago, tipoVenta, descuento = 0 } = validation.data;
+    const { items, metodoPago, tipoVenta, descuento = 0, delivery } = validation.data;
 
     if (role === "CLIENTE" && tipoVenta !== "WEB") {
       return NextResponse.json(
@@ -155,6 +163,10 @@ export async function POST(request: Request) {
       estado: "PAGADA",
     };
 
+    if (delivery) {
+      ventaPayload.delivery = delivery;
+    }
+
     if (role === "CLIENTE") {
       ventaPayload.cliente = userId;
     } else {
@@ -164,7 +176,22 @@ export async function POST(request: Request) {
     const venta = await Venta.create(ventaPayload);
 
     return NextResponse.json(
-      { message: "Venta registrada correctamente", venta },
+      { 
+        message: "Venta registrada correctamente",
+        venta: {
+          _id: venta._id,
+          numeroVenta: venta.numeroVenta,
+          estado: venta.estado,
+          subtotal: venta.subtotal,
+          descuento: venta.descuento,
+          total: venta.total,
+          metodoPago: venta.metodoPago,
+          tipoVenta: venta.tipoVenta,
+          createdAt: venta.createdAt,
+          items: venta.items,
+          delivery: venta.delivery
+        }
+      },
       { status: 201 }
     );
   } catch (err) {

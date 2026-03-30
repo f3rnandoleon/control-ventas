@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import Venta from "@/models/venta";
@@ -29,19 +28,21 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
+import { resolveApiAuth } from "@/libs/resolveApiAuth";
+
 export async function GET(request: Request, context: Context) {
   try {
-    const headersList = await headers();
-    const userId = headersList.get("x-user-id");
-    const role = headersList.get("x-user-role");
+    const userAuth = await resolveApiAuth(request);
     const { id } = await context.params;
 
-    if (!userId || role !== "CLIENTE") {
+    if (!userAuth || userAuth.role !== "CLIENTE") {
       return NextResponse.json(
         { message: "No autorizado" },
         { status: 403 }
       );
     }
+
+    const userId = userAuth.id;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

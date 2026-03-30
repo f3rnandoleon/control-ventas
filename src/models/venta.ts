@@ -109,6 +109,26 @@ const ventaSchema = new Schema(
     observaciones: {
       type: String,
     },
+    
+    delivery: {
+      method: {
+        type: String,
+        enum: ["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY"],
+      },
+      pickupPoint: {
+        type: String,
+        enum: ["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS", null],
+        default: null,
+      },
+      address: {
+        type: String,
+        default: null,
+      },
+      phone: {
+        type: String,
+        default: null,
+      },
+    },
   },
   {
     timestamps: true,
