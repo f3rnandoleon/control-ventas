@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +21,7 @@ export default function ProductoForm({
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<ProductoFormValues>({
     resolver: zodResolver(createProductoSchema),
@@ -28,7 +30,15 @@ export default function ProductoForm({
       modelo: initialData?.modelo || "",
       precioVenta: initialData?.precioVenta || 0,
       precioCosto: initialData?.precioCosto || 0,
+      categoria: initialData?.categoria || "Chompas",
     },
+  });
+
+  const [categoriaSelect, setCategoriaSelect] = useState(() => {
+    const isKnown = ["Chompas", "Poleras", "Ponchos"].includes(
+      initialData?.categoria || "Chompas"
+    );
+    return isKnown ? initialData?.categoria || "Chompas" : "Otra";
   });
 
   return (
@@ -57,6 +67,38 @@ export default function ProductoForm({
         />
         {errors.modelo && (
           <p className="mt-1 text-xs text-red-400">{errors.modelo.message}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="label">Categoría</label>
+        
+        <select 
+          className="input w-full mb-2"
+          value={categoriaSelect}
+          onChange={(e) => {
+            setCategoriaSelect(e.target.value);
+            if (e.target.value !== "Otra") {
+              setValue("categoria", e.target.value, { shouldValidate: true });
+            } else {
+              setValue("categoria", "", { shouldValidate: true });
+            }
+          }}
+        >
+          <option value="Chompas">Chompas</option>
+          <option value="Poleras">Poleras</option>
+          <option value="Ponchos">Ponchos</option>
+          <option value="Otra">Otra...</option>
+        </select>
+
+        <input
+          {...register("categoria")}
+          className={`input w-full ${categoriaSelect !== "Otra" ? "hidden" : ""}`}
+          placeholder="Escribe la nueva categoría"
+        />
+
+        {errors.categoria && (
+          <p className="mt-1 text-xs text-red-400">{errors.categoria?.message as string}</p>
         )}
       </div>
 

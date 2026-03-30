@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/libs/authOptions";
+import SignOutButton from "@/components/SignOutButton";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -29,9 +30,13 @@ export default async function Home() {
             y reportes con una interfaz luminosa en tonos azul, celeste y blanco.
           </p>
           <div className="flex flex-wrap gap-4">
-            <Link href="/login" className="btn-primary min-w-40 justify-center text-center">
-              Iniciar sesion
-            </Link>
+            {session ? (
+              <SignOutButton className="btn-primary min-w-40 justify-center text-center bg-red-600 hover:bg-red-700 hover:shadow-[0_0_20px_rgba(220,38,38,0.4)]" />
+            ) : (
+              <Link href="/login" className="btn-primary min-w-40 justify-center text-center">
+                Iniciar sesion
+              </Link>
+            )}
           </div>
         </section>
 

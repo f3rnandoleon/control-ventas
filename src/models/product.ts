@@ -5,6 +5,7 @@ const varianteSchema = new Schema(
     color: { type: String, required: true },
     talla: { type: String, required: true },
     stock: { type: Number, required: true, min: 0 },
+    descripcion: { type: String, trim: true },
     imagenes: { type: [String], default: [] },
     imagen: { type: String, trim: true },
     codigoBarra: { type: String, unique: true },

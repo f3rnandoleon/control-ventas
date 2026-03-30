@@ -20,6 +20,7 @@ export default function VarianteForm({
     color: initialData?.color || "",
     talla: initialData?.talla || "",
     stock: initialData?.stock || 0,
+    descripcion: initialData?.descripcion || "",
     imagenes: getVarianteImagenes(initialData),
     codigoBarra: initialData?.codigoBarra || "",
     qrCode: initialData?.qrCode || "",
@@ -107,6 +108,13 @@ export default function VarianteForm({
         }
       />
 
+      <textarea
+        className="input w-full min-h-[80px]"
+        placeholder="Descripción de la variante (opcional)"
+        value={form.descripcion}
+        onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+      />
+
       <div className="space-y-2">
         <label className="label">Subir imagenes a Cloudinary (opcional)</label>
         <input
@@ -183,6 +191,7 @@ export default function VarianteForm({
               color: form.color,
               talla: form.talla,
               stock: form.stock,
+              descripcion: form.descripcion,
               imagenes: form.imagenes || [],
               codigoBarra: form.codigoBarra || undefined,
               qrCode: form.qrCode || undefined,

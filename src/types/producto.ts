@@ -4,6 +4,7 @@ export interface Variante {
   stock: number;
   imagenes?: string[];
   imagen?: string;
+  descripcion?: string;
   codigoBarra?: string;
   qrCode?: string;
 }
@@ -16,5 +17,6 @@ export interface Producto {
   precioVenta: number;
   precioCosto: number;
   totalVendidos: number;
+  categoria?: string;
   variantes: Variante[];
 }

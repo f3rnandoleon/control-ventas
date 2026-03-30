@@ -201,6 +201,44 @@ Respuestas:
 
 ---
 
+### Perfil
+
+#### `GET /api/perfil`
+Obtiene los datos del usuario autenticado (excluyendo password).
+
+Respuestas:
+- `200`
+- `401`: no autenticado.
+- `404`: usuario no encontrado.
+- `500`
+
+#### `PUT /api/perfil`
+Actualiza el perfil del usuario autenticado.
+
+Body (todos opcionales):
+
+```json
+{
+  "fullname": "Nuevo Nombre",
+  "email": "nuevo@correo.com",
+  "password": "nueva-clave"
+}
+```
+
+Notas:
+- Si el `email` ya existe en otro usuario, devuelve error.
+- Si `password` no se envia o llega vacio, no se actualiza.
+
+Respuestas:
+- `200`
+- `400`: validacion de campos.
+- `401`: no autenticado.
+- `404`: usuario no encontrado.
+- `409`: email ya en uso.
+- `500`
+
+---
+
 ### Productos (ADMIN y VENDEDOR para lectura, solo ADMIN para escritura)
 
 #### `GET /api/productos`
@@ -230,6 +268,7 @@ Body:
 {
   "nombre": "Polera",
   "modelo": "Classic",
+  "categoria": "Poleras",
   "precioVenta": 120,
   "precioCosto": 80,
   "variantes": [
@@ -237,6 +276,7 @@ Body:
       "color": "Negro",
       "talla": "M",
       "stock": 10,
+      "descripcion": "Polera negra talla M",
       "imagenes": [
         "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m-1.jpg",
         "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m-2.jpg"
@@ -249,6 +289,7 @@ Body:
 Validaciones:
 - `nombre`: 3..100
 - `modelo`: 2..50
+- `categoria`: string opcional, default "Chompas" (o ingresado por el usuario libremente).
 - `precioVenta`: numero positivo
 - `precioCosto`: numero positivo
 - `precioVenta > precioCosto`
@@ -257,6 +298,7 @@ Validaciones:
   - `color`: requerido, max 50
   - `talla`: requerido, max 20
   - `stock`: entero >= 0
+  - `descripcion?`: string opcional para detalles.
   - `imagenes?`: arreglo de URLs validas de Cloudinary o valores `data:image/...` validos para migracion/compatibilidad
   - `imagen?`: campo legado aceptado por compatibilidad; se migra a `imagenes[]`
   - `codigoBarra?`, `qrCode?`

@@ -43,6 +43,8 @@ export const varianteSchema = z.object({
 
     imagen: varianteImageValueSchema.optional(),
 
+    descripcion: z.string().optional(),
+
     codigoBarra: z.string().optional(),
 
     qrCode: z.string().optional(),
@@ -63,6 +65,8 @@ export const createProductoSchema = z.object({
     precioVenta: positiveNumberSchema,
 
     precioCosto: positiveNumberSchema,
+
+    categoria: z.string().optional().default("Chompas"),
 
     variantes: z
         .array(varianteSchema)
@@ -94,6 +98,7 @@ export const updateProductoSchema = z.object({
 
     precioCosto: positiveNumberSchema.optional(),
 
+    categoria: z.string().optional(),
 
     variantes: z
         .array(varianteSchema)
