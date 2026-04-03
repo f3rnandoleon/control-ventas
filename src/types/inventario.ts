@@ -6,7 +6,7 @@ export interface InventarioItem {
     _id: string;
     nombre: string;
     modelo?: string;
-  };
+  } | null;
 
   variante: {
     color: string;

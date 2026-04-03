@@ -6,27 +6,66 @@ import { Variante } from "@/types/producto";
 import { uploadVarianteImages } from "@/services/upload.service";
 import { getVarianteImagenes } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
+import {
+  COLOR_OPTIONS,
+  TALLA_OPTIONS,
+  getVariantSelectOptions,
+} from "@/constants/variant-options";
+
+type VarianteTallaForm = {
+  talla: string;
+  stock: number;
+  codigoBarra?: string;
+  qrCode?: string;
+};
+
+type VarianteSharedForm = {
+  color: string;
+  descripcion: string;
+  imagenes: string[];
+};
+
+const createEmptySizeRow = (): VarianteTallaForm => ({
+  talla: "",
+  stock: 0,
+});
+
+const normalizeVariantKey = (color: string, talla: string) =>
+  `${color.trim().toLowerCase()}::${talla.trim().toLowerCase()}`;
 
 export default function VarianteForm({
   initialData,
+  existingVariantes = [],
   onSave,
   onCancel,
 }: {
   initialData?: Variante;
-  onSave: (data: Variante) => void;
+  existingVariantes?: Variante[];
+  onSave: (data: Variante[]) => void;
   onCancel: () => void;
 }) {
-  const [form, setForm] = useState<Variante>({
+  const [sharedForm, setSharedForm] = useState<VarianteSharedForm>({
     color: initialData?.color || "",
-    talla: initialData?.talla || "",
-    stock: initialData?.stock || 0,
     descripcion: initialData?.descripcion || "",
     imagenes: getVarianteImagenes(initialData),
-    codigoBarra: initialData?.codigoBarra || "",
-    qrCode: initialData?.qrCode || "",
+  });
+  const [sizeRows, setSizeRows] = useState<VarianteTallaForm[]>(() => {
+    if (initialData) {
+      return [
+        {
+          talla: initialData.talla || "",
+          stock: initialData.stock || 0,
+          codigoBarra: initialData.codigoBarra || "",
+          qrCode: initialData.qrCode || "",
+        },
+      ];
+    }
+
+    return [createEmptySizeRow()];
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const isEdit = Boolean(initialData);
+  const colorOptions = getVariantSelectOptions(sharedForm.color, COLOR_OPTIONS);
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -53,7 +92,7 @@ export default function VarianteForm({
     try {
       const uploadedImages = await uploadVarianteImages(files);
 
-      setForm((prev) => ({
+      setSharedForm((prev) => ({
         ...prev,
         imagenes: [...new Set([...(prev.imagenes ?? []), ...uploadedImages])],
       }));
@@ -65,7 +104,9 @@ export default function VarianteForm({
       );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "No se pudieron subir las imagenes";
+        error instanceof Error
+          ? error.message
+          : "No se pudieron subir las imagenes";
 
       toast.error(message);
     } finally {
@@ -75,44 +116,199 @@ export default function VarianteForm({
   };
 
   const removeImage = (imageUrl: string) => {
-    setForm((prev) => ({
+    setSharedForm((prev) => ({
       ...prev,
       imagenes: (prev.imagenes ?? []).filter((image) => image !== imageUrl),
     }));
   };
 
+  const updateSizeRow = (
+    index: number,
+    field: keyof VarianteTallaForm,
+    value: string | number
+  ) => {
+    setSizeRows((prev) =>
+      prev.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row
+      )
+    );
+  };
+
+  const addSizeRow = () => {
+    setSizeRows((prev) => [...prev, createEmptySizeRow()]);
+  };
+
+  const removeSizeRow = (index: number) => {
+    setSizeRows((prev) => prev.filter((_, rowIndex) => rowIndex !== index));
+  };
+
+  const handleSave = () => {
+    const color = sharedForm.color.trim();
+    const descripcion = sharedForm.descripcion.trim();
+    const imagenes = sharedForm.imagenes ?? [];
+
+    if (!color) {
+      toast.error("Debes ingresar un color");
+      return;
+    }
+
+    const sanitizedRows = sizeRows.map((row) => ({
+      ...row,
+      talla: row.talla.trim(),
+      stock: Number(row.stock),
+    }));
+
+    if (sanitizedRows.some((row) => !row.talla)) {
+      toast.error("Cada fila debe tener una talla");
+      return;
+    }
+
+    if (
+      sanitizedRows.some(
+        (row) =>
+          !Number.isInteger(row.stock) ||
+          Number.isNaN(row.stock) ||
+          row.stock < 0
+      )
+    ) {
+      toast.error("La cantidad debe ser un numero entero mayor o igual a 0");
+      return;
+    }
+
+    const draftKeys = sanitizedRows.map((row) =>
+      normalizeVariantKey(color, row.talla)
+    );
+    if (new Set(draftKeys).size !== draftKeys.length) {
+      toast.error("No puedes repetir la misma talla para un mismo color");
+      return;
+    }
+
+    const originalKey = initialData
+      ? normalizeVariantKey(initialData.color, initialData.talla)
+      : null;
+
+    const existingKeys = new Set(
+      existingVariantes
+        .map((variante) => normalizeVariantKey(variante.color, variante.talla))
+        .filter((key) => key !== originalKey)
+    );
+
+    if (draftKeys.some((key) => existingKeys.has(key))) {
+      toast.error("Ya existe una variante registrada con ese color y talla");
+      return;
+    }
+
+    onSave(
+      sanitizedRows.map((row) => ({
+        color,
+        talla: row.talla,
+        stock: row.stock,
+        descripcion: descripcion || undefined,
+        imagenes,
+        codigoBarra: row.codigoBarra || undefined,
+        qrCode: row.qrCode || undefined,
+      }))
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <input
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <select
           className="input"
-          placeholder="Color"
-          value={form.color}
-          onChange={(e) => setForm({ ...form, color: e.target.value })}
-        />
-        <input
-          className="input"
-          placeholder="Talla"
-          value={form.talla}
-          onChange={(e) => setForm({ ...form, talla: e.target.value })}
-        />
+          value={sharedForm.color}
+          onChange={(e) =>
+            setSharedForm((prev) => ({ ...prev, color: e.target.value }))
+          }
+        >
+          <option value="">Selecciona un color</option>
+          {colorOptions.map((color) => (
+            <option key={color} value={color}>
+              {color}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <input
-        type="number"
-        className="input"
-        placeholder="Stock"
-        value={form.stock}
-        onChange={(e) =>
-          setForm({ ...form, stock: Number(e.target.value) })
-        }
-      />
+      <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-white">
+              {isEdit ? "Datos de la variante" : "Tallas y cantidades"}
+            </p>
+            {!isEdit && (
+              <p className="text-xs text-gray-400">
+                Reutiliza el mismo color, descripcion e imagenes para varias
+                tallas.
+              </p>
+            )}
+          </div>
+
+          {!isEdit && (
+            <button
+              type="button"
+              className="btn-link"
+              onClick={addSizeRow}
+            >
+              + Agregar talla
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {sizeRows.map((row, index) => (
+            <div
+              key={`${index}-${row.codigoBarra || "new"}`}
+              className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-black/10 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            >
+              <select
+                className="input"
+                value={row.talla}
+                onChange={(e) => updateSizeRow(index, "talla", e.target.value)}
+              >
+                <option value="">Selecciona una talla</option>
+                {getVariantSelectOptions(row.talla, TALLA_OPTIONS).map(
+                  (talla) => (
+                    <option key={talla} value={talla}>
+                      {talla}
+                    </option>
+                  )
+                )}
+              </select>
+              <input
+                type="number"
+                className="input"
+                placeholder="Cantidad / stock"
+                min={0}
+                step={1}
+                value={row.stock}
+                onChange={(e) =>
+                  updateSizeRow(index, "stock", Number(e.target.value))
+                }
+              />
+              {!isEdit && sizeRows.length > 1 ? (
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={() => removeSizeRow(index)}
+                >
+                  Quitar
+                </button>
+              ) : (
+                <div />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       <textarea
         className="input w-full min-h-[80px]"
-        placeholder="Descripción de la variante (opcional)"
-        value={form.descripcion}
-        onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+        placeholder="Descripcion de la variante (opcional)"
+        value={sharedForm.descripcion}
+        onChange={(e) =>
+          setSharedForm((prev) => ({ ...prev, descripcion: e.target.value }))
+        }
       />
 
       <div className="space-y-2">
@@ -130,10 +326,10 @@ export default function VarianteForm({
         )}
       </div>
 
-      {(form.imagenes?.length ?? 0) > 0 && (
+      {(sharedForm.imagenes?.length ?? 0) > 0 && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            {form.imagenes?.map((imageUrl, index) => (
+            {sharedForm.imagenes?.map((imageUrl, index) => (
               <div
                 key={`${imageUrl}-${index}`}
                 className="rounded-xl border border-white/10 bg-white/5 p-2"
@@ -164,10 +360,10 @@ export default function VarianteForm({
       {isEdit && (
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="label">CÃ³digo de barras</label>
+            <label className="label">Codigo de barras</label>
             <input
               className="input bg-white/5 text-gray-400 cursor-not-allowed"
-              value={form.codigoBarra}
+              value={sizeRows[0]?.codigoBarra || ""}
               disabled
             />
           </div>
@@ -176,31 +372,28 @@ export default function VarianteForm({
             <label className="label">QR</label>
             <input
               className="input bg-white/5 text-gray-400 cursor-not-allowed"
-              value={form.qrCode}
+              value={sizeRows[0]?.qrCode || ""}
               disabled
             />
           </div>
         </div>
       )}
 
+      {!isEdit && (
+        <p className="text-xs text-gray-400">
+          Los campos `codigoBarra` y `qrCode` se generaran automaticamente al
+          guardar.
+        </p>
+      )}
+
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={() => {
-            onSave({
-              color: form.color,
-              talla: form.talla,
-              stock: form.stock,
-              descripcion: form.descripcion,
-              imagenes: form.imagenes || [],
-              codigoBarra: form.codigoBarra || undefined,
-              qrCode: form.qrCode || undefined,
-            });
-          }}
+          onClick={handleSave}
           className="btn-primary flex-1"
           disabled={uploadingImage}
         >
-          Guardar
+          {isEdit ? "Guardar cambios" : "Guardar variantes"}
         </button>
         <button
           type="button"
