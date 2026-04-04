@@ -9,8 +9,16 @@ const inventarioSchema = new Schema(
     },
 
     variante: {
+      variantId: { type: String, index: true },
       color: { type: String, required: true },
       talla: { type: String, required: true },
+      codigoBarra: { type: String },
+    },
+
+    productoSnapshot: {
+      nombre: { type: String },
+      modelo: { type: String },
+      sku: { type: String },
     },
 
     tipo: {
@@ -53,6 +61,10 @@ const inventarioSchema = new Schema(
     timestamps: true,
   }
 );
+
+inventarioSchema.index({ productoId: 1, createdAt: -1 });
+inventarioSchema.index({ "variante.variantId": 1, createdAt: -1 });
+inventarioSchema.index({ referencia: 1, createdAt: -1 });
 
 const Inventario = models.Inventario || model("Inventario", inventarioSchema);
 

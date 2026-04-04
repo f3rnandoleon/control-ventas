@@ -6,8 +6,18 @@ export interface VentaItem {
   } | string;
 
   variante: {
+    variantId?: string;
     color: string;
     talla: string;
+    codigoBarra?: string;
+    qrCode?: string;
+  };
+
+  productoSnapshot?: {
+    nombre: string;
+    modelo?: string;
+    sku?: string;
+    imagen?: string;
   };
 
   cantidad: number;
@@ -42,6 +52,7 @@ export interface Venta {
 export interface VentaFormItem {
   productoId: string;
   productoNombre?: string;
+  variantId?: string;
   color: string;
   talla: string;
   stockDisponible: number;
@@ -49,6 +60,7 @@ export interface VentaFormItem {
 }
 export interface CreateVentaItemDTO {
   productoId: string;
+  variantId?: string;
   color: string;
   talla: string;
   cantidad: number;

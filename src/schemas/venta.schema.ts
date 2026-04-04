@@ -7,6 +7,18 @@ import {
     tipoVentaSchema,
 } from "./common.schema";
 
+const optionalObjectIdSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    },
+    objectIdSchema.optional()
+);
+
 // ============================================
 // SCHEMAS DE VENTA
 // ============================================
@@ -16,6 +28,8 @@ import {
  */
 export const createVentaItemSchema = z.object({
     productoId: objectIdSchema,
+
+    variantId: optionalObjectIdSchema,
 
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),

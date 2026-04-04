@@ -2,14 +2,18 @@ import { Schema, model, models, Types } from "mongoose";
 
 const varianteSchema = new Schema(
   {
+    variantId: {
+      type: String,
+      default: () => new Types.ObjectId().toString(),
+    },
     color: { type: String, required: true },
     talla: { type: String, required: true },
     stock: { type: Number, required: true, min: 0 },
     descripcion: { type: String, trim: true },
     imagenes: { type: [String], default: [] },
     imagen: { type: String, trim: true },
-    codigoBarra: { type: String, unique: true },
-    qrCode: { type: String, unique: true },
+    codigoBarra: { type: String },
+    qrCode: { type: String },
   },
   { _id: false }
 );
@@ -105,6 +109,11 @@ const productoSchema = new Schema(
     timestamps: true,
   }
 );
+
+productoSchema.index({ estado: 1, createdAt: -1 });
+productoSchema.index({ "variantes.variantId": 1 }, { unique: true, sparse: true });
+productoSchema.index({ "variantes.codigoBarra": 1 }, { unique: true, sparse: true });
+productoSchema.index({ "variantes.qrCode": 1 }, { unique: true, sparse: true });
 
 // 🔄 Calcular stock total automáticamente
 productoSchema.pre("save", function (next) {

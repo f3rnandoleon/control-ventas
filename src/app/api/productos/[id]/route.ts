@@ -16,6 +16,15 @@ import {
   validationErrorResponse,
 } from "@/middleware/validate.middleware";
 import type { Variante } from "@/types/producto";
+import { ensureVariantIdentities } from "@/utils/variantIdentity";
+
+const matchesVariant = (current: Variante, target: Variante) => {
+  if (current.variantId && target.variantId) {
+    return current.variantId === target.variantId;
+  }
+
+  return current.color === target.color && current.talla === target.talla;
+};
 
 export const runtime = "nodejs";
 
@@ -121,14 +130,17 @@ export async function PUT(request: Request, context: Context) {
         data.variantes as Variante[]
       );
 
-      variantesProcesadas = variantesNormalizadas.map((variante) => {
+      const variantesConIdentidad = ensureVariantIdentities(
+        variantesNormalizadas as Variante[]
+      );
+
+      variantesProcesadas = variantesConIdentidad.map((variante) => {
         if (variante.codigoBarra && variante.qrCode) {
           return variante;
         }
 
-        const existentes = (productoAntes.variantes as Variante[]).filter(
-          (actual) =>
-            actual.color === variante.color && actual.talla === variante.talla
+        const existentes = (productoAntes.variantes as Variante[]).filter((actual) =>
+          matchesVariant(actual, variante)
         );
 
         const correlativo = existentes.length + 1;
@@ -177,15 +189,22 @@ export async function PUT(request: Request, context: Context) {
 
     for (const vNueva of productoDespues.variantes) {
       const vAnterior = (productoAntes.variantes as Variante[]).find(
-        (v) => v.color === vNueva.color && v.talla === vNueva.talla
+        (v) => matchesVariant(v, vNueva)
       );
 
       if (!vAnterior && vNueva.stock > 0) {
         await Inventario.create({
           productoId: productoDespues._id,
+          productoSnapshot: {
+            nombre: productoDespues.nombre,
+            modelo: productoDespues.modelo,
+            sku: productoDespues.sku,
+          },
           variante: {
+            variantId: vNueva.variantId,
             color: vNueva.color,
             talla: vNueva.talla,
+            codigoBarra: vNueva.codigoBarra,
           },
           tipo: "ENTRADA",
           cantidad: vNueva.stock,
@@ -202,9 +221,16 @@ export async function PUT(request: Request, context: Context) {
 
         await Inventario.create({
           productoId: productoDespues._id,
+          productoSnapshot: {
+            nombre: productoDespues.nombre,
+            modelo: productoDespues.modelo,
+            sku: productoDespues.sku,
+          },
           variante: {
+            variantId: vNueva.variantId,
             color: vNueva.color,
             talla: vNueva.talla,
+            codigoBarra: vNueva.codigoBarra,
           },
           tipo: "ENTRADA",
           cantidad: diff,

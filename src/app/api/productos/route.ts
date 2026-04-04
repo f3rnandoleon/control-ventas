@@ -8,6 +8,7 @@ import { validateRequest, validationErrorResponse } from "@/middleware/validate.
 import { createProductoSchema } from "@/schemas/producto.schema";
 import { normalizeVariantImages } from "@/libs/cloudinary";
 import type { Variante } from "@/types/producto";
+import { ensureVariantIdentities } from "@/utils/variantIdentity";
 
 export const runtime = "nodejs";
 
@@ -86,7 +87,11 @@ export async function POST(request: Request) {
       (data.variantes ?? []) as Variante[]
     );
 
-    const variantesProcesadas = variantesNormalizadas.map((variante, index) => {
+    const variantesConIdentidad = ensureVariantIdentities(
+      variantesNormalizadas as Variante[]
+    );
+
+    const variantesProcesadas = variantesConIdentidad.map((variante, index) => {
       if (variante.codigoBarra && variante.qrCode) {
         return variante;
       }

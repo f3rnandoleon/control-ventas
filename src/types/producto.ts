@@ -1,4 +1,5 @@
 export interface Variante {
+  variantId?: string;
   color: string;
   talla: string;
   stock: number;

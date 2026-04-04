@@ -9,8 +9,18 @@ const ventaItemSchema = new Schema(
     },
 
     variante: {
+      variantId: { type: String, index: true },
       color: { type: String, required: true },
       talla: { type: String, required: true },
+      codigoBarra: { type: String },
+      qrCode: { type: String },
+    },
+
+    productoSnapshot: {
+      nombre: { type: String, required: true },
+      modelo: { type: String },
+      sku: { type: String },
+      imagen: { type: String },
     },
 
     cantidad: {
@@ -134,6 +144,12 @@ const ventaSchema = new Schema(
     timestamps: true,
   }
 );
+
+ventaSchema.index({ numeroVenta: 1 }, { unique: true });
+ventaSchema.index({ cliente: 1, createdAt: -1 });
+ventaSchema.index({ vendedor: 1, createdAt: -1 });
+ventaSchema.index({ estado: 1, createdAt: -1 });
+ventaSchema.index({ tipoVenta: 1, createdAt: -1 });
 
 const Venta = models.Venta || model("Venta", ventaSchema);
 export default Venta;

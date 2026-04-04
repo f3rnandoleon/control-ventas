@@ -65,6 +65,7 @@ export async function GET(
       modelo: producto.modelo,
       precioVenta: producto.precioVenta,
       variante: {
+        variantId: variante.variantId,
         color: variante.color,
         talla: variante.talla,
         stock: variante.stock,

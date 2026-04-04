@@ -249,6 +249,7 @@ Lista todos los productos.
 Notas:
 - Cada variante puede incluir `imagenes[]`.
 - Por compatibilidad pueden existir registros antiguos con `imagen`, pero el backend migra ese valor a `imagenes[]` al guardar.
+- Cada variante ahora puede incluir `variantId`, que funciona como identificador estable para integraciones web/app.
 - Query params opcionales:
   - `withStock=true`: devuelve productos listos para paneles de inventario, asegurando `stockTotal` y `stockMinimo` en la respuesta.
 
@@ -275,6 +276,7 @@ Body:
   "precioCosto": 80,
   "variantes": [
     {
+      "variantId": "67ee00000000000000000001",
       "color": "Negro",
       "talla": "M",
       "stock": 10,
@@ -297,6 +299,7 @@ Validaciones:
 - `precioVenta > precioCosto`
 - `variantes[]` opcional (default `[]`)
 - Variante:
+  - `variantId?`: ObjectId string opcional. Si no se envia, el backend lo genera automaticamente.
   - `color`: requerido, max 50
   - `talla`: requerido, max 20
   - `stock`: entero >= 0
@@ -353,6 +356,7 @@ Comportamiento:
 - Recalcula SKU si cambia `nombre` o `modelo`.
 - Si el SKU nuevo ya existe en otro producto, devuelve `409`.
 - Procesa variantes:
+  - Si una variante no tiene `variantId`, el backend lo genera.
   - Si `imagenes[]` o `imagen` llegan con valores base64, los sube a Cloudinary y guarda solo URLs.
   - Si variante no tiene `codigoBarra`/`qrCode`, los genera.
   - Si se agrega variante nueva con stock > 0, registra movimiento de inventario (`ENTRADA`).
@@ -398,6 +402,7 @@ Respuestas:
   "modelo": "Classic",
   "precioVenta": 120,
   "variante": {
+    "variantId": "67ee00000000000000000001",
     "color": "Negro",
     "talla": "M",
     "stock": 5,
@@ -435,6 +440,7 @@ Body:
 ```json
 {
   "productoId": "507f1f77bcf86cd799439011",
+  "variantId": "67ee00000000000000000001",
   "color": "Negro",
   "talla": "M",
   "tipo": "ENTRADA",
@@ -445,6 +451,7 @@ Body:
 
 Validaciones:
 - `productoId`: ObjectId valido
+- `variantId?`: ObjectId string opcional. Si se envia, el backend intenta resolver primero la variante por este campo.
 - `color`: requerido, max 50
 - `talla`: requerido, max 20
 - `tipo`: `ENTRADA | SALIDA | AJUSTE | DEVOLUCION`
@@ -453,9 +460,16 @@ Validaciones:
 - `referencia?`: max 100
 
 Reglas:
+- La variante se resuelve por `variantId` si llega; en caso contrario se usa compatibilidad por `color + talla`.
 - `ENTRADA`: suma stock.
 - `SALIDA`: resta stock (si no alcanza, `400`).
 - `AJUSTE`: fija stock al valor absoluto de `cantidad`.
+- Cada movimiento guarda tambien snapshots minimos:
+  - `productoSnapshot.nombre`
+  - `productoSnapshot.modelo`
+  - `productoSnapshot.sku`
+  - `variante.variantId`
+  - `variante.codigoBarra`
 
 Respuestas:
 - `201`
@@ -487,6 +501,7 @@ Body:
   "items": [
     {
       "productoId": "507f1f77bcf86cd799439011",
+      "variantId": "67ee00000000000000000001",
       "color": "Negro",
       "talla": "M",
       "cantidad": 2
@@ -507,6 +522,7 @@ Validaciones:
 - `items`: minimo 1
 - item:
   - `productoId`: ObjectId valido
+  - `variantId?`: ObjectId string opcional. Si se envia, el backend intenta resolver primero la variante por este campo.
   - `color`: requerido, max 50
   - `talla`: requerido, max 20
   - `cantidad`: entero positivo, max 1000
@@ -521,6 +537,7 @@ Validaciones:
 
 Comportamiento:
 - Valida existencia de producto y variante.
+- La variante se resuelve por `variantId` si llega; en caso contrario se usa compatibilidad por `color + talla`.
 - Valida stock suficiente.
 - Descuenta stock por item.
 - Crea movimiento de inventario (`SALIDA`, referencia `VENTA`).
@@ -535,6 +552,14 @@ Comportamiento:
   - `estado`: `PAGADA`
   - `vendedor`: usuario autenticado (si rol `ADMIN`/`VENDEDOR`)
   - `cliente`: usuario autenticado (si rol `CLIENTE`)
+- Cada item guardado en la venta incluye snapshots minimos:
+  - `productoSnapshot.nombre`
+  - `productoSnapshot.modelo`
+  - `productoSnapshot.sku`
+  - `productoSnapshot.imagen`
+  - `variante.variantId`
+  - `variante.codigoBarra`
+  - `variante.qrCode`
 
 Regla de rol `CLIENTE`:
 - Puede usar `POST /api/ventas` solo cuando `tipoVenta` es `WEB`.
@@ -571,6 +596,8 @@ Lista las ventas del cliente autenticado (`venta.cliente = userId`), ordenadas p
 Notas:
 - No expone `gananciaTotal`.
 - No expone `items[].precioCosto` ni `items[].ganancia`.
+- Si existe `productoSnapshot` dentro del item, se devuelve como parte del historial.
+- El modelo actual de "pedido" sigue siendo la coleccion de `ventas`; todavia no existe una entidad `Order` separada.
 
 Respuestas:
 - `200`
@@ -583,6 +610,7 @@ Detalle de un pedido propio del cliente autenticado.
 Notas:
 - Si el pedido no pertenece al cliente autenticado, responde `404`.
 - No expone campos de costo/ganancia.
+- Puede incluir snapshots del producto/variante guardados al momento de la compra.
 
 Respuestas:
 - `200`

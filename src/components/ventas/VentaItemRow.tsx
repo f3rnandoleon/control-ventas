@@ -37,6 +37,7 @@ export default function VentaItemRow({
           onChange({
             productoId: p._id,
             productoNombre: p.nombre,
+            variantId: v.variantId,
             color: v.color,
             talla: v.talla,
             stockDisponible: v.stock,
@@ -55,19 +56,21 @@ export default function VentaItemRow({
       {/* Variante */}
       <select
         className="input"
-        value={`${item.color}-${item.talla}`}
+        value={item.variantId || `${item.color}|${item.talla}`}
         disabled={!producto}
         onChange={(e) => {
-          const [color, talla] = e.target.value.split("|");
           const v = producto?.variantes.find(
-            (x) => x.color === color && x.talla === talla
+            (x) =>
+              x.variantId === e.target.value ||
+              `${x.color}|${x.talla}` === e.target.value
           );
           if (!v) return;
 
           onChange({
             ...item,
-            color,
-            talla,
+            variantId: v.variantId,
+            color: v.color,
+            talla: v.talla,
             stockDisponible: v.stock,
             cantidad: 1,
           });
@@ -76,8 +79,8 @@ export default function VentaItemRow({
         <option value="">Variante</option>
         {variantes.map((v) => (
           <option
-            key={`${v.color}-${v.talla}`}
-            value={`${v.color}|${v.talla}`}
+            key={v.variantId || `${v.color}-${v.talla}`}
+            value={v.variantId || `${v.color}|${v.talla}`}
           >
             {v.color} / {v.talla} (stock: {v.stock})
           </option>

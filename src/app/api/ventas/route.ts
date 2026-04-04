@@ -9,12 +9,23 @@ import Inventario from "@/models/inventario";
 import mongoose from "mongoose";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { createVentaSchema } from "@/schemas/venta.schema";
+import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import { findVariantByIdentity } from "@/utils/variantIdentity";
 
 type VentaItemProcesado = {
   productoId: string;
   variante: {
+    variantId?: string;
     color: string;
     talla: string;
+    codigoBarra?: string;
+    qrCode?: string;
+  };
+  productoSnapshot: {
+    nombre: string;
+    modelo: string;
+    sku: string;
+    imagen?: string;
   };
   cantidad: number;
   precioUnitario: number;
@@ -83,10 +94,11 @@ export async function POST(request: Request) {
         );
       }
 
-      const variante = (producto.variantes as Variante[]).find(
-        (v) =>
-          v.color === item.color && v.talla === item.talla
-      );
+      const variante = findVariantByIdentity(producto.variantes as Variante[], {
+        variantId: item.variantId,
+        color: item.color,
+        talla: item.talla,
+      });
 
       if (!variante) {
         return NextResponse.json(
@@ -116,9 +128,16 @@ export async function POST(request: Request) {
       // 🔄 Registrar movimiento de stock
       await Inventario.create({
         productoId: producto._id,
+        productoSnapshot: {
+          nombre: producto.nombre,
+          modelo: producto.modelo,
+          sku: producto.sku,
+        },
         variante: {
-          color: item.color,
-          talla: item.talla,
+          variantId: variante.variantId,
+          color: variante.color,
+          talla: variante.talla,
+          codigoBarra: variante.codigoBarra,
         },
         tipo: "SALIDA",
         cantidad: item.cantidad,
@@ -135,8 +154,17 @@ export async function POST(request: Request) {
       itemsProcesados.push({
         productoId: item.productoId,
         variante: {
-          color: item.color,
-          talla: item.talla,
+          variantId: variante.variantId,
+          color: variante.color,
+          talla: variante.talla,
+          codigoBarra: variante.codigoBarra,
+          qrCode: variante.qrCode,
+        },
+        productoSnapshot: {
+          nombre: producto.nombre,
+          modelo: producto.modelo,
+          sku: producto.sku,
+          imagen: getVarianteImagenPrincipal(variante),
         },
         cantidad: item.cantidad,
         precioUnitario,

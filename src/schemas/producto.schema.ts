@@ -5,6 +5,18 @@ import {
     nonNegativeIntegerSchema,
 } from "./common.schema";
 
+const optionalObjectIdSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    },
+    z.string().regex(/^[0-9a-fA-F]{24}$/, "ID no valido").optional()
+);
+
 const varianteImageValueSchema = z.preprocess(
     (value) => {
         if (typeof value !== "string") {
@@ -31,6 +43,8 @@ const varianteImageValueSchema = z.preprocess(
  * Schema para variante de producto
  */
 export const varianteSchema = z.object({
+    variantId: optionalObjectIdSchema,
+
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),
 

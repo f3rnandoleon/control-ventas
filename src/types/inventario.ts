@@ -9,8 +9,16 @@ export interface InventarioItem {
   } | null;
 
   variante: {
+    variantId?: string;
     color: string;
     talla: string;
+    codigoBarra?: string;
+  };
+
+  productoSnapshot?: {
+    nombre?: string;
+    modelo?: string;
+    sku?: string;
   };
 
   tipo: "ENTRADA" | "SALIDA" | "AJUSTE" | "DEVOLUCION";

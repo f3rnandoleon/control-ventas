@@ -47,6 +47,7 @@ export default function VentaPOS({
   const agregarItem = () => {
     append({
       productoId: "",
+      variantId: undefined,
       color: "",
       talla: "",
       cantidad: 1,
@@ -62,8 +63,9 @@ export default function VentaPOS({
       }
 
       await createVenta({
-        items: data.items.map(({ productoId, color, talla, cantidad }) => ({
+        items: data.items.map(({ productoId, variantId, color, talla, cantidad }) => ({
           productoId,
+          variantId,
           color,
           talla,
           cantidad,
@@ -123,7 +125,9 @@ export default function VentaPOS({
           const currentItem = watchedItems?.[index] || {};
           const productoSeleccionado = productos.find(p => p._id === currentItem.productoId);
           const varianteSeleccionada = productoSeleccionado?.variantes.find(
-            (v) => v.color === currentItem.color && v.talla === currentItem.talla
+            (v) =>
+              (currentItem.variantId && v.variantId === currentItem.variantId) ||
+              (v.color === currentItem.color && v.talla === currentItem.talla)
           );
           const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
           const varianteLabel = varianteSeleccionada
@@ -163,6 +167,7 @@ export default function VentaPOS({
                 onChange={(e) => {
                   const pid = e.target.value;
                   setValue(`items.${index}.productoId`, pid);
+                  setValue(`items.${index}.variantId`, undefined);
                   setValue(`items.${index}.color`, "");
                   setValue(`items.${index}.talla`, "");
                   setValue(`items.${index}.stockDisponible`, 0);
@@ -183,19 +188,23 @@ export default function VentaPOS({
                   className="input-chroma w-full text-sm bg-gray-800/50 rounded-md border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 py-1.5 disabled:opacity-50"
                   disabled={!currentItem.productoId}
                   value={
-                    currentItem.color && currentItem.talla
-                      ? `${currentItem.color}-${currentItem.talla}`
+                    currentItem.variantId
+                      ? currentItem.variantId
+                      : currentItem.color && currentItem.talla
+                        ? `${currentItem.color}|${currentItem.talla}`
                       : ""
                   }
                   onChange={(e) => {
                     const val = e.target.value;
                     if (!val) return;
-                    const [color, talla] = val.split("-");
                     const variante = productoSeleccionado?.variantes.find(
-                      (v) => v.color === color && v.talla === talla
+                      (v) =>
+                        v.variantId === val ||
+                        `${v.color}|${v.talla}` === val
                     );
 
                     if (variante) {
+                      setValue(`items.${index}.variantId`, variante.variantId);
                       setValue(`items.${index}.color`, variante.color);
                       setValue(`items.${index}.talla`, variante.talla);
                       setValue(`items.${index}.stockDisponible`, variante.stock);
@@ -209,8 +218,8 @@ export default function VentaPOS({
                   <option value="">Variante...</option>
                   {productoSeleccionado?.variantes.map((v) => (
                     <option
-                      key={`${v.color}-${v.talla}`}
-                      value={`${v.color}-${v.talla}`}
+                      key={v.variantId || `${v.color}-${v.talla}`}
+                      value={v.variantId || `${v.color}|${v.talla}`}
                       disabled={v.stock <= 0}
                     >
                       {v.color} - {v.talla} ({v.stock})
@@ -218,6 +227,7 @@ export default function VentaPOS({
                   ))}
                 </select>
                 {/* Campos ocultos */}
+                <input type="hidden" {...register(`items.${index}.variantId`)} />
                 <input type="hidden" {...register(`items.${index}.color`)} />
                 <input type="hidden" {...register(`items.${index}.talla`)} />
               </div>

@@ -8,6 +8,7 @@ import Producto from "@/models/product";
 import type { Variante } from "@/types/producto";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { ajusteStockSchema } from "@/schemas/inventario.schema";
+import { findVariantByIdentity } from "@/utils/variantIdentity";
 
 export async function GET() {
   try {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const { productoId, color, talla, cantidad, tipo, motivo } = validation.data;
+    const { productoId, variantId, color, talla, cantidad, tipo, motivo } = validation.data;
     const qty = Math.abs(cantidad); // Usar valor absoluto
 
     await connectDB();
@@ -71,9 +72,11 @@ export async function POST(request: Request) {
     }
 
     // 2️⃣ Leer variante real
-    const variante = (producto.variantes as Variante[]).find(
-      (v) => v.color === color && v.talla === talla
-    );
+    const variante = findVariantByIdentity(producto.variantes as Variante[], {
+      variantId,
+      color,
+      talla,
+    });
 
 
     if (!variante) {
@@ -115,7 +118,17 @@ export async function POST(request: Request) {
     // 6️⃣ Crear movimiento (MISMO QUE VENTAS)
     const movimiento = await Inventario.create({
       productoId: producto._id,
-      variante: { color, talla },
+      productoSnapshot: {
+        nombre: producto.nombre,
+        modelo: producto.modelo,
+        sku: producto.sku,
+      },
+      variante: {
+        variantId: variante.variantId,
+        color: variante.color,
+        talla: variante.talla,
+        codigoBarra: variante.codigoBarra,
+      },
       tipo,
       cantidad: qty,
       stockAnterior,
