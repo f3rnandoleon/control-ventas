@@ -145,7 +145,6 @@ const ventaSchema = new Schema(
   }
 );
 
-ventaSchema.index({ numeroVenta: 1 }, { unique: true });
 ventaSchema.index({ cliente: 1, createdAt: -1 });
 ventaSchema.index({ vendedor: 1, createdAt: -1 });
 ventaSchema.index({ estado: 1, createdAt: -1 });

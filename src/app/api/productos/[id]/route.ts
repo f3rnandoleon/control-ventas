@@ -1,30 +1,16 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import mongoose from "mongoose";
-import { connectDB } from "@/libs/mongodb";
-import Producto from "@/models/product";
-import Inventario from "@/models/inventario";
-import { generarSKU } from "@/utils/generarSKU";
-import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
 import { updateProductoSchema } from "@/schemas/producto.schema";
-import {
-  cleanupRemovedVariantImages,
-  normalizeVariantImages,
-} from "@/libs/cloudinary";
 import {
   validateRequest,
   validationErrorResponse,
 } from "@/middleware/validate.middleware";
-import type { Variante } from "@/types/producto";
-import { ensureVariantIdentities } from "@/utils/variantIdentity";
-
-const matchesVariant = (current: Variante, target: Variante) => {
-  if (current.variantId && target.variantId) {
-    return current.variantId === target.variantId;
-  }
-
-  return current.color === target.color && current.talla === target.talla;
-};
+import {
+  deleteCatalogProduct,
+  getCatalogProductById,
+  updateCatalogProduct,
+} from "@/modules/catalog/application/catalog.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export const runtime = "nodejs";
 
@@ -32,30 +18,16 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(
-  _request: Request,
-  context: Context
-) {
+export async function GET(_request: Request, context: Context) {
   try {
     const { id } = await context.params;
-
-    await connectDB();
-    const producto = await Producto.findById(id);
-
-    if (!producto) {
-      return NextResponse.json(
-        { message: "Producto no encontrado" },
-        { status: 404 }
-      );
-    }
-
+    const producto = await getCatalogProductById(id);
     return NextResponse.json(producto);
-  } catch (err) {
-    console.error("ERROR:", err);
-    return NextResponse.json(
-      { message: "Error al obtener producto" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error al obtener producto",
+      logLabel: "GET producto error:",
+    });
   }
 }
 
@@ -73,7 +45,7 @@ export async function PUT(request: Request, context: Context) {
       );
     }
 
-    if (!userIdRaw || !mongoose.Types.ObjectId.isValid(userIdRaw)) {
+    if (!userIdRaw) {
       return NextResponse.json(
         { message: "Usuario no autenticado" },
         { status: 401 }
@@ -86,180 +58,21 @@ export async function PUT(request: Request, context: Context) {
       return validationErrorResponse(validation.errors);
     }
 
-    const userId = new mongoose.Types.ObjectId(userIdRaw);
-    const data = validation.data;
-
-    await connectDB();
-
-    const productoAntes = await Producto.findById(id);
-    if (!productoAntes) {
-      return NextResponse.json(
-        { message: "Producto no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    let nuevoSKU = productoAntes.sku;
-
-    if (
-      (data.nombre && data.nombre !== productoAntes.nombre) ||
-      (data.modelo && data.modelo !== productoAntes.modelo)
-    ) {
-      const nombreFinal = data.nombre || productoAntes.nombre;
-      const modeloFinal = data.modelo || productoAntes.modelo;
-
-      nuevoSKU = generarSKU(nombreFinal, modeloFinal);
-
-      const existe = await Producto.findOne({
-        sku: nuevoSKU,
-        _id: { $ne: id },
-      });
-
-      if (existe) {
-        return NextResponse.json(
-          { message: "Ya existe un producto con ese SKU" },
-          { status: 409 }
-        );
-      }
-    }
-
-    let variantesProcesadas = data.variantes;
-
-    if (Array.isArray(data.variantes)) {
-      const variantesNormalizadas = await normalizeVariantImages(
-        data.variantes as Variante[]
-      );
-
-      const variantesConIdentidad = ensureVariantIdentities(
-        variantesNormalizadas as Variante[]
-      );
-
-      variantesProcesadas = variantesConIdentidad.map((variante) => {
-        if (variante.codigoBarra && variante.qrCode) {
-          return variante;
-        }
-
-        const existentes = (productoAntes.variantes as Variante[]).filter((actual) =>
-          matchesVariant(actual, variante)
-        );
-
-        const correlativo = existentes.length + 1;
-        const { codigoBarra, qrCode } = generarCodigoVariante({
-          sku: nuevoSKU,
-          color: variante.color,
-          talla: variante.talla,
-          correlativo,
-        });
-
-        return {
-          ...variante,
-          codigoBarra: variante.codigoBarra || codigoBarra,
-          qrCode: variante.qrCode || qrCode,
-        };
-      });
-    }
-
-    const updatePayload = {
-      ...data,
-      sku: nuevoSKU,
-      ...(Array.isArray(variantesProcesadas)
-        ? { variantes: variantesProcesadas }
-        : {}),
-    };
-
-    const productoDespues = await Producto.findByIdAndUpdate(
-      id,
-      updatePayload,
-      { new: true }
-    );
-
-    if (!productoDespues) {
-      return NextResponse.json(
-        { message: "Producto no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    if (Array.isArray(variantesProcesadas)) {
-      await cleanupRemovedVariantImages(
-        productoAntes.variantes as Variante[],
-        productoDespues.variantes as Variante[]
-      );
-    }
-
-    for (const vNueva of productoDespues.variantes) {
-      const vAnterior = (productoAntes.variantes as Variante[]).find(
-        (v) => matchesVariant(v, vNueva)
-      );
-
-      if (!vAnterior && vNueva.stock > 0) {
-        await Inventario.create({
-          productoId: productoDespues._id,
-          productoSnapshot: {
-            nombre: productoDespues.nombre,
-            modelo: productoDespues.modelo,
-            sku: productoDespues.sku,
-          },
-          variante: {
-            variantId: vNueva.variantId,
-            color: vNueva.color,
-            talla: vNueva.talla,
-            codigoBarra: vNueva.codigoBarra,
-          },
-          tipo: "ENTRADA",
-          cantidad: vNueva.stock,
-          stockAnterior: 0,
-          stockActual: vNueva.stock,
-          motivo: "Nueva variante",
-          referencia: "VARIANTE_NUEVA",
-          usuario: userId,
-        });
-      }
-
-      if (vAnterior && vNueva.stock > vAnterior.stock) {
-        const diff = vNueva.stock - vAnterior.stock;
-
-        await Inventario.create({
-          productoId: productoDespues._id,
-          productoSnapshot: {
-            nombre: productoDespues.nombre,
-            modelo: productoDespues.modelo,
-            sku: productoDespues.sku,
-          },
-          variante: {
-            variantId: vNueva.variantId,
-            color: vNueva.color,
-            talla: vNueva.talla,
-            codigoBarra: vNueva.codigoBarra,
-          },
-          tipo: "ENTRADA",
-          cantidad: diff,
-          stockAnterior: vAnterior.stock,
-          stockActual: vNueva.stock,
-          motivo: "Aumento de stock",
-          referencia: "ACTUALIZACION_VARIANTE",
-          usuario: userId,
-        });
-      }
-    }
+    const producto = await updateCatalogProduct(id, validation.data, userIdRaw);
 
     return NextResponse.json({
       message: "Producto actualizado correctamente",
-      producto: productoDespues,
+      producto,
     });
-  } catch (err) {
-    console.error("PUT productos error:", err);
-    return NextResponse.json(
-      { message: "Error al actualizar producto" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error al actualizar producto",
+      logLabel: "PUT productos error:",
+    });
   }
 }
 
-export async function DELETE(
-  _request: Request,
-  context: Context
-) {
+export async function DELETE(_request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const headersList = await headers();
@@ -272,32 +85,13 @@ export async function DELETE(
       );
     }
 
-    await connectDB();
+    await deleteCatalogProduct(id);
 
-    const producto = await Producto.findById(id);
-
-    if (!producto) {
-      return NextResponse.json(
-        { message: "Producto no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    await cleanupRemovedVariantImages(
-      producto.variantes as Variante[],
-      []
-    );
-
-    await Producto.findByIdAndDelete(id);
-
-    return NextResponse.json(
-      { message: "Producto eliminado correctamente" }
-    );
-  } catch (err) {
-    console.error("ERROR:", err);
-    return NextResponse.json(
-      { message: "Error al eliminar producto" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Producto eliminado correctamente" });
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error al eliminar producto",
+      logLabel: "DELETE producto error:",
+    });
   }
 }

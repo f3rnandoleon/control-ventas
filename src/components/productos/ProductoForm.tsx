@@ -10,6 +10,7 @@ import {
 } from "@/schemas/producto.schema";
 
 type ProductoFormValues = z.input<typeof createProductoSchema>;
+type ProductoFormSubmitValues = z.output<typeof createProductoSchema>;
 
 export default function ProductoForm({
   initialData,
@@ -23,7 +24,7 @@ export default function ProductoForm({
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<ProductoFormValues>({
+  } = useForm<ProductoFormValues, unknown, ProductoFormSubmitValues>({
     resolver: zodResolver(createProductoSchema),
     defaultValues: {
       nombre: initialData?.nombre || "",

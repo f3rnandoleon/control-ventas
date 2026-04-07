@@ -5,17 +5,23 @@ import { getToken } from "next-auth/jwt";
 const authPages = ["/login", "/register"];
 const dashboardRoutes = ["/dashboard"];
 const protectedApiRoutes = [
+  "/api/admin",
   "/api/perfil",
+  "/api/cart",
   "/api/productos",
   "/api/uploads",
   "/api/ventas",
+  "/api/orders",
+  "/api/fulfillment",
+  "/api/pos",
+  "/api/payments",
   "/api/mis-pedidos",
   "/api/inventario",
   "/api/reportes",
   "/api/usuarios",
 ];
 
-const adminApiRoutes = ["/api/reportes", "/api/usuarios", "/api/uploads"];
+const adminApiRoutes = ["/api/admin", "/api/reportes", "/api/usuarios", "/api/uploads"];
 const staffApiRoutes = ["/api/productos", "/api/ventas", "/api/inventario"];
 
 function getDashboardHomeByRole(role?: string) {
@@ -40,6 +46,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/auth/signup") ||
+    pathname.startsWith("/api/health") ||
     isPublicProductosRoute
   ) {
     return NextResponse.next();
@@ -99,6 +106,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const requestHeaders = new Headers(request.headers);
+  if (!requestHeaders.get("x-request-id")) {
+    requestHeaders.set("x-request-id", crypto.randomUUID());
+  }
   // PREVENCIÓN DE SPOOFING: Limpiamos los headers internos por si alguien intenta inyectarlos desde afuera
   requestHeaders.delete("x-user-id");
   requestHeaders.delete("x-user-role");
@@ -146,6 +156,71 @@ export async function middleware(request: NextRequest) {
       { message: "Acceso no autorizado" },
       { status: 403 }
     );
+  }
+
+  if (pathname.startsWith("/api/orders")) {
+    const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
+    const isClientRead = role === "CLIENTE" && method === "GET";
+    const isClientCheckout =
+      role === "CLIENTE" &&
+      method === "POST" &&
+      pathname.startsWith("/api/orders/checkout");
+
+    if (!isStaff && !isClientRead && !isClientCheckout) {
+      return NextResponse.json(
+        { message: "Acceso no autorizado" },
+        { status: 403 }
+      );
+    }
+  }
+
+  if (pathname.startsWith("/api/fulfillment")) {
+    const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
+    const isClientRead = role === "CLIENTE" && method === "GET";
+
+    if (!isStaff && !isClientRead) {
+      return NextResponse.json(
+        { message: "Acceso no autorizado" },
+        { status: 403 }
+      );
+    }
+  }
+
+  if (pathname.startsWith("/api/pos")) {
+    const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
+
+    if (!isStaff) {
+      return NextResponse.json(
+        { message: "Acceso no autorizado" },
+        { status: 403 }
+      );
+    }
+  }
+
+  if (pathname.startsWith("/api/cart") && role !== "CLIENTE") {
+    return NextResponse.json(
+      { message: "Acceso no autorizado" },
+      { status: 403 }
+    );
+  }
+
+  if (pathname.startsWith("/api/payments")) {
+    const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
+    const isClient = role === "CLIENTE";
+
+    if (!isStaff && !isClient) {
+      return NextResponse.json(
+        { message: "Acceso no autorizado" },
+        { status: 403 }
+      );
+    }
+
+    if (pathname.includes("/refund") && !isStaff) {
+      return NextResponse.json(
+        { message: "Acceso no autorizado" },
+        { status: 403 }
+      );
+    }
   }
 
   // Si llegamos hasta aquí, hay un token válido de NextAuth.

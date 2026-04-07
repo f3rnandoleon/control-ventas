@@ -7,8 +7,9 @@ import {
   validationErrorResponse,
 } from "@/middleware/validate.middleware";
 import { updatePerfilSchema } from "@/schemas/perfil.schema";
-
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
+import { handleRouteError } from "@/shared/http/handleRouteError";
+import { getCustomerContextByUserId } from "@/modules/customers/application/customers.service";
 
 export async function GET(request: Request) {
   try {
@@ -21,26 +22,20 @@ export async function GET(request: Request) {
       );
     }
 
-    const userId = userAuth.id;
+    const context = await getCustomerContextByUserId(userAuth.id, {
+      ensureProfile: userAuth.role === "CLIENTE",
+    });
 
-    await connectDB();
-
-    const user = await User.findById(userId).select("-password");
-
-    if (!user) {
-      return NextResponse.json(
-        { message: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(user);
+    return NextResponse.json({
+      ...context.user,
+      customerProfile: context.profile,
+      defaultAddress: context.defaultAddress,
+    });
   } catch (error) {
-    console.error("GET perfil error:", error);
-    return NextResponse.json(
-      { message: "Error al obtener perfil" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al obtener perfil",
+      logLabel: "GET perfil error:",
+    });
   }
 }
 
@@ -103,12 +98,19 @@ export async function PUT(request: Request) {
       );
     }
 
-    return NextResponse.json(user);
+    const context = await getCustomerContextByUserId(userAuth.id, {
+      ensureProfile: user.role === "CLIENTE",
+    });
+
+    return NextResponse.json({
+      ...context.user,
+      customerProfile: context.profile,
+      defaultAddress: context.defaultAddress,
+    });
   } catch (error) {
-    console.error("PUT perfil error:", error);
-    return NextResponse.json(
-      { message: "Error al actualizar perfil" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al actualizar perfil",
+      logLabel: "PUT perfil error:",
+    });
   }
 }

@@ -53,6 +53,8 @@ export const varianteSchema = z.object({
 
     stock: nonNegativeIntegerSchema,
 
+    reservedStock: nonNegativeIntegerSchema.optional(),
+
     imagenes: z.array(varianteImageValueSchema).optional().default([]),
 
     imagen: varianteImageValueSchema.optional(),

@@ -3,6 +3,7 @@ export interface Variante {
   color: string;
   talla: string;
   stock: number;
+  reservedStock?: number;
   imagenes?: string[];
   imagen?: string;
   descripcion?: string;

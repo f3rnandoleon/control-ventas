@@ -1,3 +1,5 @@
+import type { CustomerAddress, CustomerProfile } from "@/types/customer";
+
 export type UserRole = "ADMIN" | "VENDEDOR" | "CLIENTE";
 
 export interface Usuario {
@@ -12,6 +14,8 @@ export interface Usuario {
 export interface PerfilUsuario extends Usuario {
   updatedAt: string;
   lastLogin?: string;
+  customerProfile?: CustomerProfile | null;
+  defaultAddress?: CustomerAddress | null;
 }
 
 export type CreateUsuarioDTO = {

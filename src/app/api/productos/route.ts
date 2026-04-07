@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { connectDB } from "@/libs/mongodb";
-import Producto from "@/models/product";
-import { generarSKU } from "@/utils/generarSKU";
-import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
-import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import {
+  validateRequest,
+  validationErrorResponse,
+} from "@/middleware/validate.middleware";
 import { createProductoSchema } from "@/schemas/producto.schema";
-import { normalizeVariantImages } from "@/libs/cloudinary";
-import type { Variante } from "@/types/producto";
-import { ensureVariantIdentities } from "@/utils/variantIdentity";
+import {
+  createCatalogProduct,
+  listCatalog,
+} from "@/modules/catalog/application/catalog.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export const runtime = "nodejs";
 
@@ -17,34 +18,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const withStock = searchParams.get("withStock") === "true";
 
-    await connectDB();
-    const productos = await Producto.find().sort({ createdAt: -1 }).lean();
-
-    if (!withStock) {
-      return NextResponse.json(productos);
-    }
-
-    const productosConStock = productos.map((producto) => ({
-      ...producto,
-      stockTotal:
-        producto.stockTotal ??
-        (producto.variantes ?? []).reduce(
-          (
-            total: number,
-            variante: { stock?: number | null }
-          ) => total + (variante.stock || 0),
-          0
-        ),
-      stockMinimo: producto.stockMinimo ?? 5,
-    }));
-
-    return NextResponse.json(productosConStock);
+    const productos = await listCatalog(withStock);
+    return NextResponse.json(productos);
   } catch (error) {
-    console.error("GET productos error:", error);
-    return NextResponse.json(
-      { message: "Error al obtener productos" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al obtener productos",
+      logLabel: "GET productos error:",
+    });
   }
 }
 
@@ -61,74 +41,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar datos con Zod
     const validation = await validateRequest(createProductoSchema, request);
 
     if (!validation.success) {
       return validationErrorResponse(validation.errors);
     }
 
-    const data = validation.data;
-    const { nombre, modelo } = data;
-
-    await connectDB();
-
-    const sku = generarSKU(nombre, modelo);
-
-    const existe = await Producto.findOne({ sku });
-    if (existe) {
-      return NextResponse.json(
-        { message: "Ya existe un producto con ese SKU" },
-        { status: 409 }
-      );
-    }
-
-    const variantesNormalizadas = await normalizeVariantImages(
-      (data.variantes ?? []) as Variante[]
-    );
-
-    const variantesConIdentidad = ensureVariantIdentities(
-      variantesNormalizadas as Variante[]
-    );
-
-    const variantesProcesadas = variantesConIdentidad.map((variante, index) => {
-      if (variante.codigoBarra && variante.qrCode) {
-        return variante;
-      }
-
-      const { codigoBarra, qrCode } = generarCodigoVariante({
-        sku,
-        color: variante.color,
-        talla: variante.talla,
-        correlativo: index + 1,
-      });
-
-      return {
-        ...variante,
-        codigoBarra: variante.codigoBarra || codigoBarra,
-        qrCode: variante.qrCode || qrCode,
-      };
-    });
-
-    const producto = new Producto({
-      ...data,
-      sku,
-      creadoPor: userId,
-      variantes: variantesProcesadas,
-    });
-
-    await producto.save();
+    const producto = await createCatalogProduct(validation.data, userId);
 
     return NextResponse.json(
       { message: "Producto creado correctamente", producto },
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST productos error:", error);
-    return NextResponse.json(
-      { message: "Error al crear producto" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al crear producto",
+      logLabel: "POST productos error:",
+    });
   }
 }
-

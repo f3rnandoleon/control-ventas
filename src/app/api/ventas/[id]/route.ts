@@ -1,30 +1,20 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/libs/mongodb";
-import Venta from "@/models/venta";
+import { getSaleById } from "@/modules/sales/application/sales.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await connectDB();
     const { id } = await params;
-    const venta = await Venta.findById(id)
-      .populate("vendedor", "fullname email");
-
-    if (!venta) {
-      return NextResponse.json(
-        { message: "Venta no encontrada" },
-        { status: 404 }
-      );
-    }
+    const venta = await getSaleById(id);
 
     return NextResponse.json(venta);
-  } catch (err) {
-    console.error("ERROR:", err);
-    return NextResponse.json(
-      { message: "Error al obtener venta" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error al obtener venta",
+      logLabel: "GET venta/[id] error:",
+    });
   }
 }

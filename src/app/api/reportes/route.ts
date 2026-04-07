@@ -1,34 +1,15 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/libs/mongodb";
-import Venta from "@/models/venta";
+import { getGeneralReport } from "@/modules/reports/application/reports.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectDB();
-
-    const [resumen] = await Venta.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalVentas: { $sum: "$total" },
-          gananciaTotal: { $sum: "$gananciaTotal" },
-          cantidadVentas: { $sum: 1 },
-        },
-      },
-    ]);
-
-    return NextResponse.json(
-      resumen || {
-        totalVentas: 0,
-        gananciaTotal: 0,
-        cantidadVentas: 0,
-      }
-    );
+    const resumen = await getGeneralReport(request);
+    return NextResponse.json(resumen);
   } catch (error) {
-    console.error("REPORTE GENERAL ERROR:", error);
-    return NextResponse.json(
-      { message: "Error al generar reporte" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al generar reporte",
+      logLabel: "REPORTE GENERAL ERROR:",
+    });
   }
 }

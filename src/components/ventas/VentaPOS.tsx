@@ -2,16 +2,16 @@
 import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createVentaSchema, CreateVentaInput } from "@/schemas/venta.schema";
+import { z } from "zod";
+import { createVentaSchema } from "@/schemas/venta.schema";
 import { createVenta } from "@/services/venta.service";
 import { Producto } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 // Tipo extendido para incluir stock disponible en el formulario (no se envía al backend)
-type VentaFormValues = CreateVentaInput & {
-  items: (CreateVentaInput["items"][number] & { stockDisponible?: number })[];
-};
+type VentaFormValues = z.input<typeof createVentaSchema>;
+type VentaFormSubmitValues = z.output<typeof createVentaSchema>;
 
 export default function VentaPOS({
   productos,
@@ -28,7 +28,7 @@ export default function VentaPOS({
     setValue,
     reset,
     formState: { isSubmitting },
-  } = useForm<VentaFormValues>({
+  } = useForm<VentaFormValues, unknown, VentaFormSubmitValues>({
     resolver: zodResolver(createVentaSchema),
     defaultValues: {
       items: [],
@@ -51,11 +51,10 @@ export default function VentaPOS({
       color: "",
       talla: "",
       cantidad: 1,
-      stockDisponible: 0,
     });
   };
 
-  const onSubmit = async (data: VentaFormValues) => {
+  const onSubmit = async (data: VentaFormSubmitValues) => {
     try {
       if (data.items.length === 0) {
         toast.error("Agrega al menos un producto");
@@ -85,7 +84,7 @@ export default function VentaPOS({
   };
 
   // Observar items para calcular totales
-  const watchedItems = watch("items");
+  const watchedItems = watch("items") ?? [];
 
   const subtotal = watchedItems?.reduce((sum, item) => {
     if (!item.productoId || !item.cantidad) return sum;
@@ -122,7 +121,13 @@ export default function VentaPOS({
 
       <div className="space-y-3">
         {fields.map((field, index) => {
-          const currentItem = watchedItems?.[index] || {};
+          const currentItem = watchedItems[index] ?? {
+            productoId: "",
+            variantId: undefined,
+            color: "",
+            talla: "",
+            cantidad: 1,
+          };
           const productoSeleccionado = productos.find(p => p._id === currentItem.productoId);
           const varianteSeleccionada = productoSeleccionado?.variantes.find(
             (v) =>
@@ -130,9 +135,16 @@ export default function VentaPOS({
               (v.color === currentItem.color && v.talla === currentItem.talla)
           );
           const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
+          const stockDisponible = varianteSeleccionada?.stock ?? 0;
           const varianteLabel = varianteSeleccionada
             ? `${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`
             : "Variante sin seleccionar";
+          const selectedVariantValue =
+            typeof currentItem.variantId === "string" && currentItem.variantId
+              ? currentItem.variantId
+              : currentItem.color && currentItem.talla
+                ? `${currentItem.color}|${currentItem.talla}`
+                : "";
           const precio = productoSeleccionado?.precioVenta || 0;
           const subtotalItem = precio * (currentItem.cantidad || 0);
 
@@ -170,7 +182,6 @@ export default function VentaPOS({
                   setValue(`items.${index}.variantId`, undefined);
                   setValue(`items.${index}.color`, "");
                   setValue(`items.${index}.talla`, "");
-                  setValue(`items.${index}.stockDisponible`, 0);
                   setValue(`items.${index}.cantidad`, 1);
                 }}
               >
@@ -187,13 +198,7 @@ export default function VentaPOS({
                 <select
                   className="input-chroma w-full text-sm bg-gray-800/50 rounded-md border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 py-1.5 disabled:opacity-50"
                   disabled={!currentItem.productoId}
-                  value={
-                    currentItem.variantId
-                      ? currentItem.variantId
-                      : currentItem.color && currentItem.talla
-                        ? `${currentItem.color}|${currentItem.talla}`
-                      : ""
-                  }
+                  value={selectedVariantValue}
                   onChange={(e) => {
                     const val = e.target.value;
                     if (!val) return;
@@ -207,7 +212,6 @@ export default function VentaPOS({
                       setValue(`items.${index}.variantId`, variante.variantId);
                       setValue(`items.${index}.color`, variante.color);
                       setValue(`items.${index}.talla`, variante.talla);
-                      setValue(`items.${index}.stockDisponible`, variante.stock);
                       // Reset cantidad si excede stock
                       if (currentItem.cantidad > variante.stock) {
                         setValue(`items.${index}.cantidad`, variante.stock);
@@ -242,7 +246,7 @@ export default function VentaPOS({
                   })}
                   onChange={(e) => {
                     let val = parseInt(e.target.value);
-                    const max = currentItem.stockDisponible || 0;
+                    const max = stockDisponible;
 
                     if (isNaN(val) || val < 1) val = 1;
 
@@ -258,11 +262,11 @@ export default function VentaPOS({
                   }}
                   className="input-chroma w-full text-center font-mono font-medium bg-gray-800/50 rounded-md border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 py-1.5"
                   min={1}
-                  disabled={!currentItem.stockDisponible}
+                  disabled={!stockDisponible}
                 />
-                {currentItem.stockDisponible !== undefined && currentItem.stockDisponible > 0 && (
+                {stockDisponible > 0 && (
                   <div className="absolute -top-3 right-0 bg-cyan-900/80 text-cyan-200 text-[10px] px-1.5 py-0.5 rounded border border-cyan-800 shadow-sm pointer-events-none">
-                    Max: {currentItem.stockDisponible}
+                    Max: {stockDisponible}
                   </div>
                 )}
               </div>

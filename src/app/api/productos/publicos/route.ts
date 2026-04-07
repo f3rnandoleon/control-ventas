@@ -1,29 +1,15 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/libs/mongodb";
-import Producto from "@/models/product";
-
-const PUBLIC_PRODUCT_PROJECTION = {
-  precioCosto: 0,
-  creadoPor: 0,
-  __v: 0,
-  "variantes.codigoBarra": 0,
-  "variantes.qrCode": 0,
-} as const;
+import { getPublicCatalog } from "@/modules/catalog/application/catalog.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export async function GET() {
   try {
-    await connectDB();
-    const productos = await Producto.find(
-      { estado: { $ne: "INACTIVO" } },
-      PUBLIC_PRODUCT_PROJECTION
-    ).sort({ createdAt: -1 });
-
+    const productos = await getPublicCatalog();
     return NextResponse.json(productos);
   } catch (error) {
-    console.error("GET productos/publicos error:", error);
-    return NextResponse.json(
-      { message: "Error al obtener catálogo público" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al obtener catálogo público",
+      logLabel: "GET productos/publicos error:",
+    });
   }
 }
