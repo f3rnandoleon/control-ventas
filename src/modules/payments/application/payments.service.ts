@@ -127,6 +127,7 @@ async function createSaleFromOrderIfNeeded(
     const variante = findVariantByIdentity(producto.variantes as Variante[], {
       variantId: item.variante.variantId,
       color: item.variante.color,
+      colorSecundario: item.variante.colorSecundario,
       talla: item.variante.talla,
     });
 
@@ -377,6 +378,7 @@ export async function failPaymentTransaction(
         const variante = findVariantByIdentity(producto.variantes as Variante[], {
           variantId: item.variante.variantId,
           color: item.variante.color,
+          colorSecundario: item.variante.colorSecundario,
           talla: item.variante.talla,
         });
 
@@ -471,6 +473,7 @@ export async function refundPaymentTransaction(
         const variante = findVariantByIdentity(producto.variantes as Variante[], {
           variantId: item.variante.variantId,
           color: item.variante.color,
+          colorSecundario: item.variante.colorSecundario,
           talla: item.variante.talla,
         });
 

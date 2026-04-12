@@ -30,6 +30,7 @@ type OrderItemInput = {
   variante: {
     variantId?: string;
     color: string;
+    colorSecundario?: string;
     talla: string;
     codigoBarra?: string;
     qrCode?: string;
@@ -123,6 +124,7 @@ async function releaseOrderReservation(order: {
     variante: {
       variantId?: string;
       color: string;
+      colorSecundario?: string;
       talla: string;
     };
     cantidad: number;
@@ -140,6 +142,7 @@ async function releaseOrderReservation(order: {
     const variante = producto.variantes.find((candidate: {
       variantId?: string;
       color: string;
+      colorSecundario?: string;
       talla: string;
     }) => {
       if (item.variante.variantId && candidate.variantId) {
@@ -148,6 +151,9 @@ async function releaseOrderReservation(order: {
 
       return (
         candidate.color === item.variante.color &&
+        (item.variante.colorSecundario === undefined ||
+          (candidate.colorSecundario || "") ===
+            (item.variante.colorSecundario || "")) &&
         candidate.talla === item.variante.talla
       );
     });
@@ -386,6 +392,7 @@ export async function checkoutCartToOrder(
           variante: {
             variantId: variante.variantId,
             color: variante.color,
+            colorSecundario: variante.colorSecundario,
             talla: variante.talla,
             codigoBarra: variante.codigoBarra,
             qrCode: variante.qrCode,

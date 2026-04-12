@@ -1,6 +1,7 @@
 export interface Variante {
   variantId?: string;
   color: string;
+  colorSecundario?: string;
   talla: string;
   stock: number;
   reservedStock?: number;

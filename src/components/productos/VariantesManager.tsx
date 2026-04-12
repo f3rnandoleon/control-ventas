@@ -167,7 +167,7 @@ export default function VariantesManager({
           <thead className="border-b border-white/10 text-gray-400">
             <tr>
               <th className="py-3">Imagen</th>
-              <th className="py-3">Color</th>
+              <th className="py-3">Color(es)</th>
               <th>Talla</th>
               <th>Stock</th>
               <th className="">Acciones</th>
@@ -176,7 +176,7 @@ export default function VariantesManager({
           <tbody >
             {producto.variantes.map((v, index) => (
               <VarianteRow
-                key={`${v.color}-${v.talla}`}
+                key={v.variantId || `${v.color}-${v.colorSecundario || ""}-${v.talla}`}
                 variante={v}
                 onEdit={() => {
                   setEditingIndex(index);

@@ -10,6 +10,7 @@ const cartItemSchema = new Schema(
     variante: {
       variantId: { type: String, index: true },
       color: { type: String, required: true },
+      colorSecundario: { type: String, trim: true },
       talla: { type: String, required: true },
       codigoBarra: { type: String },
       qrCode: { type: String },

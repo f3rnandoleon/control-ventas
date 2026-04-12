@@ -534,6 +534,7 @@ Body:
   "productoId": "507f1f77bcf86cd799439011",
   "variantId": "67ee00000000000000000001",
   "color": "Negro",
+  "colorSecundario": "Blanco",
   "talla": "M",
   "cantidad": 2
 }
@@ -781,6 +782,7 @@ Body:
     {
       "variantId": "67ee00000000000000000001",
       "color": "Negro",
+      "colorSecundario": "Blanco",
       "talla": "M",
       "stock": 10,
       "descripcion": "Polera negra talla M",
@@ -804,6 +806,7 @@ Validaciones:
 - Variante:
   - `variantId?`: ObjectId string opcional. Si no se envia, el backend lo genera automaticamente.
   - `color`: requerido, max 50
+  - `colorSecundario?`: opcional, max 50
   - `talla`: requerido, max 20
   - `stock`: entero >= 0
   - `descripcion?`: string opcional para detalles.
@@ -909,6 +912,7 @@ Respuestas:
   "variante": {
     "variantId": "67ee00000000000000000001",
     "color": "Negro",
+    "colorSecundario": "Blanco",
     "talla": "M",
     "stock": 5,
     "reservedStock": 1,
@@ -949,6 +953,7 @@ Body:
   "productoId": "507f1f77bcf86cd799439011",
   "variantId": "67ee00000000000000000001",
   "color": "Negro",
+  "colorSecundario": "Blanco",
   "talla": "M",
   "tipo": "ENTRADA",
   "cantidad": 5,
@@ -960,6 +965,7 @@ Validaciones:
 - `productoId`: ObjectId valido
 - `variantId?`: ObjectId string opcional. Si se envia, el backend intenta resolver primero la variante por este campo.
 - `color`: requerido, max 50
+- `colorSecundario?`: opcional, max 50
 - `talla`: requerido, max 20
 - `tipo`: `ENTRADA | SALIDA | AJUSTE | DEVOLUCION`
 - `cantidad`: entero, distinto de 0
@@ -967,7 +973,7 @@ Validaciones:
 - `referencia?`: max 100
 
 Reglas:
-- La variante se resuelve por `variantId` si llega; en caso contrario se usa compatibilidad por `color + talla`.
+- La variante se resuelve por `variantId` si llega; en caso contrario usa compatibilidad por `color + talla`, y si tambien llega `colorSecundario` lo toma en cuenta para distinguir combinaciones bicolor.
 - `ENTRADA`: suma stock.
 - `SALIDA`: resta stock (si no alcanza, `400`).
 - `AJUSTE`: fija stock al valor absoluto de `cantidad`.
@@ -1011,6 +1017,7 @@ Body:
       "productoId": "507f1f77bcf86cd799439011",
       "variantId": "67ee00000000000000000001",
       "color": "Negro",
+      "colorSecundario": "Blanco",
       "talla": "M",
       "cantidad": 2
     }
@@ -1032,6 +1039,7 @@ Validaciones:
   - `productoId`: ObjectId valido
   - `variantId?`: ObjectId string opcional. Si se envia, el backend intenta resolver primero la variante por este campo.
   - `color`: requerido, max 50
+  - `colorSecundario?`: opcional, max 50
   - `talla`: requerido, max 20
   - `cantidad`: entero positivo, max 1000
 - `metodoPago`: `EFECTIVO | QR`
@@ -1045,7 +1053,7 @@ Validaciones:
 
 Comportamiento:
 - Valida existencia de producto y variante.
-- La variante se resuelve por `variantId` si llega; en caso contrario se usa compatibilidad por `color + talla`.
+- La variante se resuelve por `variantId` si llega; en caso contrario usa compatibilidad por `color + talla`, y si tambien llega `colorSecundario` lo toma en cuenta para distinguir combinaciones bicolor.
 - Valida stock suficiente.
 - Descuenta stock por item.
 - Crea movimiento de inventario (`SALIDA`, referencia `VENTA`).
@@ -1484,6 +1492,7 @@ Respuesta `200`:
   "variante": {
     "variantId": "67ee00000000000000000001",
     "color": "Negro",
+    "colorSecundario": "Blanco",
     "talla": "M",
     "stock": 5,
     "reservedStock": 1,
@@ -1517,6 +1526,7 @@ Body:
       "productoId": "507f1f77bcf86cd799439011",
       "variantId": "67ee00000000000000000001",
       "color": "Negro",
+      "colorSecundario": "Blanco",
       "talla": "M",
       "cantidad": 1
     }
@@ -1730,6 +1740,7 @@ Respuesta `200`:
     "_id": {
       "variantId": "67ee00000000000000000001",
       "color": "Negro",
+      "colorSecundario": "Blanco",
       "talla": "M",
       "productoId": "productoId"
     },
@@ -1855,6 +1866,7 @@ Respuesta `200`:
       "productoId": "productoId",
       "variantId": "67ee00000000000000000001",
       "color": "Negro",
+      "colorSecundario": "Blanco",
       "talla": "M"
     },
     "nombre": "Polera",

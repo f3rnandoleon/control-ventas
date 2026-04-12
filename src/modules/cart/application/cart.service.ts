@@ -42,6 +42,7 @@ async function getProductAndVariant(
   const variante = findVariantByIdentity(producto.variantes as Variante[], {
     variantId: input.variantId,
     color: input.color,
+    colorSecundario: input.colorSecundario,
     talla: input.talla,
   });
 
@@ -79,6 +80,8 @@ export async function addCartItemByUserId(
     (item: (typeof cart.items)[number]) =>
       item.productoId.toString() === input.productoId &&
       item.variante.color === variante.color &&
+      (item.variante.colorSecundario || "") ===
+        (variante.colorSecundario || "") &&
       item.variante.talla === variante.talla &&
       (item.variante.variantId || "") === (variante.variantId || "")
   );
@@ -105,6 +108,7 @@ export async function addCartItemByUserId(
       variante: {
         variantId: variante.variantId,
         color: variante.color,
+        colorSecundario: variante.colorSecundario,
         talla: variante.talla,
         codigoBarra: variante.codigoBarra,
         qrCode: variante.qrCode,
@@ -155,6 +159,7 @@ export async function updateCartItemByUserId(
   const variante = findVariantByIdentity(producto.variantes as Variante[], {
     variantId: item.variante.variantId,
     color: item.variante.color,
+    colorSecundario: item.variante.colorSecundario,
     talla: item.variante.talla,
   });
 
@@ -247,6 +252,7 @@ export async function getValidatedCartForCheckout(
     const variante = findVariantByIdentity(producto.variantes as Variante[], {
       variantId: item.variante.variantId,
       color: item.variante.color,
+      colorSecundario: item.variante.colorSecundario,
       talla: item.variante.talla,
     });
 

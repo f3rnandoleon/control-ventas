@@ -21,6 +21,7 @@ type VarianteTallaForm = {
 
 type VarianteSharedForm = {
   color: string;
+  colorSecundario: string;
   descripcion: string;
   imagenes: string[];
 };
@@ -30,8 +31,12 @@ const createEmptySizeRow = (): VarianteTallaForm => ({
   stock: 0,
 });
 
-const normalizeVariantKey = (color: string, talla: string) =>
-  `${color.trim().toLowerCase()}::${talla.trim().toLowerCase()}`;
+const normalizeVariantKey = (
+  color: string,
+  colorSecundario: string | undefined,
+  talla: string
+) =>
+  `${color.trim().toLowerCase()}::${(colorSecundario || "").trim().toLowerCase()}::${talla.trim().toLowerCase()}`;
 
 export default function VarianteForm({
   initialData,
@@ -46,6 +51,7 @@ export default function VarianteForm({
 }) {
   const [sharedForm, setSharedForm] = useState<VarianteSharedForm>({
     color: initialData?.color || "",
+    colorSecundario: initialData?.colorSecundario || "",
     descripcion: initialData?.descripcion || "",
     imagenes: getVarianteImagenes(initialData),
   });
@@ -66,6 +72,10 @@ export default function VarianteForm({
   const [uploadingImage, setUploadingImage] = useState(false);
   const isEdit = Boolean(initialData);
   const colorOptions = getVariantSelectOptions(sharedForm.color, COLOR_OPTIONS);
+  const secondaryColorOptions = getVariantSelectOptions(
+    sharedForm.colorSecundario,
+    COLOR_OPTIONS
+  );
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -144,6 +154,7 @@ export default function VarianteForm({
 
   const handleSave = () => {
     const color = sharedForm.color.trim();
+    const colorSecundario = sharedForm.colorSecundario.trim();
     const descripcion = sharedForm.descripcion.trim();
     const imagenes = sharedForm.imagenes ?? [];
 
@@ -176,31 +187,46 @@ export default function VarianteForm({
     }
 
     const draftKeys = sanitizedRows.map((row) =>
-      normalizeVariantKey(color, row.talla)
+      normalizeVariantKey(color, colorSecundario, row.talla)
     );
     if (new Set(draftKeys).size !== draftKeys.length) {
-      toast.error("No puedes repetir la misma talla para un mismo color");
+      toast.error(
+        "No puedes repetir la misma talla para la misma combinacion de colores"
+      );
       return;
     }
 
     const originalKey = initialData
-      ? normalizeVariantKey(initialData.color, initialData.talla)
+      ? normalizeVariantKey(
+          initialData.color,
+          initialData.colorSecundario,
+          initialData.talla
+        )
       : null;
 
     const existingKeys = new Set(
       existingVariantes
-        .map((variante) => normalizeVariantKey(variante.color, variante.talla))
+        .map((variante) =>
+          normalizeVariantKey(
+            variante.color,
+            variante.colorSecundario,
+            variante.talla
+          )
+        )
         .filter((key) => key !== originalKey)
     );
 
     if (draftKeys.some((key) => existingKeys.has(key))) {
-      toast.error("Ya existe una variante registrada con ese color y talla");
+      toast.error(
+        "Ya existe una variante registrada con esa combinacion de colores y talla"
+      );
       return;
     }
 
     onSave(
       sanitizedRows.map((row) => ({
         color,
+        colorSecundario: colorSecundario || undefined,
         talla: row.talla,
         stock: row.stock,
         descripcion: descripcion || undefined,
@@ -223,6 +249,24 @@ export default function VarianteForm({
         >
           <option value="">Selecciona un color</option>
           {colorOptions.map((color) => (
+            <option key={color} value={color}>
+              {color}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="input"
+          value={sharedForm.colorSecundario}
+          onChange={(e) =>
+            setSharedForm((prev) => ({
+              ...prev,
+              colorSecundario: e.target.value,
+            }))
+          }
+        >
+          <option value="">Color secundario (opcional)</option>
+          {secondaryColorOptions.map((color) => (
             <option key={color} value={color}>
               {color}
             </option>

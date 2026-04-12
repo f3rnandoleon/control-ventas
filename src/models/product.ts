@@ -7,6 +7,7 @@ const varianteSchema = new Schema(
       default: () => new Types.ObjectId().toString(),
     },
     color: { type: String, required: true },
+    colorSecundario: { type: String, trim: true },
     talla: { type: String, required: true },
     stock: { type: Number, required: true, min: 0 },
     reservedStock: { type: Number, default: 0, min: 0 },

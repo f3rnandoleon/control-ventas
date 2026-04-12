@@ -22,6 +22,7 @@ type LegacyVentaRecord = {
     variante: {
       variantId?: string;
       color: string;
+      colorSecundario?: string;
       talla: string;
       codigoBarra?: string;
       qrCode?: string;
@@ -86,6 +87,7 @@ async function buildOrderItemsFromLegacySale(
     const matchedVariant = producto?.variantes?.find((candidate: {
       variantId?: string;
       color: string;
+      colorSecundario?: string;
       talla: string;
       codigoBarra?: string;
       qrCode?: string;
@@ -98,6 +100,9 @@ async function buildOrderItemsFromLegacySale(
 
       return (
         candidate.color === item.variante?.color &&
+        (item.variante?.colorSecundario === undefined ||
+          (candidate.colorSecundario || "") ===
+            (item.variante?.colorSecundario || "")) &&
         candidate.talla === item.variante?.talla
       );
     });
@@ -107,6 +112,8 @@ async function buildOrderItemsFromLegacySale(
       variante: {
         variantId: item.variante?.variantId || matchedVariant?.variantId,
         color: item.variante?.color || matchedVariant?.color || "Sin color",
+        colorSecundario:
+          item.variante?.colorSecundario || matchedVariant?.colorSecundario,
         talla: item.variante?.talla || matchedVariant?.talla || "SIN_TALLA",
         codigoBarra: item.variante?.codigoBarra || matchedVariant?.codigoBarra,
         qrCode: item.variante?.qrCode || matchedVariant?.qrCode,

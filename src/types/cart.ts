@@ -4,6 +4,7 @@ export interface CartItem {
   variante: {
     variantId?: string;
     color: string;
+    colorSecundario?: string;
     talla: string;
     codigoBarra?: string;
     qrCode?: string;

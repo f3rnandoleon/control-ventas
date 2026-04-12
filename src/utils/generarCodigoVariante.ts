@@ -3,15 +3,20 @@ import { normalizarTexto } from "./normalizar";
 export function generarCodigoVariante({
   sku,
   color,
+  colorSecundario,
   talla,
   correlativo,
 }: {
   sku: string;
   color: string;
+  colorSecundario?: string;
   talla: string;
   correlativo: number;
 }) {
-  const c = normalizarTexto(color);
+  const c = [color, colorSecundario]
+    .filter(Boolean)
+    .map((value) => normalizarTexto(value as string))
+    .join("-");
   const t = normalizarTexto(talla);
 
   const correlativoStr = correlativo.toString().padStart(3, "0");

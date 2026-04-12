@@ -34,6 +34,11 @@ export const createVentaItemSchema = z.object({
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),
 
+    colorSecundario: z.string()
+        .trim()
+        .max(50, "El color secundario no puede exceder 50 caracteres")
+        .optional(),
+
     talla: nonEmptyStringSchema
         .max(20, "La talla no puede exceder 20 caracteres"),
 

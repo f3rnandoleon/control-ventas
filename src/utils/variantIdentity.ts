@@ -3,12 +3,14 @@ import { Types } from "mongoose";
 type VariantIdentity = {
   variantId?: string | null;
   color?: string | null;
+  colorSecundario?: string | null;
   talla?: string | null;
 };
 
 type VariantLike = {
   variantId?: string;
   color: string;
+  colorSecundario?: string;
   talla: string;
 };
 
@@ -43,7 +45,10 @@ export function findVariantByIdentity<T extends VariantLike>(
   if (identity.color && identity.talla) {
     return variants.find(
       (variant) =>
-        variant.color === identity.color && variant.talla === identity.talla
+        variant.color === identity.color &&
+        variant.talla === identity.talla &&
+        (identity.colorSecundario === undefined ||
+          (variant.colorSecundario || "") === (identity.colorSecundario || ""))
     );
   }
 

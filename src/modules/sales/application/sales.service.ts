@@ -23,6 +23,7 @@ type VentaItemProcesado = {
   variante: {
     variantId?: string;
     color: string;
+    colorSecundario?: string;
     talla: string;
     codigoBarra?: string;
     qrCode?: string;
@@ -78,6 +79,7 @@ export async function createDirectSale(
       const variante = findVariantByIdentity(producto.variantes as Variante[], {
         variantId: item.variantId,
         color: item.color,
+        colorSecundario: item.colorSecundario,
         talla: item.talla,
       });
 
@@ -106,6 +108,7 @@ export async function createDirectSale(
         variante: {
           variantId: variante.variantId,
           color: variante.color,
+          colorSecundario: variante.colorSecundario,
           talla: variante.talla,
           codigoBarra: variante.codigoBarra,
           qrCode: variante.qrCode,

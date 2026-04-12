@@ -11,6 +11,7 @@ export interface InventarioItem {
   variante: {
     variantId?: string;
     color: string;
+    colorSecundario?: string;
     talla: string;
     codigoBarra?: string;
   };

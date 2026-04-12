@@ -94,6 +94,7 @@ export async function createCatalogProduct(
     const { codigoBarra, qrCode } = generarCodigoVariante({
       sku,
       color: variante.color,
+      colorSecundario: variante.colorSecundario,
       talla: variante.talla,
       correlativo: index + 1,
     });
@@ -176,6 +177,7 @@ export async function updateCatalogProduct(
       const { codigoBarra, qrCode } = generarCodigoVariante({
         sku: nuevoSKU,
         color: variante.color,
+        colorSecundario: variante.colorSecundario,
         talla: variante.talla,
         correlativo,
       });
@@ -325,6 +327,7 @@ export async function findCatalogProductByCode(code: string) {
     variante: {
       variantId: variante.variantId,
       color: variante.color,
+      colorSecundario: variante.colorSecundario,
       talla: variante.talla,
       stock: variante.stock,
       reservedStock: variante.reservedStock || 0,

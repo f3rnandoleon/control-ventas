@@ -10,7 +10,11 @@ export const matchesVariant = (current: Variante, target: Variante) => {
     return current.variantId === target.variantId;
   }
 
-  return current.color === target.color && current.talla === target.talla;
+  return (
+    current.color === target.color &&
+    (current.colorSecundario || "") === (target.colorSecundario || "") &&
+    current.talla === target.talla
+  );
 };
 
 export const getVariantReservedStock = (

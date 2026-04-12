@@ -15,6 +15,7 @@ import { runInTransaction } from "@/shared/db/runTransaction";
 type VariantLookup = {
   variantId?: string;
   color?: string;
+  colorSecundario?: string;
   talla?: string;
 };
 
@@ -122,6 +123,7 @@ export async function recordInventoryMovement({
     variante: {
       variantId: variante.variantId,
       color: variante.color,
+      colorSecundario: variante.colorSecundario,
       talla: variante.talla,
       codigoBarra: variante.codigoBarra,
     },
@@ -236,6 +238,7 @@ export async function adjustInventoryStock({
   productoId,
   variantId,
   color,
+  colorSecundario,
   talla,
   cantidad,
   tipo,
@@ -250,6 +253,7 @@ export async function adjustInventoryStock({
           productoId,
           variantId,
           color,
+          colorSecundario,
           talla,
           cantidad,
           tipo,
@@ -274,6 +278,7 @@ export async function adjustInventoryStock({
   const variante = resolveVariant(producto.variantes as Variante[], {
     variantId,
     color,
+    colorSecundario,
     talla,
   });
 
