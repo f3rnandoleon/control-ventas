@@ -1,26 +1,26 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
+import {
+  buildAuthTokenUser,
+  issueAuthTokens,
+} from "@/modules/auth/application/auth-tokens.service";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { email, password } = body;
 
-    // Validación básica
     if (!email || !password) {
       return NextResponse.json(
-        { message: "Email y contraseña son obligatorios" },
+        { message: "Email y contrasena son obligatorios" },
         { status: 400 }
       );
     }
 
-    // Conectar a la base de datos
     await connectDB();
 
-    // Buscar al usuario
     const user = await User.findOne({
       email: email.toLowerCase(),
     }).select("+password");
@@ -32,7 +32,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Comprobar estado del usuario
     if (!user.isActive) {
       return NextResponse.json(
         { message: "Usuario deshabilitado" },
@@ -40,7 +39,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar contraseña
+    if (!user.password) {
+      return NextResponse.json(
+        {
+          message:
+            "Esta cuenta fue registrada con Google. Ingresa con Google desde la web de clientes.",
+        },
+        { status: 401 }
+      );
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
@@ -50,7 +58,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Actualizar la fecha del último login si es posible
     try {
       user.lastLogin = new Date();
       await user.save();
@@ -58,39 +65,20 @@ export async function POST(request: Request) {
       console.error("Error actualizando lastLogin en /api/auth/login:", error);
     }
 
-    // Crear el payload JWT
-    const payload = {
-      id: user._id.toString(),
+    const authUser = buildAuthTokenUser({
+      _id: user._id,
       email: user.email,
-      role: user.role,
       fullname: user.fullname,
-    };
+      role: user.role,
+    });
+    const { accessToken, refreshToken } = issueAuthTokens(authUser);
 
-    const secret = process.env.JWT_SECRET || "fallback_secret";
-    const expiresIn = (process.env.JWT_EXPIRES_IN || "1d") as jwt.SignOptions["expiresIn"];
-
-    // Firmar accessToken
-    const accessToken = jwt.sign(payload, secret, { expiresIn });
-
-    // Firmar refreshToken (opcional, configurado para durar más tiempo, por ej. 7 días)
-    const refreshToken = jwt.sign(
-      { id: user._id.toString() },
-      secret,
-      { expiresIn: "7d" as jwt.SignOptions["expiresIn"] }
-    );
-
-    // Devolver un objeto estable y fácil de consumir por terceros Auth
     return NextResponse.json(
       {
         message: "Login exitoso",
         accessToken,
         refreshToken,
-        user: {
-          id: user._id.toString(),
-          email: user.email,
-          fullname: user.fullname,
-          role: user.role,
-        },
+        user: authUser,
       },
       { status: 200 }
     );

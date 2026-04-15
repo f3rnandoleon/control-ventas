@@ -67,6 +67,8 @@ export async function POST(request: Request) {
     role: userRole,
     password: hash,
     isActive,
+    authProviders: ["credentials"],
+    emailVerified: false,
   });
 
   if (user.role === "CLIENTE") {

@@ -48,6 +48,8 @@ export async function POST(request: Request) {
       password: hashedPassword,
       role: userRole,
       isActive: true,
+      authProviders: ["credentials"],
+      emailVerified: false,
     });
 
     await user.save();

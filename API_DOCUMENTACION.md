@@ -7,6 +7,7 @@ Base URL en desarrollo: `/api`
 - La API usa un modelo **híbrido**:
   - NextAuth (JWT en cookie httpOnly) para el panel interno.
   - Token JWT tradicional (`Authorization: Bearer <token>`) emitido por `/api/auth/login` para acceso desde clientes externos o web.
+  - Login cliente con Google mediante `POST /api/auth/google`, que tambien devuelve JWT tradicional para la web cliente.
 - Middleware protege rutas, rechaza spoofing de headers y agrega info interna confiable:
   - `x-user-id`
   - `x-user-role`
@@ -16,6 +17,7 @@ Base URL en desarrollo: `/api`
   - `/login` y `/register` siguen siendo publicas; solo redirigen al dashboard correspondiente si ya existe sesion.
 - Rutas publicas:
   - `POST /api/auth/signup`
+  - `POST /api/auth/google`
   - `GET|POST /api/auth/[...nextauth]`
   - `GET /api/productos/publicos`
   - `GET /api/productos/publicos/:id`
@@ -349,6 +351,7 @@ Notas:
 - `password` minimo 6 caracteres.
 - Solo se acepta rol `CLIENTE`; cualquier otro valor se guarda como `CLIENTE`.
 - Al registrar un cliente, el backend crea tambien su `CustomerProfile` base para poder guardar direcciones y preferencias de entrega.
+- Las cuentas creadas por este flujo quedan con proveedor `credentials`.
 
 Respuestas:
 - `201`: usuario creado.
@@ -388,8 +391,64 @@ Respuestas:
 }
 ```
 - `400`: faltan credenciales.
-- `401`: credenciales incorrectas o usuario inactivo.
+- `401`: credenciales incorrectas, usuario inactivo o cuenta registrada solo con Google.
 - `500`: error interno.
+
+Notas:
+- Si la cuenta fue creada solo con Google y no tiene password local, este endpoint responde:
+
+```json
+{
+  "message": "Esta cuenta fue registrada con Google. Ingresa con Google desde la web de clientes."
+}
+```
+
+#### `POST /api/auth/google`
+Login o registro automatico para clientes usando Google Sign-In.
+
+Body:
+
+```json
+{
+  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ik..."
+}
+```
+
+Notas:
+- Disponible solo para cuentas `CLIENTE`.
+- El backend valida el `idToken` directamente con Google.
+- Si no existe usuario local con ese correo, crea la cuenta automaticamente.
+- Si ya existe una cuenta con el mismo correo y rol `CLIENTE`, la vincula automaticamente con Google.
+- Si la cuenta existe pero esta deshabilitada, rechaza el acceso.
+- Al crear o vincular un cliente, el backend garantiza tambien la existencia de su `CustomerProfile`.
+
+Respuestas:
+- `200`: autenticacion exitosa. Retorna:
+
+```json
+{
+  "message": "Se detecto un correo igual y se lo vinculo exitosamente con Google.",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "user": {
+    "id": "64abcdef1234567890abcdef",
+    "email": "cliente@correo.com",
+    "fullname": "Cliente Demo",
+    "role": "CLIENTE"
+  },
+  "created": false,
+  "linkedExistingAccount": true
+}
+```
+- `400`: `idToken` faltante o invalido por schema.
+- `401`: token Google invalido o correo Google no verificado.
+- `403`: cuenta deshabilitada o acceso no permitido para roles no cliente.
+- `409`: conflicto de vinculacion con otra cuenta Google.
+- `503`: Google auth no configurado (`GOOGLE_CLIENT_ID` faltante).
+
+Variables de entorno requeridas para habilitarlo:
+- `GOOGLE_CLIENT_ID`
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` en la web cliente que inicia Google Sign-In
 
 ---
 

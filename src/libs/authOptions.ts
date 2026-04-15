@@ -31,6 +31,12 @@ export const authOptions: AuthOptions = {
           throw new Error("Usuario deshabilitado");
         }
 
+        if (!user.password) {
+          throw new Error(
+            "Esta cuenta usa Google. Ingresa con Google desde la web de clientes."
+          );
+        }
+
         const isMatch = await bcrypt.compare(
           credentials.password,
           user.password
