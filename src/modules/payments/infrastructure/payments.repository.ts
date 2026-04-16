@@ -32,4 +32,8 @@ export const paymentsRepository = {
       { new: true, session }
     );
   },
+
+  findByReviewToken(token: string, session?: ClientSession) {
+    return PaymentTransaction.findOne({ reviewToken: token }).session(session ?? null);
+  },
 };

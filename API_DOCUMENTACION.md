@@ -1103,7 +1103,7 @@ Validaciones:
   - `cantidad`: entero positivo, max 1000
 - `metodoPago`: `EFECTIVO | QR`
 - `tipoVenta`: `WEB | APP_QR | TIENDA`
-- `descuento?`: numero >= 0 y <= 100
+- `descuento?`: monto en Bs >= 0. El backend lo resta directamente del subtotal (`total = subtotal - descuento`). Si no se envia, se asume `0` (sin descuento).
 - `delivery?`: objeto opcional
   - `method`: `WHATSAPP | PICKUP_LAPAZ | HOME_DELIVERY`
   - `pickupPoint`: requerido para PICKUP (`TELEFERICO_MORADO | TELEFERICO_ROJO | CORREOS`)
@@ -1571,7 +1571,7 @@ Respuestas:
 - `500`
 
 #### `POST /api/pos/sales`
-Registra una venta desde la app o flujo POS.
+Registra una venta desde el panel POS (punto de venta en tienda o app).
 
 Permisos:
 - Solo `ADMIN` y `VENDEDOR`.
@@ -1591,18 +1591,63 @@ Body:
     }
   ],
   "metodoPago": "QR",
-  "descuento": 0
+  "descuento": 20.00
 }
 ```
+
+Validaciones del campo `descuento`:
+- Tipo: `number` (monto en Bs).
+- Minimo: `0` (sin descuento).
+- No tiene limite maximo en el schema del backend; la logica del frontend garantiza que no supere el subtotal.
+- Si no se envia, el backend asume `0`.
+- El campo es opcional.
+
+Calculo del total:
+```
+total = subtotal - descuento
+```
+
+Modos de descuento (gestion en el frontend POS):
+
+El UI del POS permite aplicar el descuento de dos formas. Antes de enviar la request, el frontend convierte el valor a monto fijo en Bs:
+
+| Modo | Ejemplo (subtotal Bs 200) | Valor enviado al backend |
+|------|--------------------------|-------------------------|
+| Monto fijo (Bs) | Descuento: `Bs 30` | `"descuento": 30` |
+| Porcentaje (%) | Descuento: `15%` | `"descuento": 30` |
 
 Reglas:
 - El backend fuerza `tipoVenta = APP_QR`.
 - Reutiliza la misma logica transaccional de `POST /api/ventas`.
 - Crea:
-  - venta
+  - venta con `descuento` y `total` definitivos
   - movimientos de inventario
-  - pedido espejo
-  - fulfillment sincronizado
+  - pedido espejo (con `descuento` reflejado)
+  - pago inmediato confirmado
+  - evento de auditoria `SALE_CREATED`
+
+Ejemplo de respuesta `201`:
+
+```json
+{
+  "message": "Venta POS registrada correctamente",
+  "venta": {
+    "_id": "...",
+    "numeroVenta": "V-1234567890",
+    "subtotal": 240,
+    "descuento": 20,
+    "total": 220,
+    "gananciaTotal": 80,
+    "metodoPago": "QR",
+    "tipoVenta": "APP_QR",
+    "estado": "PAGADA"
+  },
+  "order": {
+    "_id": "...",
+    "orderNumber": "O-1234567890"
+  }
+}
+```
 
 Respuestas:
 - `201`

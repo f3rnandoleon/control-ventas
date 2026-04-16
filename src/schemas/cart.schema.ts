@@ -17,6 +17,9 @@ const optionalObjectIdSchema = z.preprocess(
   objectIdSchema.optional()
 );
 
+const optionalStr = (max: number) =>
+  z.string().trim().max(max).optional().nullable();
+
 export const addCartItemSchema = z.object({
   productoId: objectIdSchema,
   variantId: optionalObjectIdSchema,
@@ -34,28 +37,100 @@ export const updateCartItemSchema = z.object({
   cantidad: positiveIntegerSchema.max(1000, "La cantidad no puede exceder 1000"),
 });
 
-export const checkoutCartSchema = z.object({
-  metodoPago: z.enum(["EFECTIVO", "QR"]),
-  addressId: optionalObjectIdSchema,
-  delivery: z
-    .object({
-      method: z.enum(["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY"]),
-      pickupPoint: z
-        .enum(["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS"])
-        .nullable()
-        .optional(),
-      address: z.string().nullable().optional(),
-      phone: z.string().nullable().optional(),
-      recipientName: nonEmptyStringSchema
-        .max(100, "El destinatario no puede exceder 100 caracteres")
-        .nullable()
-        .optional(),
-    })
-    .optional(),
-  notes: nonEmptyStringSchema
-    .max(300, "Las notas no pueden exceder 300 caracteres")
-    .optional(),
-});
+export const checkoutCartSchema = z
+  .object({
+    metodoPago: z.enum(["EFECTIVO", "QR"]),
+    addressId: optionalObjectIdSchema,
+    notes: nonEmptyStringSchema
+      .max(300, "Las notas no pueden exceder 300 caracteres")
+      .optional(),
+
+    delivery: z
+      .object({
+        method: z.enum(["WHATSAPP", "HOME_DELIVERY", "SHIPPING_NATIONAL"]),
+
+        // HOME_DELIVERY (La Paz)
+        address: optionalStr(300),
+        phone: optionalStr(20),
+        recipientName: optionalStr(100),
+        scheduledAt: optionalStr(100),
+
+        // SHIPPING_NATIONAL (Otro departamento)
+        department: optionalStr(100),
+        city: optionalStr(100),
+        shippingCompany: optionalStr(150),
+        branch: optionalStr(150),
+        senderName: optionalStr(100),
+        senderCI: optionalStr(20),
+        senderPhone: optionalStr(20),
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    const method = data.delivery?.method;
+
+    if (method === "HOME_DELIVERY") {
+      if (!data.delivery?.phone) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El celular de contacto es obligatorio para entrega en La Paz",
+          path: ["delivery", "phone"],
+        });
+      }
+      if (!data.delivery?.address) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "La dirección es obligatoria para entrega en La Paz",
+          path: ["delivery", "address"],
+        });
+      }
+    }
+
+    if (method === "SHIPPING_NATIONAL") {
+      if (data.metodoPago !== "QR") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El envío a otro departamento requiere pago por QR",
+          path: ["metodoPago"],
+        });
+      }
+      if (!data.delivery?.department) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El departamento destino es obligatorio",
+          path: ["delivery", "department"],
+        });
+      }
+      if (!data.delivery?.shippingCompany) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "La empresa de transporte es obligatoria",
+          path: ["delivery", "shippingCompany"],
+        });
+      }
+      if (!data.delivery?.senderName) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El nombre del remitente es obligatorio",
+          path: ["delivery", "senderName"],
+        });
+      }
+      if (!data.delivery?.senderCI) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El carnet del remitente es obligatorio",
+          path: ["delivery", "senderCI"],
+        });
+      }
+      if (!data.delivery?.senderPhone) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El celular del remitente es obligatorio",
+          path: ["delivery", "senderPhone"],
+        });
+      }
+    }
+  });
 
 export type AddCartItemInput = z.infer<typeof addCartItemSchema>;
 export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;

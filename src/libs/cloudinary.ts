@@ -257,3 +257,41 @@ export async function cleanupRemovedVariantImages(
       })
   );
 }
+
+/**
+ * Upload genérico de imagen a Cloudinary desde un objeto File del navegador/edge.
+ * Usado para subir comprobantes de pago QR.
+ */
+export async function uploadFileToCloudinary(
+  file: File,
+  folder: string
+): Promise<string> {
+  const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const paramsToSign: Record<string, string> = { folder, timestamp };
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("folder", folder);
+  formData.append("timestamp", timestamp);
+  formData.append("api_key", apiKey);
+  formData.append("unique_filename", "true");
+  formData.append("use_filename", "true");
+  paramsToSign.unique_filename = "true";
+  paramsToSign.use_filename = "true";
+  formData.append("signature", signCloudinaryParams(paramsToSign, apiSecret));
+
+  const response = await fetch(buildCloudinaryUrl(cloudName, "upload"), {
+    method: "POST",
+    body: formData,
+    cache: "no-store",
+  });
+
+  const data = await parseCloudinaryResponse(response);
+
+  if (!data.secure_url) {
+    throw new Error("Cloudinary no devolvio la URL de la imagen");
+  }
+
+  return data.secure_url;
+}

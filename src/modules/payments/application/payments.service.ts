@@ -543,3 +543,92 @@ export async function refundPaymentTransaction(
     return { payment, order, venta };
   });
 }
+
+// ============================================================
+// FLUJO QR: COMPROBANTE + VERIFICACION POR LINK/TOKEN
+// ============================================================
+
+export async function uploadComprobanteAndGenerateToken(
+  paymentId: string,
+  comprobanteUrl: string,
+  actorId: string
+) {
+  assertObjectId(paymentId, "Pago invalido");
+  await connectDB();
+
+  const payment = await paymentsRepository.findById(paymentId);
+  if (!payment) throw new AppError("Pago no encontrado", 404);
+  if (payment.customer?.toString() !== actorId) throw new AppError("No autorizado", 403);
+  if (payment.status !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
+
+  const reviewToken = crypto.randomUUID();
+  payment.comprobanteUrl = comprobanteUrl;
+  payment.reviewToken = reviewToken;
+  payment.reviewTokenUsed = false;
+  await payment.save();
+
+  return { payment, reviewToken };
+}
+
+export async function getPaymentByReviewToken(token: string) {
+  await connectDB();
+  const payment = await paymentsRepository.findByReviewToken(token);
+  if (!payment) throw new AppError("Link de verificacion invalido", 404);
+  if (payment.reviewTokenUsed) throw new AppError("Este link ya fue utilizado", 410);
+  const order = await Order.findById(payment.orderId)
+    .populate("customer", "fullname email")
+    .lean();
+  if (!order) throw new AppError("Pedido no encontrado", 404);
+  return { payment, order };
+}
+
+export async function confirmPaymentByToken(token: string) {
+  await connectDB();
+  return runInTransaction(async (session) => {
+    const payment = await paymentsRepository.findByReviewToken(token, session);
+    if (!payment) throw new AppError("Link invalido", 404);
+    if (payment.reviewTokenUsed) throw new AppError("Este link ya fue utilizado", 410);
+    const order = await getOrderForPayment(payment.orderId.toString(), session);
+    if (order.orderStatus === "CANCELLED") throw new AppError("El pedido ya fue cancelado", 409);
+    const tokenActor: AuthActor = { id: "token-review", role: "ADMIN" };
+    const venta = await createSaleFromOrderIfNeeded(order, tokenActor, session);
+    payment.status = "PAID"; payment.confirmedAt = new Date(); payment.reviewTokenUsed = true;
+    await payment.save({ session });
+    order.paymentStatus = "PAID"; order.orderStatus = "CONFIRMED";
+    order.stockReservationStatus = "CONSUMED"; order.reservedAt = null; order.reservationExpiresAt = null;
+    if (order.fulfillmentStatus !== "DELIVERED") order.fulfillmentStatus = "PENDING";
+    await order.save({ session });
+    await syncFulfillmentForOrder(order, session);
+    await recordAuditEventSafe({ action: "PAYMENT_CONFIRMED", entityType: "PAYMENT", entityId: payment._id.toString(), actorId: "TOKEN_REVIEW", actorRole: "ADMIN", status: "SUCCESS", metadata: { orderId: order._id.toString(), via: "review_token" } }, session);
+    return { payment, order, venta };
+  });
+}
+
+export async function rejectPaymentByToken(token: string, reason?: string) {
+  await connectDB();
+  return runInTransaction(async (session) => {
+    const payment = await paymentsRepository.findByReviewToken(token, session);
+    if (!payment) throw new AppError("Link invalido", 404);
+    if (payment.reviewTokenUsed) throw new AppError("Este link ya fue utilizado", 410);
+    const order = await getOrderForPayment(payment.orderId.toString(), session);
+    if (order.stockReservationStatus === "RESERVED") {
+      for (const item of order.items) {
+        const producto = await Producto.findById(item.productoId).session(session);
+        if (!producto) continue;
+        const variante = findVariantByIdentity(producto.variantes as Variante[], { variantId: item.variante.variantId, color: item.variante.color, colorSecundario: item.variante.colorSecundario, talla: item.variante.talla });
+        if (!variante) continue;
+        await releaseReservedStockForOrder({ producto, variante, cantidad: item.cantidad }, session);
+      }
+    }
+    payment.status = "FAILED"; payment.failedAt = new Date();
+    payment.failureReason = reason || "Comprobante rechazado"; payment.reviewTokenUsed = true;
+    await payment.save({ session });
+    order.paymentStatus = "FAILED"; order.orderStatus = "CANCELLED";
+    order.fulfillmentStatus = "CANCELLED"; order.stockReservationStatus = "RELEASED";
+    order.reservedAt = null; order.reservationExpiresAt = null;
+    await order.save({ session });
+    await syncFulfillmentForOrder(order, session);
+    await recordAuditEventSafe({ action: "PAYMENT_FAILED", entityType: "PAYMENT", entityId: payment._id.toString(), actorId: "TOKEN_REVIEW", actorRole: "ADMIN", status: "SUCCESS", metadata: { orderId: order._id.toString(), via: "review_token", reason } }, session);
+    return { payment, order };
+  });
+}

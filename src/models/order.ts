@@ -133,7 +133,7 @@ const orderSchema = new Schema(
     deliverySnapshot: {
       method: {
         type: String,
-        enum: ["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY", null],
+        enum: ["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY", "SHIPPING_NATIONAL", null],
         default: null,
       },
       pickupPoint: {
@@ -150,6 +150,39 @@ const orderSchema = new Schema(
         default: null,
       },
       recipientName: {
+        type: String,
+        default: null,
+      },
+      scheduledAt: {
+        type: String,
+        default: null,
+      },
+      // Campos para envío a otro departamento
+      department: {
+        type: String,
+        default: null,
+      },
+      city: {
+        type: String,
+        default: null,
+      },
+      shippingCompany: {
+        type: String,
+        default: null,
+      },
+      branch: {
+        type: String,
+        default: null,
+      },
+      senderName: {
+        type: String,
+        default: null,
+      },
+      senderCI: {
+        type: String,
+        default: null,
+      },
+      senderPhone: {
         type: String,
         default: null,
       },

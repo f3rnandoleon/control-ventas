@@ -4,7 +4,10 @@ export async function createVenta(data: CreateVentaDTO) {
   const res = await fetch("/api/ventas", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      descuento: data.descuento ?? 0,
+    }),
   });
 
   if (!res.ok) {

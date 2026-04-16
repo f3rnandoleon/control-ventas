@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useState } from "react";
 import { createVentaSchema } from "@/schemas/venta.schema";
 import { createVenta } from "@/services/venta.service";
 import { Producto } from "@/types/producto";
@@ -34,6 +35,7 @@ export default function VentaPOS({
       items: [],
       metodoPago: "EFECTIVO",
       tipoVenta: "TIENDA",
+      descuento: 0,
     },
     mode: "onChange",
   });
@@ -43,6 +45,9 @@ export default function VentaPOS({
     name: "items",
   });
 
+  // Estado local para el tipo de descuento (Bs o %)
+  const [tipoDescuento, setTipoDescuento] = useState<"BS" | "PORCENTAJE">("BS");
+  const [valorDescuento, setValorDescuento] = useState<number>(0);
 
   const agregarItem = () => {
     append({
@@ -52,6 +57,33 @@ export default function VentaPOS({
       talla: "",
       cantidad: 1,
     });
+  };
+
+  // Observar items para calcular totales
+  const watchedItems = watch("items") ?? [];
+
+  const subtotal = watchedItems?.reduce((sum, item) => {
+    if (!item.productoId || !item.cantidad) return sum;
+    const producto = productos.find((p) => p._id === item.productoId);
+    if (!producto) return sum;
+    return sum + producto.precioVenta * item.cantidad;
+  }, 0) || 0;
+
+  // Calcular el monto de descuento en Bs
+  const montoDescuento =
+    tipoDescuento === "PORCENTAJE"
+      ? Math.min((valorDescuento / 100) * subtotal, subtotal)
+      : Math.min(valorDescuento, subtotal);
+
+  const total = Math.max(subtotal - montoDescuento, 0);
+
+  const handleDescuentoChange = (val: number) => {
+    const cleaned = Math.max(0, val);
+    if (tipoDescuento === "PORCENTAJE" && cleaned > 100) {
+      setValorDescuento(100);
+    } else {
+      setValorDescuento(cleaned);
+    }
   };
 
   const onSubmit = async (data: VentaFormSubmitValues) => {
@@ -71,9 +103,11 @@ export default function VentaPOS({
         })),
         metodoPago: data.metodoPago,
         tipoVenta: "TIENDA",
+        descuento: montoDescuento,
       });
 
-      reset({ items: [], metodoPago: "EFECTIVO", tipoVenta: "TIENDA" });
+      reset({ items: [], metodoPago: "EFECTIVO", tipoVenta: "TIENDA", descuento: 0 });
+      setValorDescuento(0);
 
       toast.success("Venta registrada correctamente");
       onSuccess();
@@ -82,18 +116,6 @@ export default function VentaPOS({
       toast.error(message)
     }
   };
-
-  // Observar items para calcular totales
-  const watchedItems = watch("items") ?? [];
-
-  const subtotal = watchedItems?.reduce((sum, item) => {
-    if (!item.productoId || !item.cantidad) return sum;
-    const producto = productos.find((p) => p._id === item.productoId);
-    if (!producto) return sum;
-    return sum + producto.precioVenta * item.cantidad;
-  }, 0) || 0;
-
-  const total = subtotal;
 
   return (
     <div className="bg-gray-900/50 border border-white/10 rounded-2xl p-6 space-y-6 shadow-2xl backdrop-blur-sm">
@@ -253,7 +275,6 @@ export default function VentaPOS({
                     // 🔒 VALIDACIÓN ESTRICTA: No permitir superar el stock
                     if (val > max && max > 0) {
                       val = max;
-                      // Aquí podríamos mostrar un toast aviso si quisiéramos
                     }
 
                     // Forzamos el valor en el input y en el formulario
@@ -325,6 +346,7 @@ export default function VentaPOS({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end bg-black/20 p-5 rounded-xl border border-white/5">
         <div className="space-y-4">
+          {/* Método de Pago */}
           <div className="space-y-2">
             <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Método de Pago</label>
             <div className="grid grid-cols-2 gap-3">
@@ -344,15 +366,107 @@ export default function VentaPOS({
               </label>
             </div>
           </div>
+
+          {/* Descuento */}
+          <div className="space-y-2">
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wider flex items-center gap-2">
+              <span>🏷️</span> Descuento
+            </label>
+            <div className="flex gap-2 items-stretch">
+              {/* Toggle Bs / % */}
+              <div className="flex rounded-lg overflow-hidden border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoDescuento("BS");
+                    setValorDescuento(0);
+                  }}
+                  className={`px-3 py-2 text-sm font-semibold transition-all ${
+                    tipoDescuento === "BS"
+                      ? "bg-amber-500/20 text-amber-300 border-r border-amber-500/40"
+                      : "bg-white/5 text-gray-500 hover:text-gray-300 border-r border-white/10"
+                  }`}
+                >
+                  Bs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoDescuento("PORCENTAJE");
+                    setValorDescuento(0);
+                  }}
+                  className={`px-3 py-2 text-sm font-semibold transition-all ${
+                    tipoDescuento === "PORCENTAJE"
+                      ? "bg-amber-500/20 text-amber-300"
+                      : "bg-white/5 text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  %
+                </button>
+              </div>
+
+              {/* Input de descuento */}
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
+                  step="0.01"
+                  value={valorDescuento || ""}
+                  onChange={(e) => handleDescuentoChange(parseFloat(e.target.value) || 0)}
+                  placeholder={tipoDescuento === "BS" ? "0.00" : "0"}
+                  className="input-chroma w-full bg-gray-800/50 rounded-lg border-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 py-2 px-3 text-white placeholder-gray-600 font-mono"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
+                  {tipoDescuento === "PORCENTAJE" ? "%" : "Bs"}
+                </span>
+              </div>
+            </div>
+
+            {/* Vista previa del descuento */}
+            {montoDescuento > 0 && (
+              <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                <span className="text-xs text-amber-300/70">Ahorro</span>
+                <span className="text-sm font-bold text-amber-400 font-mono">
+                  −Bs {montoDescuento.toFixed(2)}
+                  {tipoDescuento === "PORCENTAJE" && valorDescuento > 0 && (
+                    <span className="text-amber-500/70 text-xs ml-1">({valorDescuento}%)</span>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Resumen y botón */}
         <div className="space-y-4">
-          <div className="flex justify-between items-end pb-3 border-b border-white/10">
-            <span className="text-gray-400 font-medium">Total a Pagar</span>
-            <span className="text-3xl font-bold text-white tracking-tight">
-              <span className="text-2xl text-cyan-500 mr-1">Bs</span>
-              {total.toFixed(2)}
-            </span>
+          <div className="space-y-2 pb-3 border-b border-white/10">
+            {/* Subtotal */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Subtotal</span>
+              <span className="text-sm text-gray-400 font-mono">Bs {subtotal.toFixed(2)}</span>
+            </div>
+
+            {/* Descuento */}
+            {montoDescuento > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-amber-400/80 flex items-center gap-1">
+                  <span>🏷️</span> Descuento
+                </span>
+                <span className="text-sm text-amber-400 font-mono font-semibold">
+                  −Bs {montoDescuento.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {/* Total */}
+            <div className="flex justify-between items-end pt-1">
+              <span className="text-gray-400 font-medium">Total a Pagar</span>
+              <span className="text-3xl font-bold text-white tracking-tight">
+                <span className="text-2xl text-cyan-500 mr-1">Bs</span>
+                {total.toFixed(2)}
+              </span>
+            </div>
           </div>
 
           <button

@@ -303,21 +303,40 @@ export async function checkoutCartToOrder(
     ensureProfile: true,
   });
 
+  const method = payload.delivery?.method ?? null;
   let deliverySnapshot: Record<string, unknown> | null = null;
 
-  if (payload.addressId) {
+  if (method === "WHATSAPP") {
+    // Sin dirección, solo se coordina por WhatsApp
+    deliverySnapshot = { method: "WHATSAPP" };
+  } else if (method === "HOME_DELIVERY") {
+    deliverySnapshot = {
+      method: "HOME_DELIVERY",
+      address: payload.delivery?.address ?? null,
+      phone: payload.delivery?.phone ?? null,
+      recipientName: payload.delivery?.recipientName || customer.user.fullname,
+      scheduledAt: payload.delivery?.scheduledAt ?? null,
+    };
+  } else if (method === "SHIPPING_NATIONAL") {
+    deliverySnapshot = {
+      method: "SHIPPING_NATIONAL",
+      department: payload.delivery?.department ?? null,
+      city: payload.delivery?.city ?? null,
+      shippingCompany: payload.delivery?.shippingCompany ?? null,
+      branch: payload.delivery?.branch ?? null,
+      senderName: payload.delivery?.senderName ?? null,
+      senderCI: payload.delivery?.senderCI ?? null,
+      senderPhone: payload.delivery?.senderPhone ?? null,
+      recipientName: payload.delivery?.recipientName || customer.user.fullname,
+    };
+  } else if (payload.addressId) {
+    // Compatibilidad con flujo anterior via addressId
     const address = await getCustomerAddressByUserId(customerId, payload.addressId);
     deliverySnapshot = {
-      method: payload.delivery?.method || "HOME_DELIVERY",
-      pickupPoint: payload.delivery?.pickupPoint || null,
+      method: "HOME_DELIVERY",
       address: payload.delivery?.address || address.addressLine,
       phone: payload.delivery?.phone || address.phone,
       recipientName: payload.delivery?.recipientName || address.recipientName,
-    };
-  } else if (payload.delivery) {
-    deliverySnapshot = {
-      ...payload.delivery,
-      recipientName: payload.delivery.recipientName || customer.user.fullname,
     };
   } else if (customer.defaultAddress) {
     deliverySnapshot = {
@@ -328,6 +347,8 @@ export async function checkoutCartToOrder(
     };
   }
 
+  // WhatsApp necesita más tiempo (confirmación manual)
+  const reservationMinutes = method === "WHATSAPP" ? 60 * 24 : 30;
 
   return runInTransaction(async (session) => {
     const { validatedItems } = await getValidatedCartForCheckout(
@@ -355,6 +376,9 @@ export async function checkoutCartToOrder(
       );
     }
 
+    const fulfillmentStatus =
+      method === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
+
     const order = await ordersRepository.create({
       orderNumber: createOrderNumber(),
       sourceSaleId: null,
@@ -362,14 +386,10 @@ export async function checkoutCartToOrder(
       channel: "WEB",
       orderStatus: "PENDING_PAYMENT",
       paymentStatus: "PENDING",
-      fulfillmentStatus: deliverySnapshot
-        ? deliverySnapshot.method === "WHATSAPP"
-          ? "NOT_APPLICABLE"
-          : "PENDING"
-        : "PENDING",
+      fulfillmentStatus,
       stockReservationStatus: "RESERVED",
       reservedAt: new Date(),
-      reservationExpiresAt: createReservationExpirationDate(),
+      reservationExpiresAt: createReservationExpirationDate(reservationMinutes),
       metodoPago: payload.metodoPago,
       customer: customerId,
       seller: null,
@@ -378,7 +398,7 @@ export async function checkoutCartToOrder(
         fullname: customer.user.fullname,
         email: customer.user.email,
         phone:
-          deliverySnapshot?.phone ||
+          (deliverySnapshot?.phone as string) ||
           customer.profile?.phone ||
           customer.defaultAddress?.phone ||
           null,
@@ -427,6 +447,7 @@ export async function checkoutCartToOrder(
         status: "SUCCESS",
         metadata: {
           channel: order.channel,
+          deliveryMethod: method,
           total: order.total,
           items: order.items.length,
         },

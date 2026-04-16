@@ -61,6 +61,22 @@ const paymentTransactionSchema = new Schema(
       type: Date,
       default: null,
     },
+    comprobanteUrl: {
+      type: String,
+      default: null,
+    },
+    reviewToken: {
+      type: String,
+      default: null,
+      index: {
+        unique: true,
+        sparse: true,
+      },
+    },
+    reviewTokenUsed: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

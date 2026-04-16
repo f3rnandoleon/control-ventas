@@ -73,4 +73,5 @@ export interface CreateVentaDTO {
   items: CreateVentaItemDTO[];
   metodoPago: "EFECTIVO" | "QR";
   tipoVenta: "WEB" | "APP_QR" | "TIENDA";
+  descuento?: number;
 }
