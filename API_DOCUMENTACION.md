@@ -1195,47 +1195,98 @@ Respuestas:
 - `500`
 
 #### `POST /api/orders/checkout`
-Convierte el carrito del cliente autenticado en un pedido real.
+Convierte el carrito del cliente autenticado en un pedido real con la opción de entrega elegida.
 
 Permisos:
 - Solo `CLIENTE`.
 
-Body:
+**3 métodos de entrega disponibles (`delivery.method`):**
 
+| Método | Descripción | Pago permitido | Reserva stock |
+|--------|-------------|:--------------:|:--------------:|
+| `WHATSAPP` | Coordinación por WhatsApp | EFECTIVO o QR | 24 horas |
+| `HOME_DELIVERY` | Entrega en La Paz | EFECTIVO o QR | 30 minutos |
+| `SHIPPING_NATIONAL` | Envío a otro departamento | Solo QR | 30 minutos |
+
+---
+
+**Opción 1 — WhatsApp:**
+```json
+{
+  "metodoPago": "EFECTIVO",
+  "delivery": { "method": "WHATSAPP" }
+}
+```
+El backend crea el pedido en `PENDING_PAYMENT` con reserva de 24 horas. El frontend debe abrir `wa.me` con el resumen del pedido para que el cliente lo envíe al número del negocio.
+
+---
+
+**Opción 2 — Entrega en La Paz:**
 ```json
 {
   "metodoPago": "QR",
-  "addressId": "507f1f77bcf86cd799439013",
   "delivery": {
     "method": "HOME_DELIVERY",
+    "address": "Zona Sur, Calle 12 #345",
     "phone": "76543210",
-    "recipientName": "Cliente Demo"
+    "recipientName": "Juan Pérez",
+    "scheduledAt": "Miércoles por la tarde"
   }
 }
 ```
+- `address` y `phone` son **obligatorios**.
+- `scheduledAt` y `recipientName` son opcionales (texto libre).
+- Si `metodoPago = QR`: el siguiente paso es subir el comprobante con `POST /api/payments/:id/upload-comprobante`.
+- Si `metodoPago = EFECTIVO`: el pedido queda pendiente hasta que un admin lo confirme manualmente.
 
-Reglas:
-- El backend valida que el carrito no este vacio.
-- Vuelve a validar existencia de producto, variante y stock antes de crear el pedido.
+---
+
+**Opción 3 — Envío a otro departamento:**
+```json
+{
+  "metodoPago": "QR",
+  "delivery": {
+    "method": "SHIPPING_NATIONAL",
+    "department": "Santa Cruz",
+    "city": "Santa Cruz de la Sierra",
+    "shippingCompany": "Trans Copacabana",
+    "branch": "Terminal Bimodal",
+    "recipientName": "María López",
+    "senderName": "Juan Pérez",
+    "senderCI": "12345678",
+    "senderPhone": "76543210"
+  }
+}
+```
+- `metodoPago` debe ser **`QR`** (validado por el backend).
+- `department`, `shippingCompany`, `senderName`, `senderCI` y `senderPhone` son **obligatorios**.
+- `city`, `branch` y `recipientName` son opcionales.
+- El siguiente paso es subir el comprobante con `POST /api/payments/:id/upload-comprobante`.
+
+---
+
+Campos comunes opcionales:
+- `addressId`: ID de una dirección guardada del cliente (solo aplica si no se usa el nuevo campo `delivery`).
+- `notes`: Observaciones del pedido (max 300 chars).
+
+Reglas generales:
+- El backend valida que el carrito no esté vacío.
+- Valida existencia de producto, variante y stock disponible.
 - Crea un `Order` con:
   - `channel = WEB`
   - `orderStatus = PENDING_PAYMENT`
   - `paymentStatus = PENDING`
-- Reserva stock en cada variante con:
-  - `stockReservationStatus = RESERVED`
-  - `reservedAt`
-  - `reservationExpiresAt`
-- Luego vacia el carrito.
-- No descuenta stock fisico en este paso; el stock se consume al confirmar el pago.
-- La reserva expira automaticamente segun la configuracion actual del backend (15 minutos).
-- La reserva, la creacion del pedido y el vaciado del carrito se ejecutan dentro de una sola transaccion Mongo.
+- Reserva stock (`stockReservationStatus = RESERVED`).
+- Vacía el carrito al finalizar.
+- No descuenta stock físico en este paso; se consume al confirmar el pago.
+- Todo corre dentro de una transacción Mongo.
 
 Respuestas:
 - `201`
-- `400`: carrito vacio, validacion o stock insuficiente.
+- `400`: carrito vacío, validación condicional de campos, stock insuficiente.
 - `401`: no autenticado.
 - `403`: solo clientes.
-- `404`: producto, variante o direccion no encontrada.
+- `404`: producto o variante no encontrada.
 - `500`
 
 #### `GET /api/orders/:id`
@@ -1286,6 +1337,118 @@ Respuestas:
 - `403`: no autorizado.
 - `404`: pedido no encontrado.
 - `500`
+
+---
+
+### Payments
+
+#### `POST /api/payments`
+Crea una transaccion de pago para un pedido.
+
+Body:
+
+```json
+{
+  "orderId": "507f1f77bcf86cd799439021",
+  "metodoPago": "QR",
+  "idempotencyKey": "checkout-123",
+  "externalReference": "qr-session-001"
+}
+```
+
+Reglas:
+- Un pedido no puede tener mas de un pago confirmado.
+- Si se envia un `idempotencyKey` ya usado, el backend devuelve la transaccion existente.
+- Si el pedido ya perdio su reserva activa (`stockReservationStatus = RELEASED`) y no esta pagado, el backend responde `409`.
+- La verificacion del pedido y la creacion de la transaccion de pago se ejecutan dentro de una misma transaccion Mongo.
+
+Respuestas:
+- `201`
+- `400`: validacion o ID invalido.
+- `401`: no autenticado.
+- `403`: no autorizado.
+- `404`: pedido no encontrado.
+- `409`: el pedido ya tiene un pago confirmado.
+- `500`
+
+#### `POST /api/payments/:id/confirm`
+Confirma una transaccion de pago.
+
+Body:
+
+```json
+{
+  "externalReference": "qr-paid-001"
+}
+```
+
+Reglas:
+- Si el pedido aun no tiene `Venta` asociada, el backend:
+  - consume stock reservado
+  - registra movimientos de inventario
+  - crea la `Venta`
+  - enlaza `Order.sourceSaleId`
+- Luego marca el pago como pagado.
+
+#### `POST /api/payments/:id/fail`
+Falla una transacción de pago y libera las reservas.
+
+#### `POST /api/payments/:id/refund`
+Reembolsa un pago.
+
+---
+
+### Comprobantes QR y Verificación Manual Web
+
+Estos endpoints pertenecen al flujo de pago QR del checkout web (cliente sube imagen, admin aprueba por WhatsApp).
+
+#### `POST /api/payments/:id/upload-comprobante`
+Sube imagen de comprobante QR y genera link de verificación.
+
+Permisos:
+- Solo `CLIENTE` (dueño del pago).
+
+Body: Form-Data con campo `file` (imagen max 5 MB).
+
+Respuestas:
+- `201`: Retorna URL Cloudinary del comprobante y `verifyLink` (URL completa del frontend para enviar por WhatsApp al admin).
+- `400` / `403` / `409` (pago ya procesado) / `500`.
+
+#### `GET /api/verify/payment/:token`
+Ruta **PÚBLICA**. Admin la consume cuando entra al link recibido por WhatsApp.
+Busca la transacción de pago mediante el token UUID único de revisión.
+
+Respuestas:
+- `200`: Retorna datos del pago, URLs, comprobante y datos completos del Pedido.
+- `404`: Link inválido.
+- `410`: Link ya fue utilizado.
+
+#### `POST /api/verify/payment/:token/confirm`
+Ruta **PÚBLICA** (autorizada por UUID token) activada por el admin.
+Flujo interno:
+- El token sustituye la autenticación normal (Actor: `TOKEN_REVIEW`).
+- Marca el pago como `PAID`.
+- Confirma la reserva de stock y crea la `Venta`.
+- Marca el token como usado.
+
+Respuestas:
+- `200`: Pago confirmado.
+- `404` / `410`: Link inválido o ya usado.
+
+#### `POST /api/verify/payment/:token/reject`
+Ruta **PÚBLICA** (autorizada por UUID token) activada por el admin.
+Flujo interno:
+- Marca el pago como `FAILED`.
+- Cancela el pedido.
+- Libera la reserva de stock a disponible.
+- Marca el token como usado.
+
+Body opcional (JSON):
+```json
+{
+  "reason": "Comprobante falso o borroso"
+}
+```
 
 ---
 
