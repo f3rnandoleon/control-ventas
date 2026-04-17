@@ -12,6 +12,7 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
     { label: "Productos", href: "/dashboard/admin/productos", keywords: ["catalogo", "stock"] },
     { label: "Ventas", href: "/dashboard/admin/ventas", keywords: ["caja", "pos"] },
     { label: "Inventario", href: "/dashboard/admin/inventario", keywords: ["almacen", "disponible"] },
+    { label: "Pedidos", href: "/dashboard/admin/pedidos", keywords: ["reserva", "comprobante"] },
     { label: "Reportes", href: "/dashboard/admin/reportes", keywords: ["metricas", "graficos"] },
     { label: "Usuarios", href: "/dashboard/admin/usuarios", keywords: ["roles", "equipo"] },
   ],
@@ -20,5 +21,6 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
     { label: "Ventas", href: "/dashboard/vendedor/ventas", keywords: ["caja", "pos"] },
     { label: "Productos", href: "/dashboard/vendedor/productos", keywords: ["catalogo"] },
     { label: "Inventario", href: "/dashboard/vendedor/inventario", keywords: ["stock", "disponible"] },
+    { label: "Pedidos", href: "/dashboard/vendedor/pedidos", keywords: ["reserva", "comprobante"] },
   ],
 };

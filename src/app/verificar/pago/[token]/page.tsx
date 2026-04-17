@@ -55,8 +55,8 @@ type PageState = "loading" | "ready" | "error" | "used" | "confirming" | "reject
 
 const DELIVERY_LABELS: Record<string, string> = {
   WHATSAPP: "📱 WhatsApp",
-  HOME_DELIVERY: "🏠 Entrega en La Paz",
-  SHIPPING_NATIONAL: "🚚 Envío a otro departamento",
+  PICKUP_POINT: "🏠 Punto de Encuentro",
+  SHIPPING_NATIONAL: "📦 Envío Nacional",
 };
 
 export default function VerificarPagoPage() {

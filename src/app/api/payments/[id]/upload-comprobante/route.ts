@@ -3,6 +3,7 @@ import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { uploadFileToCloudinary } from "@/libs/cloudinary";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 import { uploadComprobanteAndGenerateToken } from "@/modules/payments/application/payments.service";
+import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ type Context = { params: Promise<{ id: string }> };
  * - Acepta multipart/form-data con campo "file" (imagen, max 5 MB).
  * - Sube la imagen a Cloudinary en la carpeta "control-ventas/comprobantes".
  * - Genera un reviewToken único (UUID) y lo guarda en el PaymentTransaction.
- * - Devuelve el link de verificación para que el frontend lo envíe al admin por WhatsApp.
+ * - Envía una notificación automática al admin vía Telegram con el link de verificación.
  */
 export async function POST(request: Request, context: Context) {
   try {
@@ -71,9 +72,22 @@ export async function POST(request: Request, context: Context) {
       "https://control-ventas-azure.vercel.app";
     const verifyLink = `${appUrl}/verificar/pago/${reviewToken}`;
 
+    // 🤖 Notificación automática al admin vía Telegram
+    const montoEscapado = escapeTelegramMd(`Bs ${payment.amount?.toFixed(2) ?? "0.00"}`);
+    const pagoEscapado = escapeTelegramMd(payment.paymentNumber ?? paymentId);
+    const linkEscapado = escapeTelegramMd(verifyLink);
+
+    await sendTelegramMessage(
+      `🔔 *NUEVO COMPROBANTE POR VERIFICAR*\n\n` +
+      `💳 Pago: \`${pagoEscapado}\`\n` +
+      `💰 Monto: *${montoEscapado}*\n\n` +
+      `📋 [Ver comprobante y procesar](${linkEscapado})\n\n` +
+      `_Este link es de un solo uso\\._`
+    );
+
     return NextResponse.json(
       {
-        message: "Comprobante subido correctamente",
+        message: "Comprobante subido correctamente. El administrador fue notificado.",
         comprobanteUrl: payment.comprobanteUrl,
         verifyLink,
       },

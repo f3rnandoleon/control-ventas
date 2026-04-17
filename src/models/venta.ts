@@ -124,7 +124,7 @@ const ventaSchema = new Schema(
     delivery: {
       method: {
         type: String,
-        enum: ["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY"],
+        enum: ["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT"],
       },
       pickupPoint: {
         type: String,

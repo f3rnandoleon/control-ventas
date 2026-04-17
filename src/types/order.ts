@@ -58,7 +58,7 @@ export interface Order {
   total: number;
   items: OrderItem[];
   deliverySnapshot?: {
-    method: "WHATSAPP" | "PICKUP_LAPAZ" | "HOME_DELIVERY";
+    method: "WHATSAPP" | "PICKUP_LAPAZ" | "PICKUP_POINT";
     pickupPoint?: "TELEFERICO_MORADO" | "TELEFERICO_ROJO" | "CORREOS" | null;
     address?: string | null;
     phone?: string | null;

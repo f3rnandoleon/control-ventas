@@ -58,8 +58,8 @@ type CreateOrderFromSaleInput = {
   customerId?: string;
   sellerId?: string;
   delivery?: {
-    method: "WHATSAPP" | "PICKUP_LAPAZ" | "HOME_DELIVERY";
-    pickupPoint?: "TELEFERICO_MORADO" | "TELEFERICO_ROJO" | "CORREOS" | null;
+    method: "WHATSAPP" | "PICKUP_LAPAZ" | "PICKUP_POINT";
+    pickupPoint?: string | null;
     address?: string | null;
     phone?: string | null;
   };
@@ -254,8 +254,8 @@ export async function createOrderFromSale(
       };
     } else if (customer.defaultAddress) {
       deliverySnapshot = {
-        method: "HOME_DELIVERY",
-        address: customer.defaultAddress.addressLine,
+        method: "PICKUP_POINT",
+        pickupPoint: customer.defaultAddress.addressLine,
         phone: customer.defaultAddress.phone,
         recipientName: customer.defaultAddress.recipientName,
       };
@@ -309,10 +309,10 @@ export async function checkoutCartToOrder(
   if (method === "WHATSAPP") {
     // Sin dirección, solo se coordina por WhatsApp
     deliverySnapshot = { method: "WHATSAPP" };
-  } else if (method === "HOME_DELIVERY") {
+  } else if (method === "PICKUP_POINT") {
     deliverySnapshot = {
-      method: "HOME_DELIVERY",
-      address: payload.delivery?.address ?? null,
+      method: "PICKUP_POINT",
+      pickupPoint: payload.delivery?.pickupPoint ?? null,
       phone: payload.delivery?.phone ?? null,
       recipientName: payload.delivery?.recipientName || customer.user.fullname,
       scheduledAt: payload.delivery?.scheduledAt ?? null,
@@ -333,22 +333,24 @@ export async function checkoutCartToOrder(
     // Compatibilidad con flujo anterior via addressId
     const address = await getCustomerAddressByUserId(customerId, payload.addressId);
     deliverySnapshot = {
-      method: "HOME_DELIVERY",
-      address: payload.delivery?.address || address.addressLine,
+      method: "PICKUP_POINT",
+      pickupPoint: payload.delivery?.pickupPoint || address.addressLine,
       phone: payload.delivery?.phone || address.phone,
       recipientName: payload.delivery?.recipientName || address.recipientName,
     };
   } else if (customer.defaultAddress) {
     deliverySnapshot = {
-      method: "HOME_DELIVERY",
-      address: customer.defaultAddress.addressLine,
+      method: "PICKUP_POINT",
+      pickupPoint: customer.defaultAddress.addressLine,
       phone: customer.defaultAddress.phone,
       recipientName: customer.defaultAddress.recipientName,
     };
   }
 
   // WhatsApp necesita más tiempo (confirmación manual)
-  const reservationMinutes = method === "WHATSAPP" ? 60 * 24 : 30;
+  // Igual si es en efectivo se le da 48 horas por defecto
+  const reservationMinutes = 
+    (method === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
 
   return runInTransaction(async (session) => {
     const { validatedItems } = await getValidatedCartForCheckout(

@@ -9,7 +9,7 @@ type Context = { params: Promise<{ token: string }> };
 /**
  * GET /api/verify/payment/:token
  * Ruta PÚBLICA — no requiere autenticación.
- * El admin accede con el link recibido por WhatsApp para revisar el comprobante.
+ * El admin accede con el link recibido vía Telegram para revisar el comprobante.
  * Devuelve datos del pago, el pedido y la URL del comprobante.
  */
 export async function GET(_request: Request, context: Context) {

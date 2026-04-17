@@ -33,7 +33,7 @@ const fulfillmentSchema = new Schema(
     },
     method: {
       type: String,
-      enum: ["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY", null],
+      enum: ["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT", null],
       default: null,
     },
     status: {

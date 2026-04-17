@@ -9,7 +9,7 @@ export type FulfillmentStatus =
 export type FulfillmentMethod =
   | "WHATSAPP"
   | "PICKUP_LAPAZ"
-  | "HOME_DELIVERY"
+  | "PICKUP_POINT"
   | null;
 
 export interface Fulfillment {

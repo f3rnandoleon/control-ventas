@@ -47,10 +47,10 @@ export const checkoutCartSchema = z
 
     delivery: z
       .object({
-        method: z.enum(["WHATSAPP", "HOME_DELIVERY", "SHIPPING_NATIONAL"]),
+        method: z.enum(["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL"]),
 
-        // HOME_DELIVERY (La Paz)
-        address: optionalStr(300),
+        // PICKUP_POINT (Puntos de entrega)
+        pickupPoint: optionalStr(150),
         phone: optionalStr(20),
         recipientName: optionalStr(100),
         scheduledAt: optionalStr(100),
@@ -69,19 +69,19 @@ export const checkoutCartSchema = z
   .superRefine((data, ctx) => {
     const method = data.delivery?.method;
 
-    if (method === "HOME_DELIVERY") {
+    if (method === "PICKUP_POINT") {
       if (!data.delivery?.phone) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "El celular de contacto es obligatorio para entrega en La Paz",
+          message: "El celular de contacto es obligatorio para el punto de encuentro",
           path: ["delivery", "phone"],
         });
       }
-      if (!data.delivery?.address) {
+      if (!data.delivery?.pickupPoint) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "La dirección es obligatoria para entrega en La Paz",
-          path: ["delivery", "address"],
+          message: "El lugar de encuentro es obligatorio",
+          path: ["delivery", "pickupPoint"],
         });
       }
     }

@@ -3,7 +3,7 @@ export type CustomerDocumentType = "CI" | "NIT" | "PASAPORTE" | "OTRO";
 export type CustomerDeliveryMethod =
   | "WHATSAPP"
   | "PICKUP_LAPAZ"
-  | "HOME_DELIVERY";
+  | "PICKUP_POINT";
 
 export interface CustomerProfile {
   _id: string;

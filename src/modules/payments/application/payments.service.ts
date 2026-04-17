@@ -567,6 +567,16 @@ export async function uploadComprobanteAndGenerateToken(
   payment.reviewTokenUsed = false;
   await payment.save();
 
+  // Pausar la expiración del pedido para darle tiempo al admin de revisar el comprobante
+  const order = await Order.findById(payment.orderId);
+  if (order && order.stockReservationStatus === "RESERVED") {
+    // Le damos 48 horas adicionales desde que subió el comprobante para que el Admin revise
+    const extendedDate = new Date();
+    extendedDate.setHours(extendedDate.getHours() + 48);
+    order.reservationExpiresAt = extendedDate;
+    await order.save();
+  }
+
   return { payment, reviewToken };
 }
 
@@ -630,5 +640,69 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
     await syncFulfillmentForOrder(order, session);
     await recordAuditEventSafe({ action: "PAYMENT_FAILED", entityType: "PAYMENT", entityId: payment._id.toString(), actorId: "TOKEN_REVIEW", actorRole: "ADMIN", status: "SUCCESS", metadata: { orderId: order._id.toString(), via: "review_token", reason } }, session);
     return { payment, order };
+  });
+}
+
+export async function confirmCashOrder(orderId: string, actor: AuthActor) {
+  assertObjectId(orderId, "Pedido invalido");
+  await connectDB();
+  await releaseExpiredReservations();
+
+  return runInTransaction(async (session) => {
+    const order = await getOrderForPayment(orderId, session);
+
+    if (order.metodoPago !== "EFECTIVO") {
+      throw new AppError("El pedido no es en efectivo", 400);
+    }
+    
+    if (order.paymentStatus === "PAID") {
+      throw new AppError("El pedido ya está pagado", 400);
+    }
+
+    if (
+      order.stockReservationStatus === "RELEASED" &&
+      order.paymentStatus !== "PAID"
+    ) {
+      throw new AppError(
+        "La reserva de stock de este pedido ya no esta activa",
+        409
+      );
+    }
+
+    const payment = await createImmediatePaidPaymentForOrder(
+      {
+        orderId,
+        customerId: order.customer?.toString(),
+        metodoPago: "EFECTIVO",
+        amount: order.total,
+        externalReference: "CASH_PANEL_CONFIRM_BY_ADMIN",
+      },
+      session
+    );
+
+    const venta = await createSaleFromOrderIfNeeded(order, actor, session);
+
+    order.paymentStatus = "PAID";
+    order.orderStatus = "CONFIRMED";
+    order.stockReservationStatus = "CONSUMED";
+    await order.save({ session });
+
+    await recordAuditEventSafe(
+      {
+        action: "ORDER_PAYMENT_CONFIRMED_CASH",
+        entityType: "ORDER",
+        entityId: order._id.toString(),
+        actorId: actor.id,
+        actorRole: actor.role,
+        status: "SUCCESS",
+        metadata: {
+          paymentId: payment._id.toString(),
+          saleId: venta._id.toString(),
+        },
+      },
+      session
+    );
+
+    return { order, payment, venta };
   });
 }

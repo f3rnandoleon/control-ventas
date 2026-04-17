@@ -47,9 +47,9 @@ export const createVentaItemSchema = z.object({
 });
 
 export const deliverySchema = z.object({
-    method: z.enum(["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY"]),
+    method: z.enum(["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT"]),
     pickupPoint: z.enum(["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS"]).nullable().optional(),
-    address: z.string().nullable().optional(),
+    pickupPoint: z.string().nullable().optional(),
     phone: z.string().nullable().optional(),
 }).superRefine((data, ctx) => {
     if (data.method === "PICKUP_LAPAZ" && !data.pickupPoint) {
@@ -66,14 +66,14 @@ export const deliverySchema = z.object({
             path: ["phone"],
         });
     }
-    if (data.method === "HOME_DELIVERY" && !data.address) {
+    if (data.method === "PICKUP_POINT" && !data.pickupPoint) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "La dirección es obligatoria",
-            path: ["address"],
+            path: ["pickupPoint"],
         });
     }
-    if (data.method === "HOME_DELIVERY" && !data.phone) {
+    if (data.method === "PICKUP_POINT" && !data.phone) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "El teléfono es obligatorio",

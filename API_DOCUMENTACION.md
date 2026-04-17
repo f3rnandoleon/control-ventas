@@ -21,6 +21,9 @@ Base URL en desarrollo: `/api`
   - `GET|POST /api/auth/[...nextauth]`
   - `GET /api/productos/publicos`
   - `GET /api/productos/publicos/:id`
+  - `GET /api/verify/payment/:token` *(link de revision de comprobante enviado por Telegram)*
+  - `POST /api/verify/payment/:token/confirm` *(autorizado por token UUID de un solo uso)*
+  - `POST /api/verify/payment/:token/reject` *(autorizado por token UUID de un solo uso)*
 - Rutas protegidas:
   - Solo `ADMIN`: `/api/admin/**`, `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`
   - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`
@@ -46,6 +49,34 @@ Status: `400`
 
 ## Endpoints
 
+## Variables de entorno requeridas
+
+| Variable | Descripcion | Ejemplo |
+|---|---|---|
+| `MONGODB_URL` | URI de conexion a MongoDB Atlas | `mongodb+srv://...` |
+| `JWT_SECRET` | Secreto para firmar tokens JWT | string largo aleatorio |
+| `JWT_EXPIRES_IN` | Duracion del access token | `1d` |
+| `NEXTAUTH_SECRET` | Secreto de NextAuth | string aleatorio |
+| `NEXTAUTH_URL` | URL base del servidor | `http://localhost:3000` |
+| `CLOUDINARY_CLOUD_NAME` | Nombre del cloud en Cloudinary | `mi-cloud` |
+| `CLOUDINARY_API_KEY` | API Key de Cloudinary | `767714819689957` |
+| `CLOUDINARY_API_SECRET` | API Secret de Cloudinary | `...` |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloud name publico (frontend) | `mi-cloud` |
+| `GOOGLE_CLIENT_ID` | Client ID de Google OAuth | `...apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Client Secret de Google OAuth | `GOCSPX-...` |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Client ID publico para Google Sign-In web | `...apps.googleusercontent.com` |
+| `NEXT_PUBLIC_APP_URL` | URL publica del frontend (para construir links de verificacion) | `https://control-ventas-azure.vercel.app` |
+| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram (BotFather) para notificaciones al admin | `123456:AAEMwor...` |
+| `TELEGRAM_CHAT_ID` | ID del chat/usuario Telegram del admin | `1226712516` |
+| `BACKUP_ENABLED` | Habilita el reporte de backup en `/api/admin/ops/overview` | `true` |
+| `BACKUP_PROVIDER` | Proveedor de backup | `atlas` / `manual-local` |
+| `BACKUP_TARGET` | Destino del backup | `s3://bucket` |
+| `BACKUP_RETENTION_DAYS` | Dias de retencion | `7` |
+| `BACKUP_MAX_AGE_HOURS` | Horas maximas antes de alertar backup stale | `24` |
+| `LAST_BACKUP_AT` | Timestamp del ultimo backup (ISO 8601) | `2026-04-04T09:30:00.000Z` |
+
+---
+
 ## Garantias de consistencia
 
 - Los flujos criticos ahora corren dentro de transacciones MongoDB:
@@ -56,6 +87,8 @@ Status: `400`
   - `POST /api/payments/:id/confirm`
   - `POST /api/payments/:id/fail`
   - `POST /api/payments/:id/refund`
+  - `POST /api/verify/payment/:token/confirm`
+  - `POST /api/verify/payment/:token/reject`
 - Si una operacion critica falla a mitad del proceso, el backend revierte los cambios del bloque transaccional para evitar:
   - stock descontado sin venta
   - pedido creado sin reserva
@@ -667,7 +700,7 @@ Respuesta `200`:
     "phone": "76543210",
     "documentType": "CI",
     "documentNumber": "1234567",
-    "defaultDeliveryMethod": "HOME_DELIVERY",
+    "defaultDeliveryMethod": "PICKUP_POINT",
     "notes": null
   },
   "defaultAddress": {
@@ -708,7 +741,7 @@ Body:
   "phone": "76543210",
   "documentType": "CI",
   "documentNumber": "1234567",
-  "defaultDeliveryMethod": "HOME_DELIVERY",
+  "defaultDeliveryMethod": "PICKUP_POINT",
   "notes": "Entregar por las tardes"
 }
 ```
@@ -1085,7 +1118,7 @@ Body:
   "tipoVenta": "TIENDA",
   "descuento": 0,
   "delivery": {
-    "method": "HOME_DELIVERY",
+    "method": "PICKUP_POINT",
     "address": "Zona Sur, Calle 10, casa 123",
     "phone": "76543210"
   }
@@ -1105,10 +1138,10 @@ Validaciones:
 - `tipoVenta`: `WEB | APP_QR | TIENDA`
 - `descuento?`: monto en Bs >= 0. El backend lo resta directamente del subtotal (`total = subtotal - descuento`). Si no se envia, se asume `0` (sin descuento).
 - `delivery?`: objeto opcional
-  - `method`: `WHATSAPP | PICKUP_LAPAZ | HOME_DELIVERY`
-  - `pickupPoint`: requerido para PICKUP (`TELEFERICO_MORADO | TELEFERICO_ROJO | CORREOS`)
-  - `address`: requerido para HOME_DELIVERY
-  - `phone`: requerido para PICKUP y HOME_DELIVERY
+  - `method`: `WHATSAPP | PICKUP_POINT | SHIPPING_NATIONAL`
+  - `pickupPoint`: requerido para PICKUP_POINT, max 150 caracteres
+  - `phone`: requerido para PICKUP_POINT
+  - `scheduledAt`: horario, opcional
 
 Comportamiento:
 - Valida existencia de producto y variante.
@@ -1205,7 +1238,7 @@ Permisos:
 | Método | Descripción | Pago permitido | Reserva stock |
 |--------|-------------|:--------------:|:--------------:|
 | `WHATSAPP` | Coordinación por WhatsApp | EFECTIVO o QR | 24 horas |
-| `HOME_DELIVERY` | Entrega en La Paz | EFECTIVO o QR | 30 minutos |
+| `PICKUP_POINT` | Punto de Encuentro | EFECTIVO o QR | 30 minutos |
 | `SHIPPING_NATIONAL` | Envío a otro departamento | Solo QR | 30 minutos |
 
 ---
@@ -1221,12 +1254,12 @@ El backend crea el pedido en `PENDING_PAYMENT` con reserva de 24 horas. El front
 
 ---
 
-**Opción 2 — Entrega en La Paz:**
+**Opción 2 — Punto de Encuentro:**
 ```json
 {
   "metodoPago": "QR",
   "delivery": {
-    "method": "HOME_DELIVERY",
+    "method": "PICKUP_POINT",
     "address": "Zona Sur, Calle 12 #345",
     "phone": "76543210",
     "recipientName": "Juan Pérez",
@@ -1398,179 +1431,213 @@ Reembolsa un pago.
 
 ---
 
+### Confirmacion Manual de Pagos en Efectivo
+
+#### `POST /api/orders/:id/confirm-cash`
+Confirma de manera directa un pedido en estado `PENDING_PAYMENT` y método de pago `EFECTIVO`.
+
+Permisos:
+- Solo `ADMIN` y `VENDEDOR`.
+
+Reglas:
+- Genera un `PaymentTransaction` con estado `PAID` inmediatamente, referenciando pago externo manual.
+- No utiliza flujo de QR ni tokens ni Telegram.
+- Crea la `Venta`, consume el stock reservado y actualiza el pedido a `CONFIRMED`.
+
+Respuestas:
+- `200`: `message` y datos básicos de la `order`.
+- `400`: el pedido no es en efectivo o ya fue pagado.
+- `401`/`403`: no autorizado.
+- `404`: pedido no encontrado.
+- `409`: reserva de stock expirada o sin stock disponible.
+
+---
+
 ### Comprobantes QR y Verificación Manual Web
 
-Estos endpoints pertenecen al flujo de pago QR del checkout web (cliente sube imagen, admin aprueba por WhatsApp).
+Estos endpoints pertenecen al flujo de pago QR del checkout web. El cliente sube la imagen del comprobante, el sistema notifica **automáticamente** al admin vía **Telegram Bot**, y el admin confirma o rechaza desde el link de revisión.
+
+**Variables de entorno requeridas:**
+- `TELEGRAM_BOT_TOKEN` — token del bot otorgado por BotFather.
+- `TELEGRAM_CHAT_ID` — ID del chat/usuario al que se enviarán las alertas (usualmente el del admin).
+
+Si estas variables no están configuradas, el sistema omite la notificación silenciosamente (falla controlada, no interrumpe el flujo de pago).
 
 #### `POST /api/payments/:id/upload-comprobante`
-Sube imagen de comprobante QR y genera link de verificación.
+Sube imagen de comprobante QR, genera link de verificación y **notifica automáticamente al admin vía Telegram**.
 
 Permisos:
 - Solo `CLIENTE` (dueño del pago).
 
-Body: Form-Data con campo `file` (imagen max 5 MB).
+Content-Type:
+- `multipart/form-data`
+
+Body:
+- `file`: imagen del comprobante (obligatorio, max 5 MB, solo `image/*`).
+
+Flujo interno:
+1. Valida autenticación y rol `CLIENTE`.
+2. Sube la imagen a Cloudinary en `/control-ventas/comprobantes`.
+3. Genera un `reviewToken` UUID único y lo asocia al `PaymentTransaction`.
+4. Construye el `verifyLink`: `{NEXT_PUBLIC_APP_URL}/verificar/pago/{reviewToken}`.
+5. **Pausa la expiración de reserva del pedido**, dándole al Admin 48 horas extra para revisar antes de cancelar automáticamente el stock.
+6. Envía el mensaje con MarkdownV2 escapado a Telegram (evitando errores por caracteres como `.`, `-`, etc.).
+
+Mensaje Telegram enviado al admin:
+```
+🔔 NUEVO COMPROBANTE POR VERIFICAR
+
+💳 Pago: P-1713369600000
+💰 Monto: Bs 250.00
+
+📋 Ver comprobante y procesar → https://tu-web.com/verificar/pago/{token}
+
+Este link es de un solo uso.
+```
+
+Respuesta `201`:
+```json
+{
+  "message": "Comprobante subido correctamente. El administrador fue notificado.",
+  "comprobanteUrl": "https://res.cloudinary.com/.../comprobante.jpg",
+  "verifyLink": "https://tu-web.com/verificar/pago/uuid-token"
+}
+```
 
 Respuestas:
-- `201`: Retorna URL Cloudinary del comprobante y `verifyLink` (URL completa del frontend para enviar por WhatsApp al admin).
-- `400` / `403` / `409` (pago ya procesado) / `500`.
+- `201`: Comprobante subido y admin notificado por Telegram.
+- `400`: archivo faltante, tipo inválido o mayor a 5 MB.
+- `401`: no autenticado.
+- `403`: solo clientes pueden subir comprobantes.
+- `409`: el pago ya fue procesado.
+- `500`.
 
 #### `GET /api/verify/payment/:token`
-Ruta **PÚBLICA**. Admin la consume cuando entra al link recibido por WhatsApp.
-Busca la transacción de pago mediante el token UUID único de revisión.
+Ruta **PÚBLICA** (no requiere autenticación). El admin accede al link recibido vía Telegram para revisar el comprobante.
+Busca la transacción de pago mediante el `reviewToken` UUID único.
+
+Respuesta `200`:
+```json
+{
+  "payment": {
+    "_id": "...",
+    "paymentNumber": "P-1713369600000",
+    "metodoPago": "QR",
+    "amount": 250.00,
+    "status": "PENDING",
+    "comprobanteUrl": "https://res.cloudinary.com/.../comprobante.jpg",
+    "createdAt": "2026-04-17T06:00:00.000Z"
+  },
+  "order": {
+    "_id": "...",
+    "orderNumber": "O-1713369600000",
+    "channel": "WEB",
+    "metodoPago": "QR",
+    "subtotal": 250.00,
+    "descuento": 0,
+    "total": 250.00,
+    "orderStatus": "PENDING_PAYMENT",
+    "paymentStatus": "PENDING",
+    "customerSnapshot": {
+      "fullname": "Juan Pérez",
+      "email": "juan@correo.com",
+      "phone": "76543210"
+    },
+    "deliverySnapshot": {
+      "method": "PICKUP_POINT",
+      "address": "Zona Sur, Calle 12",
+      "phone": "76543210"
+    },
+    "items": [
+      {
+        "productoSnapshot": { "nombre": "Polera Classic", "imagen": "url" },
+        "variante": { "color": "Negro", "talla": "M" },
+        "cantidad": 2,
+        "precioUnitario": 125.00
+      }
+    ]
+  }
+}
+```
 
 Respuestas:
-- `200`: Retorna datos del pago, URLs, comprobante y datos completos del Pedido.
-- `404`: Link inválido.
-- `410`: Link ya fue utilizado.
+- `200`: datos del pago, comprobante y pedido completo.
+- `404`: link inválido o token no encontrado.
+- `410`: link ya fue utilizado (token ya procesado).
 
 #### `POST /api/verify/payment/:token/confirm`
-Ruta **PÚBLICA** (autorizada por UUID token) activada por el admin.
+Ruta **PÚBLICA** (autorizada por UUID token). El admin confirma el pago desde la página de revisión.
+
 Flujo interno:
-- El token sustituye la autenticación normal (Actor: `TOKEN_REVIEW`).
-- Marca el pago como `PAID`.
-- Confirma la reserva de stock y crea la `Venta`.
-- Marca el token como usado.
+- El token sustituye la autenticación normal (Actor interno: `TOKEN_REVIEW`, rol `ADMIN`).
+- Si el pedido aún no tiene `Venta`: consume stock reservado, registra movimientos de inventario y crea la `Venta`.
+- Marca el pago como `PAID` y `confirmedAt = now()`.
+- Actualiza el pedido: `orderStatus = CONFIRMED`, `paymentStatus = PAID`, `stockReservationStatus = CONSUMED`.
+- Marca el `reviewToken` como usado (`reviewTokenUsed = true`). El link deja de funcionar.
+- Todo corre en una transacción Mongo.
+
+Respuesta `200`:
+```json
+{
+  "message": "Pago confirmado correctamente. Venta registrada.",
+  "order": {
+    "_id": "507f1f77bcf86cd799439021",
+    "orderNumber": "O-1713369600000",
+    "orderStatus": "CONFIRMED",
+    "paymentStatus": "PAID"
+  }
+}
+```
 
 Respuestas:
-- `200`: Pago confirmado.
-- `404` / `410`: Link inválido o ya usado.
+- `200`: pago confirmado, venta creada, stock consumido.
+- `404`: link inválido.
+- `409`: pedido ya cancelado.
+- `410`: link ya fue utilizado.
 
 #### `POST /api/verify/payment/:token/reject`
-Ruta **PÚBLICA** (autorizada por UUID token) activada por el admin.
+Ruta **PÚBLICA** (autorizada por UUID token). El admin rechaza el comprobante desde la página de revisión.
+
 Flujo interno:
 - Marca el pago como `FAILED`.
-- Cancela el pedido.
-- Libera la reserva de stock a disponible.
-- Marca el token como usado.
+- Libera todas las reservas de stock (`stockReservationStatus = RELEASED`).
+- Cancela el pedido (`orderStatus = CANCELLED`, `paymentStatus = FAILED`).
+- Marca el `reviewToken` como usado. El link deja de funcionar.
+- Todo corre en una transacción Mongo.
 
-Body opcional (JSON):
+Body opcional:
 ```json
 {
   "reason": "Comprobante falso o borroso"
 }
 ```
 
----
-
-### Payments
-
-#### `POST /api/payments`
-Crea una transaccion de pago para un pedido.
-
-Body:
-
+Body opcional:
 ```json
 {
-  "orderId": "507f1f77bcf86cd799439021",
-  "metodoPago": "QR",
-  "idempotencyKey": "checkout-123",
-  "externalReference": "qr-session-001"
+  "reason": "Comprobante falso o borroso"
 }
 ```
+Validaciones:
+- `reason`: string, max 250 caracteres, opcional.
 
-Reglas:
-- Un pedido no puede tener mas de un pago confirmado.
-- Si se envia un `idempotencyKey` ya usado, el backend devuelve la transaccion existente.
-- Si el pedido ya perdio su reserva activa (`stockReservationStatus = RELEASED`) y no esta pagado, el backend responde `409`.
-- La verificacion del pedido y la creacion de la transaccion de pago se ejecutan dentro de una misma transaccion Mongo.
-
-Respuestas:
-- `201`
-- `400`: validacion o ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `409`: el pedido ya tiene un pago confirmado.
-- `500`
-
-#### `POST /api/payments/:id/confirm`
-Confirma una transaccion de pago.
-
-Body:
-
+Respuesta `200`:
 ```json
 {
-  "externalReference": "qr-paid-001"
-}
-```
-
-Reglas:
-- Si el pedido aun no tiene `Venta` asociada, el backend:
-  - consume stock reservado
-  - registra movimientos de inventario
-  - crea la `Venta`
-  - enlaza `Order.sourceSaleId`
-- Luego marca:
-  - `payment.status = PAID`
-  - `order.paymentStatus = PAID`
-  - `order.orderStatus = CONFIRMED`
-  - `order.stockReservationStatus = CONSUMED`
-- Todo ese bloque corre en una sola transaccion Mongo.
-
-Respuestas:
-- `200`
-- `400`: ID invalido, pago reembolsado o stock insuficiente.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pago, pedido, producto o variante no encontrada.
-- `500`
-
-#### `POST /api/payments/:id/fail`
-Marca una transaccion de pago como fallida.
-
-Body:
-
-```json
-{
-  "reason": "QR expirado"
+  "message": "Pago rechazado. El pedido fue cancelado y el stock liberado.",
+  "order": {
+    "_id": "507f1f77bcf86cd799439021",
+    "orderNumber": "O-1713369600000",
+    "orderStatus": "CANCELLED",
+    "paymentStatus": "FAILED"
+  }
 }
 ```
 
 Respuestas:
-- `200`
-- `400`: ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pago o pedido no encontrado.
-- `500`
-
-Notas:
-- Si el pedido tenia stock reservado y aun no estaba pagado, el backend libera esa reserva y cancela el pedido.
-- La liberacion de reserva, el cambio de pago y la cancelacion del pedido se guardan atomica y transaccionalmente.
-
-#### `POST /api/payments/:id/refund`
-Reembolsa una transaccion de pago.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Body:
-
-```json
-{
-  "reason": "Cliente cancelo el pedido"
-}
-```
-
-Reglas:
-- Si el pedido ya genero venta, el backend:
-  - devuelve stock
-  - registra movimiento `DEVOLUCION`
-  - marca la venta como `CANCELADA`
-- Luego marca:
-  - `payment.status = REFUNDED`
-  - `order.paymentStatus = REFUNDED`
-  - `order.orderStatus = CANCELLED`
-  - `order.stockReservationStatus = RELEASED`
-- La devolucion de stock, el movimiento de inventario, la cancelacion de venta y el cambio de estados se ejecutan en una sola transaccion Mongo.
-
-Respuestas:
-- `200`
-- `400`: ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pago o pedido no encontrado.
-- `500`
+- `200`: pago rechazado, stock liberado, pedido cancelado.
+- `404`: link inválido.
+- `410`: link ya fue utilizado.
 
 ---
 
@@ -1595,7 +1662,7 @@ Respuesta `200`:
   "orderId": "507f1f77bcf86cd799439021",
   "orderNumber": "O-1712265600000",
   "channel": "WEB",
-  "method": "HOME_DELIVERY",
+  "method": "PICKUP_POINT",
   "status": "PENDING",
   "address": "Zona Sur, Calle 10 #123",
   "phone": "76543210",
