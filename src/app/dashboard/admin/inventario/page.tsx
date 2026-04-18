@@ -42,7 +42,7 @@ export default function AdminInventarioPage() {
       <StockPorProductoChart data={stockData} />
 
       {/* Resumen con valores */}
-      <InventarioResumen items={items}  />
+      <InventarioResumen items={items} />
       {/* Tabs */}
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,180,255,0.15)]">
         {/* Tab Headers */}
@@ -50,8 +50,8 @@ export default function AdminInventarioPage() {
           <button
             onClick={() => setTabActiva("stock")}
             className={`flex-1 px-6 py-3 font-medium transition-all ${tabActiva === "stock"
-                ? "bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-500"
-                : "text-gray-400 hover:text-gray-300 hover:bg-white/5"
+              ? "bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-500"
+              : "text-gray-400 hover:text-gray-300 hover:bg-white/5"
               }`}
           >
             📦 Stock Actual
@@ -59,8 +59,8 @@ export default function AdminInventarioPage() {
           <button
             onClick={() => setTabActiva("movimientos")}
             className={`flex-1 px-6 py-3 font-medium transition-all ${tabActiva === "movimientos"
-                ? "bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-500"
-                : "text-gray-400 hover:text-gray-300 hover:bg-white/5"
+              ? "bg-cyan-500/20 text-cyan-400 border-b-2 border-cyan-500"
+              : "text-gray-400 hover:text-gray-300 hover:bg-white/5"
               }`}
           >
             📋 Historial de Movimientos

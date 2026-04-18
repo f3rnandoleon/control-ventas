@@ -59,7 +59,7 @@ export default function VarianteRow({
         <button
           className="btn-link"
           onClick={() => {
-            if (!variante.qrCode) return; 
+            if (!variante.qrCode) return;
             window.open(getQRUrl(variante.qrCode), "_blank");
           }}
         >

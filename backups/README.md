@@ -1,21 +1,36 @@
-# Backups
+# Backups Automáticos (Scripts)
 
-Directorio reservado para respaldos manuales/locales del sistema central.
+Directorio reservado para los respaldos del sistema central generados y restaurados mediante **MongoDB Database Tools** (`mongodump` y `mongorestore`).
 
-Configuracion actual:
+### Configuración requerida:
+
+Para que el sistema de alertas del proyecto esté feliz, la configuración en `.env.local` debe existir:
 
 - `BACKUP_ENABLED=true`
 - `BACKUP_PROVIDER=manual-local`
 - `BACKUP_TARGET=e:\proyectos\control-ropa\control-ventas\backups`
 - `BACKUP_RETENTION_DAYS=7`
 - `BACKUP_MAX_AGE_HOURS=24`
+- `LAST_BACKUP_AT=` (¡El script actualizará esto solo!)
 
-Uso recomendado:
+---
 
-1. guardar aqui tus dumps o exportaciones
-2. despues de cada respaldo, actualizar `LAST_BACKUP_AT` en `.env.local`
-3. revisar `GET /api/admin/ops/overview` para confirmar que no haya `BACKUP_STALE`
+## 💾 Crear un Backup
 
-Nota:
+Para guardar tu base de datos actual y actualizar el timer de alertas automáticamente, solo corre en tu terminal:
 
-Este repo ahora queda configurado para reportar un backup local/manual. La automatizacion del dump sigue dependiendo de tu herramienta externa o job programado.
+```bash
+npm run backup
+```
+*Esto generará un archivo `dump_FECHA.archive` en esta carpeta, y registrará en la configuración de la app que el backup está fresco.*
+
+## 🔙 Restaurar la Base de Datos
+
+Si cometiste un error crítico o borraste clientes/productos por accidente, puedes buscar en esta carpeta el nombre del archivo `.archive` que quieras recuperar y correr:
+
+```bash
+npm run restore nombre_del_archivo.archive
+```
+*Ejemplo: `npm run restore dump_2026-04-18_10-00-00.archive`*
+
+> **ATENCIÓN:** El comando de restore elimina e ignora por completo la información que se halle actualmente en el servidor para forzar que sea reemplazada con la información exacta del backup elegido.

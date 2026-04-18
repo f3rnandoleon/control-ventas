@@ -44,7 +44,16 @@ export default function ProductoForm({
 
   return (
     <form
-      onSubmit={handleSubmit((data) => onSubmit(data as Partial<Producto>))}
+      onSubmit={handleSubmit((data) => {
+        if (initialData?._id) {
+          // Si estamos editando un producto, evitamos enviar el array de variantes
+          // (que viene vacío por defecto en el form) para no sobreescribir las existentes.
+          const { variantes: _, ...rest } = data;
+          onSubmit(rest as Partial<Producto>);
+        } else {
+          onSubmit(data as Partial<Producto>);
+        }
+      })}
       className="space-y-5"
     >
       <div>
