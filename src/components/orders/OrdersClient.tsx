@@ -16,7 +16,7 @@ type Order = {
   deliverySnapshot?: { method: string; pickupPoint?: string };
 };
 
-export default function OrdersClient({ role }: { role: "ADMIN" | "VENDEDOR" }) {
+export default function OrdersClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("TODOS");

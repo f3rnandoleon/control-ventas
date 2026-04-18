@@ -48,8 +48,9 @@ export default function ProductoForm({
         if (initialData?._id) {
           // Si estamos editando un producto, evitamos enviar el array de variantes
           // (que viene vacío por defecto en el form) para no sobreescribir las existentes.
-          const { variantes: _, ...rest } = data;
-          onSubmit(rest as Partial<Producto>);
+          const payload = { ...data };
+          delete (payload as Partial<Producto>).variantes;
+          onSubmit(payload as Partial<Producto>);
         } else {
           onSubmit(data as Partial<Producto>);
         }

@@ -48,9 +48,8 @@ export const createVentaItemSchema = z.object({
 
 export const deliverySchema = z.object({
     method: z.enum(["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT"]),
-    pickupPoint: z.enum(["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS"]).nullable().optional(),
-    pickupPoint: z.string().nullable().optional(),
-    phone: z.string().nullable().optional(),
+    pickupPoint: z.string().max(150, "El punto de encuentro no puede superar 150 caracteres").nullable().optional(),
+    phone: z.string().max(30).nullable().optional(),
 }).superRefine((data, ctx) => {
     if (data.method === "PICKUP_LAPAZ" && !data.pickupPoint) {
         ctx.addIssue({

@@ -3,7 +3,7 @@ import OrdersClient from "@/components/orders/OrdersClient";
 export default function AdminPedidosPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      <OrdersClient role="ADMIN" />
+      <OrdersClient />
     </div>
   );
 }

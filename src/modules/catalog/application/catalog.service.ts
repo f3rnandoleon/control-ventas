@@ -68,11 +68,13 @@ export async function createCatalogProduct(
 
   await connectDB();
 
-  const sku = generarSKU(nombre!, modelo!);
-  const existe = await catalogRepository.findBySku(sku);
-
-  if (existe) {
-    throw new AppError("Ya existe un producto con ese SKU", 409);
+  const baseSku = generarSKU(nombre!, modelo!);
+  let sku = baseSku;
+  let skuCount = 2;
+  
+  while (await catalogRepository.findBySku(sku)) {
+    sku = `${baseSku}-${skuCount}`;
+    skuCount++;
   }
 
   const variantesNormalizadas = await normalizeVariantImages(
@@ -141,11 +143,13 @@ export async function updateCatalogProduct(
   ) {
     const nombreFinal = data.nombre || productoAntes.nombre;
     const modeloFinal = data.modelo || productoAntes.modelo;
-    nuevoSKU = generarSKU(nombreFinal, modeloFinal);
-
-    const existe = await catalogRepository.findBySkuExcludingId(nuevoSKU, id);
-    if (existe) {
-      throw new AppError("Ya existe un producto con ese SKU", 409);
+    const baseSku = generarSKU(nombreFinal, modeloFinal);
+    nuevoSKU = baseSku;
+    let skuCount = 2;
+    
+    while (await catalogRepository.findBySkuExcludingId(nuevoSKU, id)) {
+      nuevoSKU = `${baseSku}-${skuCount}`;
+      skuCount++;
     }
   }
 

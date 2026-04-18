@@ -51,7 +51,7 @@ const productoSchema = new Schema(
       type: String,
       required: true,
       unique: true,
-      immutable: true, 
+      immutable: true,
     },
 
 
@@ -114,8 +114,6 @@ const productoSchema = new Schema(
 
 productoSchema.index({ estado: 1, createdAt: -1 });
 productoSchema.index({ "variantes.variantId": 1 }, { unique: true, sparse: true });
-productoSchema.index({ "variantes.codigoBarra": 1 }, { unique: true, sparse: true });
-productoSchema.index({ "variantes.qrCode": 1 }, { unique: true, sparse: true });
 
 // 🔄 Calcular stock total automáticamente
 productoSchema.pre("save", function (next) {
