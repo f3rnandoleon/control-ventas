@@ -3,6 +3,11 @@
 import { Variante } from "@/types/producto";
 import { getQRUrl } from "@/utils/qr";
 import { generarCodigoBarraImagen } from "@/utils/barcode";
+import {
+  getVarianteImagenPrincipal,
+  getVarianteImagenes,
+} from "@/utils/varianteImagen";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 export default function VarianteRow({
   variante,
@@ -13,21 +18,35 @@ export default function VarianteRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const imagenPrincipal = getVarianteImagenPrincipal(variante);
+  const totalImagenes = getVarianteImagenes(variante).length;
+  const colorLabel = variante.colorSecundario
+    ? `${variante.color} / ${variante.colorSecundario}`
+    : variante.color;
+
   return (
     <tr className="border-b border-white/5 hover:bg-white/5 text-center">
       <td className="py-2">
-        {variante.imagen ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={variante.imagen}
-            alt={`${variante.color}-${variante.talla}`}
-            className="h-20 w-20 rounded object-cover border border-white/10"
-          />
+        {imagenPrincipal ? (
+          <div className="relative inline-flex">
+            <CloudinaryImage
+              src={imagenPrincipal}
+              alt={`${colorLabel}-${variante.talla}`}
+              width={80}
+              height={80}
+              className="h-20 w-20 rounded object-cover border border-white/10"
+            />
+            {totalImagenes > 1 && (
+              <span className="absolute -right-2 -top-2 rounded-full bg-cyan-500 px-2 py-0.5 text-xs font-semibold text-black">
+                +{totalImagenes - 1}
+              </span>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-gray-500">Sin imagen</span>
         )}
       </td>
-      <td className="py-2">{variante.color}</td>
+      <td className="py-2">{colorLabel}</td>
       <td>{variante.talla}</td>
       <td>{variante.stock}</td>
 

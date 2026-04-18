@@ -49,6 +49,18 @@ export default function VendedorDashboardPage() {
         >
           Registrar venta
         </Link>
+        <Link
+          href="/dashboard/vendedor/productos"
+          className="btn-secondary"
+        >
+          Ver productos
+        </Link>
+        <Link
+          href="/dashboard/vendedor/inventario"
+          className="btn-secondary"
+        >
+          Revisar inventario
+        </Link>
       </div>
 
       <VentasPropiasRecientes ventas={ventas.slice(0, 5)} />

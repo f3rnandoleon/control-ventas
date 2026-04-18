@@ -1,32 +1,15 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/libs/mongodb";
-import Venta from "@/models/venta";
+import { getMonthlySalesReport } from "@/modules/reports/application/reports.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectDB();
-
-    const ventas = await Venta.aggregate([
-      {
-        $group: {
-          _id: {
-            anio: { $year: "$createdAt" },
-            mes: { $month: "$createdAt" },
-          },
-          totalVentas: { $sum: "$total" },
-          ganancia: { $sum: "$gananciaTotal" },
-          cantidad: { $sum: 1 },
-        },
-      },
-      { $sort: { "_id.anio": 1, "_id.mes": 1 } },
-    ]);
-
+    const ventas = await getMonthlySalesReport(request);
     return NextResponse.json(ventas);
-  } catch (err) {
-    console.error("ERROR:", err);
-    return NextResponse.json(
-      { message: "Error en reporte mensual" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error en reporte mensual",
+      logLabel: "REPORTE MENSUAL ERROR:",
+    });
   }
 }

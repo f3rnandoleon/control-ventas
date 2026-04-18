@@ -6,11 +6,20 @@ export interface InventarioItem {
     _id: string;
     nombre: string;
     modelo?: string;
-  };
+  } | null;
 
   variante: {
+    variantId?: string;
     color: string;
+    colorSecundario?: string;
     talla: string;
+    codigoBarra?: string;
+  };
+
+  productoSnapshot?: {
+    nombre?: string;
+    modelo?: string;
+    sku?: string;
   };
 
   tipo: "ENTRADA" | "SALIDA" | "AJUSTE" | "DEVOLUCION";

@@ -1,7 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { InventarioItem } from "@/types/inventario";
-import { useState, useMemo } from "react";
+
+const getProductoNombre = (item: InventarioItem) =>
+  item.productoId?.nombre || "Producto eliminado";
 
 export default function InventarioTable({
   items,
@@ -10,46 +13,51 @@ export default function InventarioTable({
   items: InventarioItem[];
   loading: boolean;
 }) {
-  // Estados de filtros
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<string>("TODOS");
   const [productoFiltro, setProductoFiltro] = useState<string>("TODOS");
 
-  // Obtener lista única de productos
   const productosUnicos = useMemo(() => {
-    const productos = items.map((i) => ({
-      id: i.productoId._id,
-      nombre: i.productoId.nombre,
-    }));
-    const uniqueMap = new Map(productos.map((p) => [p.id, p]));
+    const productos = items
+      .filter(
+        (
+          item
+        ): item is InventarioItem & {
+          productoId: NonNullable<InventarioItem["productoId"]>;
+        } => Boolean(item.productoId)
+      )
+      .map((item) => ({
+        id: item.productoId._id,
+        nombre: item.productoId.nombre,
+      }));
+
+    const uniqueMap = new Map(productos.map((producto) => [producto.id, producto]));
     return Array.from(uniqueMap.values());
   }, [items]);
 
-  // Aplicar filtros
   const itemsFiltrados = useMemo(() => {
     return items.filter((item) => {
-      // Filtro por fecha desde
       if (fechaDesde) {
         const fechaItem = new Date(item.createdAt);
         const fechaDesdeDate = new Date(fechaDesde);
         if (fechaItem < fechaDesdeDate) return false;
       }
 
-      // Filtro por fecha hasta
       if (fechaHasta) {
         const fechaItem = new Date(item.createdAt);
-        const fechaHastaDate = new Date(fechaHasta + "T23:59:59");
+        const fechaHastaDate = new Date(`${fechaHasta}T23:59:59`);
         if (fechaItem > fechaHastaDate) return false;
       }
 
-      // Filtro por tipo
       if (tipoFiltro !== "TODOS" && item.tipo !== tipoFiltro) {
         return false;
       }
 
-      // Filtro por producto
-      if (productoFiltro !== "TODOS" && item.productoId._id !== productoFiltro) {
+      if (
+        productoFiltro !== "TODOS" &&
+        item.productoId?._id !== productoFiltro
+      ) {
         return false;
       }
 
@@ -65,7 +73,10 @@ export default function InventarioTable({
   };
 
   const hayFiltrosActivos =
-    fechaDesde || fechaHasta || tipoFiltro !== "TODOS" || productoFiltro !== "TODOS";
+    Boolean(fechaDesde) ||
+    Boolean(fechaHasta) ||
+    tipoFiltro !== "TODOS" ||
+    productoFiltro !== "TODOS";
 
   if (loading) {
     return <p className="text-gray-400">Cargando inventario...</p>;
@@ -73,11 +84,10 @@ export default function InventarioTable({
 
   return (
     <div className="space-y-4">
-      {/* Panel de Filtros */}
       <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-semibold text-cyan-400 flex items-center gap-2">
-            🔍 Filtros
+            Filtros
           </h3>
           {hayFiltrosActivos && (
             <button
@@ -90,7 +100,6 @@ export default function InventarioTable({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Fecha Desde */}
           <div>
             <label className="block text-xs text-gray-400 mb-1">Desde</label>
             <input
@@ -101,7 +110,6 @@ export default function InventarioTable({
             />
           </div>
 
-          {/* Fecha Hasta */}
           <div>
             <label className="block text-xs text-gray-400 mb-1">Hasta</label>
             <input
@@ -112,7 +120,6 @@ export default function InventarioTable({
             />
           </div>
 
-          {/* Tipo de Movimiento */}
           <div>
             <label className="block text-xs text-gray-400 mb-1">Tipo</label>
             <select
@@ -124,11 +131,10 @@ export default function InventarioTable({
               <option value="ENTRADA">Entrada</option>
               <option value="SALIDA">Salida</option>
               <option value="AJUSTE">Ajuste</option>
-              <option value="DEVOLUCION">Devolución</option>
+              <option value="DEVOLUCION">Devolucion</option>
             </select>
           </div>
 
-          {/* Producto */}
           <div>
             <label className="block text-xs text-gray-400 mb-1">Producto</label>
             <select
@@ -137,23 +143,24 @@ export default function InventarioTable({
               className="w-full bg-gray-800/50 border border-white/10 rounded-md px-3 py-2 text-sm text-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
             >
               <option value="TODOS">Todos</option>
-              {productosUnicos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
+              {productosUnicos.map((producto) => (
+                <option key={producto.id} value={producto.id}>
+                  {producto.nombre}
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Contador de resultados */}
         <div className="text-xs text-gray-400">
-          Mostrando <span className="text-cyan-400 font-semibold">{itemsFiltrados.length}</span> de{" "}
-          <span className="text-gray-300">{items.length}</span> movimientos
+          Mostrando{" "}
+          <span className="text-cyan-400 font-semibold">
+            {itemsFiltrados.length}
+          </span>{" "}
+          de <span className="text-gray-300">{items.length}</span> movimientos
         </div>
       </div>
 
-      {/* Tabla */}
       <div className="bg-white/5 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(0,180,255,0.15)] overflow-x-auto">
         <table className="w-full text-sm text-gray-300">
           <thead className="text-gray-400 border-b border-white/10">
@@ -169,39 +176,37 @@ export default function InventarioTable({
           </thead>
 
           <tbody>
-            {itemsFiltrados.map((i) => (
+            {itemsFiltrados.map((item) => (
               <tr
-                key={i._id}
+                key={item._id}
                 className="border-b border-white/5 hover:bg-white/5"
               >
                 <td className="px-6 py-3">
-                  {new Date(i.createdAt).toLocaleString()}
+                  {new Date(item.createdAt).toLocaleString()}
                 </td>
-                <td>{i.productoId.nombre}</td>
+                <td>{getProductoNombre(item)}</td>
                 <td>
-                  {i.variante.color} / {i.variante.talla}
+                  {item.variante.color} / {item.variante.talla}
                 </td>
                 <td>
                   <span
-                    className={`px-2 py-1 rounded text-xs font-semibold
-                    ${i.tipo === "ENTRADA"
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                      item.tipo === "ENTRADA"
                         ? "bg-green-500/20 text-green-400"
-                        : i.tipo === "SALIDA"
+                        : item.tipo === "SALIDA"
                           ? "bg-red-500/20 text-red-400"
                           : "bg-yellow-500/20 text-yellow-400"
-                      }`}
+                    }`}
                   >
-                    {i.tipo}
+                    {item.tipo}
                   </span>
                 </td>
-                <td>{i.cantidad}</td>
+                <td>{item.cantidad}</td>
                 <td>
-                  {i.stockAnterior} →{" "}
-                  <span className="text-cyan-400">
-                    {i.stockActual}
-                  </span>
+                  {item.stockAnterior} -&gt;{" "}
+                  <span className="text-cyan-400">{item.stockActual}</span>
                 </td>
-                <td>{i.usuario?.fullname || "-"}</td>
+                <td>{item.usuario?.fullname || "-"}</td>
               </tr>
             ))}
 

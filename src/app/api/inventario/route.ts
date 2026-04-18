@@ -1,32 +1,29 @@
-
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
-import { connectDB } from "@/libs/mongodb";
-import Inventario from "@/models/inventario";
-import Producto from "@/models/product";
-import type { Variante } from "@/types/producto";
-import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
+import {
+  validateRequest,
+  validationErrorResponse,
+} from "@/middleware/validate.middleware";
 import { ajusteStockSchema } from "@/schemas/inventario.schema";
+import {
+  adjustInventoryStock,
+  listInventoryMovements,
+} from "@/modules/inventory/application/inventory.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export async function GET() {
   try {
-    await connectDB();
-
-    const movimientos = await Inventario.find()
-      .populate("productoId", "nombre modelo")
-      .populate("usuario", "fullname email")
-      .sort({ createdAt: -1 });
-
+    const movimientos = await listInventoryMovements();
     return NextResponse.json(movimientos);
   } catch (error) {
-    console.error("INVENTARIO GET ERROR:", error);
-    return NextResponse.json(
-      { message: "Error al obtener inventario" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al obtener inventario",
+      logLabel: "INVENTARIO GET ERROR:",
+    });
   }
 }
+
 export async function POST(request: Request) {
   try {
     const headersList = await headers();
@@ -47,82 +44,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const userId = new mongoose.Types.ObjectId(userIdRaw);
-
-    // Validar datos con Zod
     const validation = await validateRequest(ajusteStockSchema, request);
 
     if (!validation.success) {
       return validationErrorResponse(validation.errors);
     }
 
-    const { productoId, color, talla, cantidad, tipo, motivo } = validation.data;
-    const qty = Math.abs(cantidad); // Usar valor absoluto
-
-    await connectDB();
-
-    // 1️⃣ Leer producto
-    const producto = await Producto.findById(productoId);
-    if (!producto) {
-      return NextResponse.json(
-        { message: "Producto no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    // 2️⃣ Leer variante real
-    const variante = (producto.variantes as Variante[]).find(
-      (v) => v.color === color && v.talla === talla
-    );
-
-
-    if (!variante) {
-      return NextResponse.json(
-        { message: "Variante no encontrada" },
-        { status: 404 }
-      );
-    }
-
-    // 3️⃣ Stock anterior real
-    const stockAnterior = variante.stock;
-
-    // 4️⃣ Aplicar movimiento
-    let stockActual = stockAnterior;
-
-    if (tipo === "ENTRADA") {
-      stockActual += qty;
-    } else if (tipo === "SALIDA") {
-      if (stockAnterior < qty) {
-        return NextResponse.json(
-          { message: "Stock insuficiente para salida" },
-          { status: 400 }
-        );
-      }
-      stockActual -= qty;
-    } else if (tipo === "AJUSTE") {
-      stockActual = qty;
-    } else {
-      return NextResponse.json(
-        { message: "Tipo de movimiento inválido" },
-        { status: 400 }
-      );
-    }
-
-    // 5️⃣ Guardar producto (CLAVE)
-    variante.stock = stockActual;
-    await producto.save();
-
-    // 6️⃣ Crear movimiento (MISMO QUE VENTAS)
-    const movimiento = await Inventario.create({
-      productoId: producto._id,
-      variante: { color, talla },
-      tipo,
-      cantidad: qty,
-      stockAnterior,
-      stockActual,
-      motivo,
-      referencia: "AJUSTE_MANUAL",
-      usuario: userId,
+    const { movimiento } = await adjustInventoryStock({
+      ...validation.data,
+      userIdRaw,
     });
 
     return NextResponse.json(
@@ -130,10 +60,9 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("INVENTARIO POST ERROR:", error);
-    return NextResponse.json(
-      { message: "Error al ajustar inventario" },
-      { status: 500 }
-    );
+    return handleRouteError(error, {
+      fallbackMessage: "Error al ajustar inventario",
+      logLabel: "INVENTARIO POST ERROR:",
+    });
   }
 }

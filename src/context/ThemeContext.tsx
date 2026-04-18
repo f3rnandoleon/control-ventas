@@ -11,23 +11,27 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
+function applyTheme(theme: Theme) {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.style.colorScheme = theme;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme") as "dark" | "light" | null;
-    const initial = stored ?? "dark";
+    const stored = localStorage.getItem("theme") as Theme | null;
+    const initial = stored ?? "light";
 
     setTheme(initial);
-    document.documentElement.classList.toggle("dark", initial === "dark");
-    }, []);
-
+    applyTheme(initial);
+  }, []);
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
     localStorage.setItem("theme", next);
-    document.documentElement.classList.toggle("dark", next === "dark");
+    applyTheme(next);
   };
 
   return (

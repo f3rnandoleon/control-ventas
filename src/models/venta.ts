@@ -9,8 +9,19 @@ const ventaItemSchema = new Schema(
     },
 
     variante: {
+      variantId: { type: String, index: true },
       color: { type: String, required: true },
+      colorSecundario: { type: String, trim: true },
       talla: { type: String, required: true },
+      codigoBarra: { type: String },
+      qrCode: { type: String },
+    },
+
+    productoSnapshot: {
+      nombre: { type: String, required: true },
+      modelo: { type: String },
+      sku: { type: String },
+      imagen: { type: String },
     },
 
     cantidad: {
@@ -109,11 +120,36 @@ const ventaSchema = new Schema(
     observaciones: {
       type: String,
     },
+    
+    delivery: {
+      method: {
+        type: String,
+        enum: ["WHATSAPP", "PICKUP_LAPAZ", "HOME_DELIVERY"],
+      },
+      pickupPoint: {
+        type: String,
+        enum: ["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS", null],
+        default: null,
+      },
+      address: {
+        type: String,
+        default: null,
+      },
+      phone: {
+        type: String,
+        default: null,
+      },
+    },
   },
   {
     timestamps: true,
   }
 );
+
+ventaSchema.index({ cliente: 1, createdAt: -1 });
+ventaSchema.index({ vendedor: 1, createdAt: -1 });
+ventaSchema.index({ estado: 1, createdAt: -1 });
+ventaSchema.index({ tipoVenta: 1, createdAt: -1 });
 
 const Venta = models.Venta || model("Venta", ventaSchema);
 export default Venta;

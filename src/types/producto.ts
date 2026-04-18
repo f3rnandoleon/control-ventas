@@ -1,8 +1,13 @@
 export interface Variante {
+  variantId?: string;
   color: string;
+  colorSecundario?: string;
   talla: string;
   stock: number;
+  reservedStock?: number;
+  imagenes?: string[];
   imagen?: string;
+  descripcion?: string;
   codigoBarra?: string;
   qrCode?: string;
 }
@@ -15,5 +20,6 @@ export interface Producto {
   precioVenta: number;
   precioCosto: number;
   totalVendidos: number;
+  categoria?: string;
   variantes: Variante[];
 }

@@ -5,6 +5,7 @@ import User from "@/models/user";
 import bcrypt from "bcryptjs";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { createUsuarioSchema } from "@/schemas/usuario.schema";
+import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
 
 export async function GET() {
   const headersList = await headers();
@@ -66,7 +67,13 @@ export async function POST(request: Request) {
     role: userRole,
     password: hash,
     isActive,
+    authProviders: ["credentials"],
+    emailVerified: false,
   });
+
+  if (user.role === "CLIENTE") {
+    await ensureCustomerProfileForUser(user._id.toString());
+  }
 
   return NextResponse.json(
     {

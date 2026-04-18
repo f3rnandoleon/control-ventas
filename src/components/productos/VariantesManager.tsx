@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Variante, Producto } from "@/types/producto";
 import VarianteForm from "./VarianteForm";
 import VarianteRow from "./VarianteRow";
@@ -23,11 +24,23 @@ export default function VariantesManager({
 
   const saveVariantes = async (variantes: Variante[]) => {
     setLoading(true);
-    await updateProducto(producto._id, { variantes });
-    await onUpdated();
-    setMode("LIST");
-    setEditingIndex(null);
-    setLoading(false);
+
+    try {
+      await updateProducto(producto._id, { variantes });
+      await onUpdated();
+      setMode("LIST");
+      setEditingIndex(null);
+      toast.success("Variantes actualizadas correctamente");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudieron guardar las variantes";
+
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* =========================
@@ -40,7 +53,7 @@ export default function VariantesManager({
         shadow-[0_0_20px_rgba(0,180,255,0.2)] space-y-4 "
       >
         <h3 className="text-lg font-semibold text-cyan-400">
-          {mode === "ADD" ? "Agregar variante" : "Editar variante"}
+          {mode === "ADD" ? "Agregar variantes" : "Editar variante"}
         </h3>
 
         <VarianteForm
@@ -49,13 +62,14 @@ export default function VariantesManager({
               ? producto.variantes[editingIndex]
               : undefined
           }
+          existingVariantes={producto.variantes}
           onSave={(data) => {
             const nuevas = [...producto.variantes];
 
             if (mode === "EDIT" && editingIndex !== null) {
-              nuevas[editingIndex] = data;
+              nuevas[editingIndex] = data[0];
             } else {
-              nuevas.push(data);
+              nuevas.push(...data);
             }
 
             saveVariantes(nuevas);
@@ -81,10 +95,10 @@ export default function VariantesManager({
   return (
     <div
       className="bg-white/5 border border-white/10 rounded-2xl p-6
-      shadow-[0_0_20px_rgba(0,180,255,0.15)] space-y-4 w-3xl"
+      shadow-[0_0_20px_rgba(0,180,255,0.15)] space-y-4 w-3xl "
     >
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center ">
         <h3 className="text-lg font-semibold text-cyan-400">
           Variantes
         </h3>
@@ -94,7 +108,7 @@ export default function VariantesManager({
             className="btn-primary px-4 py-2  cursor-pointer"
             onClick={() => setMode("ADD")}
           >
-            + Agregar variante
+            + Agregar variantes
           </button>
 
           <button
@@ -153,16 +167,16 @@ export default function VariantesManager({
           <thead className="border-b border-white/10 text-gray-400">
             <tr>
               <th className="py-3">Imagen</th>
-              <th className="py-3">Color</th>
+              <th className="py-3">Color(es)</th>
               <th>Talla</th>
               <th>Stock</th>
               <th className="">Acciones</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody >
             {producto.variantes.map((v, index) => (
               <VarianteRow
-                key={`${v.color}-${v.talla}`}
+                key={v.variantId || `${v.color}-${v.colorSecundario || ""}-${v.talla}`}
                 variante={v}
                 onEdit={() => {
                   setEditingIndex(index);

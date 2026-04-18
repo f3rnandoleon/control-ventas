@@ -17,19 +17,53 @@ export default function AdminProductosPage() {
 
   const [view, setView] = useState<ModalView>("PRODUCTO");
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadProductos = async () => {
     setLoading(true);
-    setProductos(await getProductos());
-    setLoading(false);
+
+    try {
+      const fetchedProductos = await getProductos();
+      setProductos(fetchedProductos);
+      setEditing((currentEditing) => {
+        if (!currentEditing) {
+          return currentEditing;
+        }
+
+        return (
+          fetchedProductos.find((producto) => producto._id === currentEditing._id) ||
+          currentEditing
+        );
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadProductos();
   }, []);
+
+  const filteredProductos = productos.filter((producto) => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    const variantValues = producto.variantes.flatMap((variante) => [
+      variante.color,
+      variante.talla,
+    ]);
+
+    return [producto.nombre, producto.modelo, producto.sku, ...variantValues]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
 
   const handleSave = async (data: Partial<Producto>) => {
     if (editing) {
@@ -47,20 +81,34 @@ export default function AdminProductosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Productos</h1>
-        <button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-            setView("PRODUCTO");
-          }}
-          className="btn-primary max-w-60 px-6"
-        >
-          + Nuevo producto
-        </button>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Productos</h1>
+          <p className="mt-1 text-sm text-gray-400">
+            {filteredProductos.length} de {productos.length} productos visibles
+          </p>
+        </div>
+        
       </div>
-
+      <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row">
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nombre, modelo, SKU o variante..."
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-cyan-400/40 lg:w-full"
+          />
+          <button
+            onClick={() => {
+              setEditing(null);
+              setModalOpen(true);
+              setView("PRODUCTO");
+            }}
+            className="btn-primary max-w-60 min-w-60 px-6"
+          >
+            + Nuevo producto
+          </button>
+        </div>
       {/* Table */}
       <div
         className="bg-white/5 border border-white/10 rounded-2xl
@@ -81,14 +129,14 @@ export default function AdminProductosPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-gray-400">
+                <td colSpan={5} className="py-8 text-center text-gray-400">
                   Cargando productos...
                 </td>
               </tr>
             )}
 
             {!loading &&
-              productos.map((p) => (
+              filteredProductos.map((p) => (
                 <tr
                   key={p._id}
                   className="border-b border-white/5 hover:bg-white/5 transition"
@@ -136,8 +184,16 @@ export default function AdminProductosPage() {
 
             {!loading && productos.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-gray-400">
+                <td colSpan={5} className="py-8 text-center text-gray-400">
                   No hay productos registrados
+                </td>
+              </tr>
+            )}
+
+            {!loading && productos.length > 0 && filteredProductos.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-gray-400">
+                  No hay productos que coincidan con la busqueda
                 </td>
               </tr>
             )}
@@ -148,7 +204,10 @@ export default function AdminProductosPage() {
       {/* Modal */}
       <ProductoModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setEditing(null);
+        }}
         title={
             view === "PRODUCTO"
             ? "Editar producto"

@@ -5,6 +5,36 @@ import {
     nonNegativeIntegerSchema,
 } from "./common.schema";
 
+const optionalObjectIdSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    },
+    z.string().regex(/^[0-9a-fA-F]{24}$/, "ID no valido").optional()
+);
+
+const varianteImageValueSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    },
+    z.union([
+        z.string().url("La imagen debe ser una URL valida"),
+        z.string().regex(
+            /^data:image\/[a-zA-Z0-9.+-]+;base64,/,
+            "La imagen debe ser una URL valida o una imagen base64 valida"
+        ),
+    ])
+);
+
 // ============================================
 // SCHEMAS DE PRODUCTO
 // ============================================
@@ -13,13 +43,28 @@ import {
  * Schema para variante de producto
  */
 export const varianteSchema = z.object({
+    variantId: optionalObjectIdSchema,
+
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),
+
+    colorSecundario: z.string()
+        .trim()
+        .max(50, "El color secundario no puede exceder 50 caracteres")
+        .optional(),
 
     talla: nonEmptyStringSchema
         .max(20, "La talla no puede exceder 20 caracteres"),
 
     stock: nonNegativeIntegerSchema,
+
+    reservedStock: nonNegativeIntegerSchema.optional(),
+
+    imagenes: z.array(varianteImageValueSchema).optional().default([]),
+
+    imagen: varianteImageValueSchema.optional(),
+
+    descripcion: z.string().optional(),
 
     codigoBarra: z.string().optional(),
 
@@ -41,6 +86,8 @@ export const createProductoSchema = z.object({
     precioVenta: positiveNumberSchema,
 
     precioCosto: positiveNumberSchema,
+
+    categoria: z.string().optional().default("Chompas"),
 
     variantes: z
         .array(varianteSchema)
@@ -72,9 +119,10 @@ export const updateProductoSchema = z.object({
 
     precioCosto: positiveNumberSchema.optional(),
 
+    categoria: z.string().optional(),
+
     variantes: z
         .array(varianteSchema)
-        .min(1, "Debe agregar al menos una variante")
         .optional(),
 }).refine(
     (data) => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import User from "@/models/user";
 import { connectDB } from "@/libs/mongodb";
+import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
 
 export async function POST(request: Request) {
   try {
@@ -47,9 +48,12 @@ export async function POST(request: Request) {
       password: hashedPassword,
       role: userRole,
       isActive: true,
+      authProviders: ["credentials"],
+      emailVerified: false,
     });
 
     await user.save();
+    await ensureCustomerProfileForUser(user._id.toString());
 
     // 🧹 Respuesta limpia (sin token - debe hacer login después)
     return NextResponse.json(

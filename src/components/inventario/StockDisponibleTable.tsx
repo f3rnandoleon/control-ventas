@@ -2,11 +2,15 @@
 
 import { ProductoInventario } from "@/types/inventario";
 import { useState } from "react";
+import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 export default function StockDisponibleTable({
     productos,
+    searchTerm = "",
 }: {
     productos: ProductoInventario[];
+    searchTerm?: string;
 }) {
     const [ordenarPor, setOrdenarPor] = useState<"nombre" | "stock">("nombre");
 
@@ -18,13 +22,26 @@ export default function StockDisponibleTable({
             color: variante.color,
             talla: variante.talla,
             stock: variante.stock,
-            imagen: variante.imagen,
+            imagen: getVarianteImagenPrincipal(variante),
             stockMinimo: producto.stockMinimo || 5,
         }))
     );
 
+    const query = searchTerm.trim().toLowerCase();
+
+    const variantesFiltradas = variantes.filter((variante) => {
+        if (!query) {
+            return true;
+        }
+
+        return [variante.productoNombre, variante.color, variante.talla]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+    });
+
     // Ordenar
-    const variantesOrdenadas = [...variantes].sort((a, b) => {
+    const variantesOrdenadas = [...variantesFiltradas].sort((a, b) => {
         if (ordenarPor === "stock") {
             return a.stock - b.stock;
         }
@@ -99,9 +116,11 @@ export default function StockDisponibleTable({
                                     {/* Imagen */}
                                     <td className="px-4 py-3">
                                         {v.imagen ? (
-                                            <img
+                                            <CloudinaryImage
                                                 src={v.imagen}
                                                 alt={`${v.color} - ${v.talla}`}
+                                                width={48}
+                                                height={48}
                                                 className="w-12 h-12 object-cover rounded-lg border border-white/20"
                                             />
                                         ) : (
@@ -156,7 +175,9 @@ export default function StockDisponibleTable({
                         {variantesOrdenadas.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="py-8 text-center text-gray-400">
-                                    No hay productos en el inventario
+                                    {query
+                                        ? "No hay variantes que coincidan con la busqueda"
+                                        : "No hay productos en el inventario"}
                                 </td>
                             </tr>
                         )}

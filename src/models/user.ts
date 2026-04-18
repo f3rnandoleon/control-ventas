@@ -1,5 +1,8 @@
 import { Schema, model, models } from "mongoose";
 
+export const authProviderValues = ["credentials", "google"] as const;
+export type AuthProvider = (typeof authProviderValues)[number];
+
 const userSchema = new Schema(
   {
     email: {
@@ -15,7 +18,9 @@ const userSchema = new Schema(
 
     password: {
       type: String,
-      required: true,
+      required(this: { authProviders?: AuthProvider[] }) {
+        return !(this.authProviders || []).includes("google");
+      },
       select: false, // No se devuelve por defecto
     },
 
@@ -36,6 +41,34 @@ const userSchema = new Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    authProviders: {
+      type: [
+        {
+          type: String,
+          enum: authProviderValues,
+        },
+      ],
+      default: ["credentials"],
+    },
+
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
+    avatarUrl: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
+    emailVerified: {
+      type: Boolean,
+      default: false,
     },
 
     lastLogin: {

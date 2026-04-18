@@ -1,31 +1,15 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/libs/mongodb";
-import Venta from "@/models/venta";
+import { getDailySalesReport } from "@/modules/reports/application/reports.service";
+import { handleRouteError } from "@/shared/http/handleRouteError";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectDB();
-
-    const ventas = await Venta.aggregate([
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
-          },
-          totalVentas: { $sum: "$total" },
-          ganancia: { $sum: "$gananciaTotal" },
-          cantidad: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
+    const ventas = await getDailySalesReport(request);
     return NextResponse.json(ventas);
-  } catch (err) {
-    console.error("ERROR:", err);
-    return NextResponse.json(
-      { message: "Error en reporte diario" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error en reporte diario",
+      logLabel: "REPORTE DIARIO ERROR:",
+    });
   }
 }

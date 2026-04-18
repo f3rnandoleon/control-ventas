@@ -3,17 +3,10 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
-import type { Usuario, UserRole } from "@/types/usuario";
+import type { Usuario } from "@/types/usuario";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { updateUsuarioSchema } from "@/schemas/usuario.schema";
-
-type UpdateUsuarioDTO = {
-  fullname?: string;
-  email?: string;
-  role?: UserRole;
-  isActive?: boolean;
-  password?: string;
-};
+import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
 
 export async function PUT(
   request: Request,
@@ -66,6 +59,10 @@ export async function PUT(
         { message: "Usuario no encontrado" },
         { status: 404 }
       );
+    }
+
+    if (user.role === "CLIENTE") {
+      await ensureCustomerProfileForUser(user._id.toString());
     }
 
     return NextResponse.json(user);
