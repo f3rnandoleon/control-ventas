@@ -67,7 +67,6 @@ const paymentTransactionSchema = new Schema(
     },
     reviewToken: {
       type: String,
-      default: null,
       index: {
         unique: true,
         sparse: true,
