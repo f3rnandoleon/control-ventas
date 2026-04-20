@@ -30,7 +30,8 @@ export default function UsuarioModal({
     reset,
     formState: { errors },
   } = useForm<CreateUsuarioInput | UpdateUsuarioInput>({
-    resolver: zodResolver(Schema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(Schema) as any,
     defaultValues: {
       fullname: "",
       email: "",
