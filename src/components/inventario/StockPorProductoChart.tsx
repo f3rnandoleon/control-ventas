@@ -27,7 +27,7 @@ export default function StockPorProductoChart({
       shadow-[0_0_20px_rgba(0,180,255,0.15)]"
     >
       <h2 className="text-lg font-semibold text-cyan-400 mb-4">
-        Stock Vendido
+        Stock Actual
       </h2>
 
       <div className="h-80">

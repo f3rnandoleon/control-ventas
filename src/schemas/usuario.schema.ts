@@ -38,7 +38,9 @@ export const updateUsuarioSchema = z.object({
 
     email: emailSchema.optional(),
 
-    password: passwordSchema.optional(),
+    password: z.string().optional().refine(val => !val || val.length >= 6, {
+      message: "La contraseña debe tener al menos 6 caracteres"
+    }).transform(val => val === "" ? undefined : val),
 
     role: userRoleSchema.optional(),
 

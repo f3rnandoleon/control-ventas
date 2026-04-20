@@ -47,10 +47,11 @@ export const withComputedStock = <T extends { stockTotal?: number; stockMinimo?:
 ) => ({
   ...producto,
   stockTotal:
-    producto.stockTotal ??
-    (producto.variantes ?? []).reduce(
-      (total, variante) => total + (variante.stock || 0),
-      0
-    ),
+    (producto.variantes && producto.variantes.length > 0)
+      ? producto.variantes.reduce(
+          (total, variante) => total + (variante.stock || 0),
+          0
+        )
+      : (producto.stockTotal || 0),
   stockMinimo: producto.stockMinimo ?? 5,
 });

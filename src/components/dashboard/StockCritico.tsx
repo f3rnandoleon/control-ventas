@@ -28,9 +28,9 @@ export default function StockCritico({
         </p>
       ) : (
         <ul className="space-y-3 text-sm text-gray-300">
-          {criticos.map((p) => (
+          {criticos.map((p, index) => (
             <li
-              key={p.nombre}
+              key={`${p.nombre}-${index}`}
               className="flex justify-between"
             >
               <span>{p.nombre}</span>

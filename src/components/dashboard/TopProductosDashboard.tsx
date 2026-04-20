@@ -17,7 +17,7 @@ export default function TopProductosDashboard({
       <ul className="space-y-3 text-sm text-gray-300">
         {productos.map((p, index) => (
           <li
-            key={p.nombre}
+            key={`${p.nombre}-${index}`}
             className="flex justify-between items-center
             border-b border-white/5 pb-2"
           >
