@@ -24,8 +24,9 @@ Base URL en desarrollo: `/api`
   - `GET /api/verify/payment/:token` *(link de revision de comprobante enviado por Telegram)*
   - `POST /api/verify/payment/:token/confirm` *(autorizado por token UUID de un solo uso)*
   - `POST /api/verify/payment/:token/reject` *(autorizado por token UUID de un solo uso)*
+  - `GET /api/delivery-options` *(publico para la web)*
 - Rutas protegidas:
-  - Solo `ADMIN`: `/api/admin/**`, `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`
+  - Solo `ADMIN`: `/api/admin/**`, `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`, `/api/admin/delivery-options`
   - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`, `/api/pos/**`
   - `ADMIN` o `VENDEDOR`: `/api/orders/**` (excluyendo acciones de cliente), `POST /api/fulfillment`, `PATCH /api/fulfillment/**`
   - `CLIENTE`: `/api/cart/**`, `/api/mis-pedidos/**`, `/api/customers/me/**`
@@ -2270,3 +2271,31 @@ Respuestas:
 - `200`
 - `400`: filtros invalidos.
 - `500`
+
+---
+
+### Delivery Options
+
+#### `GET /api/delivery-options`
+Obtiene la configuración actual de puntos de encuentro, horarios y empresas de envío.
+
+Respuesta `200`:
+```json
+{
+  "pickupPoints": [{ "id": "...", "name": "..." }],
+  "pickupSchedules": [{ "id": "...", "day": "...", "start": "...", "end": "...", "label": "..." }],
+  "shippingCompanies": [{
+    "id": "...",
+    "name": "...",
+    "departments": [{ "name": "...", "branches": ["..."] }]
+  }]
+}
+```
+
+#### `PATCH /api/admin/delivery-options`
+Actualiza la configuración de opciones de entrega.
+
+Permisos:
+- Solo `ADMIN`.
+
+Respuesta `200`: Confirmación de actualización.

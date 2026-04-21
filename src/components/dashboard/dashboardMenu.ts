@@ -15,6 +15,7 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
     { label: "Pedidos", href: "/dashboard/admin/pedidos", keywords: ["reserva", "comprobante"] },
     { label: "Reportes", href: "/dashboard/admin/reportes", keywords: ["metricas", "graficos"] },
     { label: "Usuarios", href: "/dashboard/admin/usuarios", keywords: ["roles", "equipo"] },
+    { label: "Opciones Entrega", href: "/dashboard/admin/delivery", keywords: ["horarios", "envios", "puntos"] },
   ],
   VENDEDOR: [
     { label: "Dashboard", href: "/dashboard/vendedor", keywords: ["inicio", "resumen"] },
