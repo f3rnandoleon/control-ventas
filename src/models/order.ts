@@ -133,12 +133,11 @@ const orderSchema = new Schema(
     deliverySnapshot: {
       method: {
         type: String,
-        enum: ["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT", "SHIPPING_NATIONAL", null],
+        enum: ["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL", null],
         default: null,
       },
       pickupPoint: {
         type: String,
-        enum: ["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS", null],
         default: null,
       },
       address: {

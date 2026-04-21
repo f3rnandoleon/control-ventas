@@ -33,7 +33,7 @@ const fulfillmentSchema = new Schema(
     },
     method: {
       type: String,
-      enum: ["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT", null],
+      enum: ["WHATSAPP", "PICKUP_POINT", null],
       default: null,
     },
     status: {
@@ -45,7 +45,6 @@ const fulfillmentSchema = new Schema(
     },
     pickupPoint: {
       type: String,
-      enum: ["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS", null],
       default: null,
     },
     address: {

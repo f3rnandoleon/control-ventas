@@ -45,8 +45,8 @@ type LegacyVentaRecord = {
   cliente?: { toString(): string } | null;
   vendedor?: { toString(): string } | null;
   delivery?: {
-    method: "WHATSAPP" | "PICKUP_LAPAZ" | "PICKUP_POINT";
-    pickupPoint?: "TELEFERICO_MORADO" | "TELEFERICO_ROJO" | "CORREOS" | null;
+    method: "WHATSAPP" | "PICKUP_POINT";
+    pickupPoint?: string | null;
     address?: string | null;
     phone?: string | null;
   } | null;

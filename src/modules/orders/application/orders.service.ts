@@ -61,7 +61,7 @@ type CreateOrderFromSaleInput = {
   customerId?: string;
   sellerId?: string;
   delivery?: {
-    method: "WHATSAPP" | "PICKUP_LAPAZ" | "PICKUP_POINT";
+    method: "WHATSAPP" | "PICKUP_POINT";
     pickupPoint?: string | null;
     address?: string | null;
     phone?: string | null;
@@ -100,8 +100,8 @@ function mapSaleStatusToOrderState(saleStatus: CreateOrderFromSaleInput["saleSta
 }
 
 function mapFulfillmentStatus(
-  channel: CreateOrderFromSaleInput["channel"],
-  delivery?: CreateOrderFromSaleInput["delivery"]
+  channel?: string,
+  delivery?: { method?: string }
 ) {
   if (channel === "TIENDA" && !delivery) {
     return "NOT_APPLICABLE" as const;
@@ -315,7 +315,7 @@ export async function checkoutCartToOrder(
   } else if (method === "PICKUP_POINT") {
     deliverySnapshot = {
       method: "PICKUP_POINT",
-      pickupPoint: payload.delivery?.pickupPoint ?? null,
+      pickupPoint: payload.delivery?.address ?? null,
       phone: payload.delivery?.phone ?? null,
       recipientName: payload.delivery?.recipientName || customer.user.fullname,
       scheduledAt: payload.delivery?.scheduledAt ?? null,
@@ -337,7 +337,7 @@ export async function checkoutCartToOrder(
     const address = await getCustomerAddressByUserId(customerId, payload.addressId);
     deliverySnapshot = {
       method: "PICKUP_POINT",
-      pickupPoint: payload.delivery?.pickupPoint || address.addressLine,
+      pickupPoint: payload.delivery?.address || address.addressLine,
       phone: payload.delivery?.phone || address.phone,
       recipientName: payload.delivery?.recipientName || address.recipientName,
     };

@@ -45,7 +45,7 @@ export const updateOrderStatusSchema = z
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
 
 export const updateOrderDeliverySchema = z.object({
-  method: z.enum(["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT", "SHIPPING_NATIONAL"]).optional(),
+  method: z.enum(["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL"]).optional(),
   pickupPoint: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),

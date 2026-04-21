@@ -50,7 +50,7 @@ export const checkoutCartSchema = z
         method: z.enum(["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL"]),
 
         // PICKUP_POINT (Puntos de entrega)
-        pickupPoint: optionalStr(150),
+        address: optionalStr(250),
         phone: optionalStr(20),
         recipientName: optionalStr(100),
         scheduledAt: optionalStr(100),
@@ -77,11 +77,11 @@ export const checkoutCartSchema = z
           path: ["delivery", "phone"],
         });
       }
-      if (!data.delivery?.pickupPoint) {
+      if (!data.delivery?.address) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El lugar de encuentro es obligatorio",
-          path: ["delivery", "pickupPoint"],
+          path: ["delivery", "address"],
         });
       }
     }

@@ -124,11 +124,10 @@ const ventaSchema = new Schema(
     delivery: {
       method: {
         type: String,
-        enum: ["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT"],
+        enum: ["WHATSAPP", "PICKUP_POINT"],
       },
       pickupPoint: {
         type: String,
-        enum: ["TELEFERICO_MORADO", "TELEFERICO_ROJO", "CORREOS", null],
         default: null,
       },
       address: {

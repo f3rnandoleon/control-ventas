@@ -1138,7 +1138,7 @@ Validaciones:
 - `descuento?`: monto en Bs >= 0. El backend lo resta directamente del subtotal (`total = subtotal - descuento`). Si no se envia, se asume `0` (sin descuento).
 - `delivery?`: objeto opcional
   - `method`: `WHATSAPP | PICKUP_POINT | SHIPPING_NATIONAL`
-  - `pickupPoint`: requerido para PICKUP_POINT, max 150 caracteres
+  - `address`: requerido para PICKUP_POINT (nombre del punto de encuentro), max 250 caracteres
   - `phone`: requerido para PICKUP_POINT
   - `scheduledAt`: horario, opcional
 

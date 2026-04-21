@@ -29,7 +29,6 @@ export const customerDocumentTypeSchema = z.enum([
 
 export const customerDeliveryMethodSchema = z.enum([
   "WHATSAPP",
-  "PICKUP_LAPAZ",
   "PICKUP_POINT",
 ]);
 
@@ -44,7 +43,6 @@ export const updateCustomerProfileSchema = z
     documentNumber: optionalTrimmedString(30).nullable().optional(),
     defaultDeliveryMethod: optionalNullableEnum([
       "WHATSAPP",
-      "PICKUP_LAPAZ",
       "PICKUP_POINT",
     ]),
     notes: optionalTrimmedString(300).nullable().optional(),

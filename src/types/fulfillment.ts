@@ -8,7 +8,6 @@ export type FulfillmentStatus =
 
 export type FulfillmentMethod =
   | "WHATSAPP"
-  | "PICKUP_LAPAZ"
   | "PICKUP_POINT"
   | null;
 
@@ -21,7 +20,7 @@ export interface Fulfillment {
   channel: "WEB" | "APP_QR" | "TIENDA";
   method: FulfillmentMethod;
   status: FulfillmentStatus;
-  pickupPoint?: "TELEFERICO_MORADO" | "TELEFERICO_ROJO" | "CORREOS" | null;
+  pickupPoint?: string | null;
   address?: string | null;
   phone?: string | null;
   recipientName?: string | null;

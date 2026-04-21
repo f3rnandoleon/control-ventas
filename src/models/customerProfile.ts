@@ -26,7 +26,7 @@ const customerProfileSchema = new Schema(
     },
     defaultDeliveryMethod: {
       type: String,
-      enum: ["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT", null],
+      enum: ["WHATSAPP", "PICKUP_POINT", null],
       default: null,
     },
     notes: {

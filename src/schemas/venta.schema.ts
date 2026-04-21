@@ -47,24 +47,10 @@ export const createVentaItemSchema = z.object({
 });
 
 export const deliverySchema = z.object({
-    method: z.enum(["WHATSAPP", "PICKUP_LAPAZ", "PICKUP_POINT"]),
+    method: z.enum(["WHATSAPP", "PICKUP_POINT"]),
     pickupPoint: z.string().max(150, "El punto de encuentro no puede superar 150 caracteres").nullable().optional(),
     phone: z.string().max(30).nullable().optional(),
 }).superRefine((data, ctx) => {
-    if (data.method === "PICKUP_LAPAZ" && !data.pickupPoint) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "El punto de recojo es obligatorio",
-            path: ["pickupPoint"],
-        });
-    }
-    if (data.method === "PICKUP_LAPAZ" && !data.phone) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "El teléfono es obligatorio",
-            path: ["phone"],
-        });
-    }
     if (data.method === "PICKUP_POINT" && !data.pickupPoint) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
