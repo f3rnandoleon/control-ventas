@@ -8,6 +8,8 @@ import { updateOrderStatusSchema } from "@/schemas/order.schema";
 import {
   getOrderForActor,
   updateOrderStatusForStaff,
+  cancelOrderForCustomer,
+  updateOrderDeliveryForCustomer,
 } from "@/modules/orders/application/orders.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
@@ -45,18 +47,31 @@ export async function PATCH(request: Request, context: Context) {
       return NextResponse.json({ message: "No autenticado" }, { status: 401 });
     }
 
-    if (!["ADMIN", "VENDEDOR"].includes(userAuth.role)) {
-      return NextResponse.json({ message: "No autorizado" }, { status: 403 });
-    }
-
-    const validation = await validateRequest(updateOrderStatusSchema, request);
-
-    if (!validation.success) {
-      return validationErrorResponse(validation.errors);
-    }
-
     const { id } = await context.params;
-    const order = await updateOrderStatusForStaff(id, validation.data);
+
+    let order;
+    if (["ADMIN", "VENDEDOR"].includes(userAuth.role)) {
+      const validation = await validateRequest(updateOrderStatusSchema, request);
+      if (!validation.success) {
+        return validationErrorResponse(validation.errors);
+      }
+      order = await updateOrderStatusForStaff(id, validation.data);
+    } else {
+      // Flujo para CLIENTE
+      const body = await request.json();
+
+      if (body.orderStatus === "CANCELLED") {
+        order = await cancelOrderForCustomer(id, userAuth.id);
+      } else if (body.delivery) {
+        // En este caso asumimos que si manda 'delivery' es para editar datos de envío
+        order = await updateOrderDeliveryForCustomer(id, userAuth.id, body.delivery);
+      } else {
+        return NextResponse.json(
+          { message: "Acción no permitida para clientes" },
+          { status: 400 }
+        );
+      }
+    }
 
     return NextResponse.json({
       message: "Pedido actualizado correctamente",

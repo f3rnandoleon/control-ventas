@@ -19,11 +19,14 @@ import {
   sortOrdersByCreatedAtDesc,
 } from "@/modules/orders/domain/order.utils";
 import { syncFulfillmentForOrder } from "@/modules/fulfillment/application/fulfillment.service";
-import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
+import {
+  recordAuditEventSafe,
+  type AuditActorRole,
+} from "@/modules/audit/application/audit.service";
 import { AppError } from "@/shared/errors/AppError";
 import { runInTransaction } from "@/shared/db/runTransaction";
 import type { CheckoutCartInput } from "@/schemas/cart.schema";
-import type { UpdateOrderStatusInput } from "@/schemas/order.schema";
+import type { UpdateOrderStatusInput, UpdateOrderDeliveryInput } from "@/schemas/order.schema";
 
 type OrderItemInput = {
   productoId: string;
@@ -601,3 +604,135 @@ export async function getCustomerOrderWithLegacyFallback(
 
   return mapLegacyVentaToCustomerOrderView(legacyVenta as Record<string, unknown>);
 }
+
+export async function cancelOrderForCustomer(id: string, customerId: string) {
+  assertObjectId(id, "ID de pedido invalido");
+  await connectDB();
+
+  return runInTransaction(async (session) => {
+    const order = await ordersRepository.findByIdForCustomer(id, customerId, session);
+
+    if (!order) {
+      throw new AppError("Pedido no encontrado o no pertenece al cliente", 404);
+    }
+
+    if (order.orderStatus !== "PENDING_PAYMENT") {
+      throw new AppError("Solo se pueden cancelar pedidos pendientes de pago", 400);
+    }
+
+    if (order.stockReservationStatus === "RESERVED") {
+      await releaseOrderReservation(order, session);
+    }
+
+    order.orderStatus = "CANCELLED";
+    order.paymentStatus = "FAILED";
+    order.fulfillmentStatus = "CANCELLED";
+    order.stockReservationStatus = "RELEASED";
+    order.reservedAt = null;
+    order.reservationExpiresAt = null;
+
+    await order.save({ session });
+
+    await recordAuditEventSafe({
+      action: "ORDER_CANCELLED_BY_CUSTOMER",
+      entityType: "ORDER",
+      entityId: order._id.toString(),
+      actorId: customerId,
+      actorRole: "CLIENTE",
+      status: "SUCCESS",
+    }, session);
+
+    return order;
+  });
+}
+
+export async function updateOrderDeliveryForCustomer(
+  id: string,
+  customerId: string,
+  deliveryData: UpdateOrderDeliveryInput
+) {
+  assertObjectId(id, "ID de pedido invalido");
+  await connectDB();
+
+  return runInTransaction(async (session) => {
+    const order = await ordersRepository.findByIdForCustomer(id, customerId, session);
+
+    if (!order) {
+      throw new AppError("Pedido no encontrado o no pertenece al cliente", 404);
+    }
+
+    if (order.orderStatus !== "PENDING_PAYMENT") {
+      throw new AppError("Solo se pueden editar pedidos pendientes de pago", 400);
+    }
+
+    // Validar ventana de 30 minutos
+    const now = new Date();
+    const createdAt = new Date(order.createdAt);
+    const diffMs = now.getTime() - createdAt.getTime();
+    const diffMins = diffMs / (1000 * 60);
+
+    if (diffMins > 30) {
+      throw new AppError("El plazo para editar el pedido (30 min) ha expirado", 403);
+    }
+
+    // Actualizar datos de entrega
+    order.deliverySnapshot = {
+      ...order.deliverySnapshot,
+      ...deliveryData,
+    };
+
+    await order.save({ session });
+
+    await recordAuditEventSafe({
+      action: "ORDER_DELIVERY_UPDATED_BY_CUSTOMER",
+      entityType: "ORDER",
+      entityId: order._id.toString(),
+      actorId: customerId,
+      actorRole: "CLIENTE",
+      status: "SUCCESS",
+    }, session);
+
+    return order;
+  });
+}
+
+export async function confirmOrderForDelivery(
+  id: string,
+  actor: { id: string; role: AuditActorRole }
+) {
+  assertObjectId(id, "ID de pedido invalido");
+  await connectDB();
+
+  return runInTransaction(async (session) => {
+    const order = await ordersRepository.findById(id, session);
+
+    if (!order) {
+      throw new AppError("Pedido no encontrado", 404);
+    }
+
+    if (order.orderStatus !== "PENDING_PAYMENT") {
+      throw new AppError("El pedido ya no esta pendiente de pago", 400);
+    }
+
+    order.orderStatus = "CONFIRMED";
+    // Al confirmar para entrega, la reserva se vuelve permanente hasta la entrega física
+    order.reservationExpiresAt = null;
+
+    await order.save({ session });
+
+    await recordAuditEventSafe(
+      {
+        action: "ORDER_CONFIRMED_FOR_DELIVERY",
+        entityType: "ORDER",
+        entityId: order._id.toString(),
+        actorId: actor.id,
+        actorRole: actor.role,
+        status: "SUCCESS",
+      },
+      session
+    );
+
+    return order;
+  });
+}
+

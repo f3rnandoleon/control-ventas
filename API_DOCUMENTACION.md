@@ -26,12 +26,10 @@ Base URL en desarrollo: `/api`
   - `POST /api/verify/payment/:token/reject` *(autorizado por token UUID de un solo uso)*
 - Rutas protegidas:
   - Solo `ADMIN`: `/api/admin/**`, `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`
-  - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`
-  - `ADMIN` o `VENDEDOR`: `/api/orders/**`
-  - `ADMIN` o `VENDEDOR`: `POST /api/fulfillment`, `PATCH /api/fulfillment/**`
-  - `ADMIN` o `VENDEDOR`: `/api/pos/**`
-  - `CLIENTE`: `/api/cart/**`
-  - `CLIENTE`: `POST /api/ventas` (solo `tipoVenta: WEB`), `GET /api/orders/**`, `GET /api/fulfillment/:orderId`, `/api/mis-pedidos/**`, `/api/customers/me/**`
+  - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`, `/api/pos/**`
+  - `ADMIN` o `VENDEDOR`: `/api/orders/**` (excluyendo acciones de cliente), `POST /api/fulfillment`, `PATCH /api/fulfillment/**`
+  - `CLIENTE`: `/api/cart/**`, `/api/mis-pedidos/**`, `/api/customers/me/**`
+  - `CLIENTE`: `POST /api/orders/checkout`, `GET /api/orders/:id` (propios), `PATCH /api/orders/:id` (cancelación/edición limitada)
   - `CLIENTE`, `ADMIN` o `VENDEDOR`: `/api/payments/**`
 
 ## Formato de error de validacion (Zod)
@@ -1322,6 +1320,26 @@ Respuestas:
 - `404`: producto o variante no encontrada.
 - `500`
 
+#### `GET /api/mis-pedidos`
+Lista los pedidos del cliente autenticado, ordenados por fecha descendente.
+
+Reglas:
+- Solo accesible para usuarios con rol `CLIENTE`.
+- Antes de listar, el backend intenta liberar reservas expiradas.
+- Prioriza pedidos de la nueva colección `Order`, con fallback a ventas legacy si existen ventas web sin pedido.
+
+Respuesta `200`: Arreglo de objetos de pedido simplificados para vista de cliente.
+
+#### `GET /api/mis-pedidos/:id`
+Obtiene el detalle de un pedido propio para el cliente.
+
+Reglas:
+- Valida que el pedido pertenezca al cliente autenticado.
+- Fallback automático a ventas legacy si el ID corresponde a una venta antigua.
+- Oculta campos sensibles (costos, utilidad).
+
+Respuesta `200`: Detalle del pedido.
+
 #### `GET /api/orders/:id`
 Obtiene el detalle de un pedido.
 
@@ -1338,38 +1356,67 @@ Respuestas:
 - `500`
 
 #### `PATCH /api/orders/:id`
-Actualiza estados operativos del pedido.
+Actualiza estados operativos del pedido o permite autogestión al cliente.
 
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
+**Permisos y Reglas:**
 
-Body:
+1. **Staff (ADMIN / VENDEDOR)**:
+   - Puede actualizar `orderStatus`, `paymentStatus` y `fulfillmentStatus` a cualquier valor válido.
+   - Sincroniza automáticamente la logística.
 
+2. **Cliente (CLIENTE)**:
+   - Solo puede cancelar el pedido (`orderStatus = CANCELLED`).
+   - Solo puede editar datos de entrega (`deliverySnapshot`).
+   - **Restricción de Tiempo**: Los cambios por parte del cliente solo se permiten dentro de los **primeros 30 minutos** posteriores a la creación del pedido.
+   - **Restricción de Estado**: Solo se permite si el pedido está en `PENDING_PAYMENT`.
+
+Body (ejemplo cliente):
 ```json
 {
-  "orderStatus": "PREPARING",
-  "paymentStatus": "PAID",
-  "fulfillmentStatus": "PENDING"
+  "orderStatus": "CANCELLED"
 }
 ```
 
-Validaciones:
-- Debe enviarse al menos uno de estos campos:
-  - `orderStatus`: `PENDING_PAYMENT | CONFIRMED | PREPARING | READY | IN_TRANSIT | DELIVERED | CANCELLED`
-  - `paymentStatus`: `PENDING | PAID | FAILED | REFUNDED`
-  - `fulfillmentStatus`: `PENDING | READY | IN_TRANSIT | DELIVERED | NOT_APPLICABLE | CANCELLED`
-
-Notas:
-- Si `orderStatus` se actualiza a `CANCELLED` y no se envia `fulfillmentStatus`, el backend lo ajusta automaticamente a `CANCELLED`.
-- Si el pedido tenia stock reservado y aun no estaba pagado, al cancelarlo el backend libera la reserva y marca `stockReservationStatus = RELEASED`.
+Body (ejemplo staff):
+```json
+{
+  "orderStatus": "IN_TRANSIT",
+  "fulfillmentStatus": "IN_TRANSIT"
+}
+```
 
 Respuestas:
-- `200`
-- `400`: validacion o ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `500`
+- `200`: Pedido actualizado.
+- `400`: Validación o estado no permitido.
+- `403`: Plazo de edición expirado o acción no permitida para el rol.
+- `404`: Pedido no encontrado.
+
+#### `POST /api/orders/:id/confirm-for-delivery`
+Prepara el pedido para su entrega física (solo Staff). Se utiliza principalmente para pedidos de Efectivo/Punto de Encuentro/WhatsApp.
+
+Reglas:
+- Solo para pedidos en `PENDING_PAYMENT`.
+- Cambia `orderStatus` a `CONFIRMED`.
+- **Reserva de Stock**: Elimina la expiración de la reserva (`reservationExpiresAt = null`). El producto queda asegurado indefinidamente hasta la entrega o cancelación manual.
+
+#### `POST /api/orders/:id/confirm-cash`
+Finaliza un pedido con cobro en efectivo en el momento de la entrega física (solo Staff).
+
+Reglas:
+- Transforma el pedido en una **Venta** oficial (PAGADA).
+- Consume el stock reservado definitivamente (`RESERVED` -> `CONSUMED`).
+- Registra movimiento de inventario.
+- Actualiza:
+  - `orderStatus = DELIVERED`
+  - `fulfillmentStatus = DELIVERED`
+  - `paymentStatus = PAID`
+  - `stockReservationStatus = CONSUMED`
+
+Respuestas:
+- `200`: Venta registrada y pedido finalizado.
+- `409`: Conflicto si el pedido ya fue pagado o cancelado.
+
+---
 
 ---
 

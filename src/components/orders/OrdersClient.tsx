@@ -2,25 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-type Order = {
-  _id: string;
-  orderNumber: string;
-  orderStatus: string;
-  paymentStatus: string;
-  fulfillmentStatus: string;
-  metodoPago: string;
-  total: number;
-  createdAt: string;
-  customerSnapshot?: { fullname: string; phone?: string };
-  deliverySnapshot?: { method: string; pickupPoint?: string };
-};
+import type { Order } from "@/types/order";
+import OrderDetailModal from "./modals/OrderDetailModal";
 
 export default function OrdersClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("TODOS");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const itemsPerPage = 10;
 
   const fetchOrders = async () => {
@@ -42,17 +32,31 @@ export default function OrdersClient() {
     fetchOrders();
   }, []);
 
+  const handleConfirmForDelivery = async (orderId: string) => {
+    if (!confirm("¿Confirmar este pedido para entrega? La reserva de stock se asegurará indefinidamente.")) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}/confirm-for-delivery`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Falló confirmación");
+      toast.success("Pedido confirmado para entrega");
+      fetchOrders();
+    } catch {
+      toast.error("Error al confirmar el pedido");
+    }
+  };
+
   const handleConfirmCash = async (orderId: string) => {
-    if (!confirm("¿Confirmar el pago en efectivo y descontar stock?")) return;
+    if (!confirm("¿Confirmar entrega y cobro en efectivo? Se creará la venta y se descontará el stock.")) return;
     try {
       const res = await fetch(`/api/orders/${orderId}/confirm-cash`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Falló confirmación");
-      toast.success("Pago confirmado");
+      toast.success("Venta realizada y stock descontado");
       fetchOrders();
     } catch {
-      toast.error("Error al confirmar el pago");
+      toast.error("Error al finalizar la venta en efectivo");
     }
   };
 
@@ -88,6 +92,33 @@ export default function OrdersClient() {
     } catch(err) {
       console.error(err);
       toast.error("Error al marcar como entregado");
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm("¿Seguro que deseas CANCELAR este pedido? Se liberará el stock inmediatamente.")) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderStatus: "CANCELLED" }),
+      });
+      if (!res.ok) throw new Error("Falló cancelación");
+      toast.success("Pedido cancelado y stock liberado");
+      fetchOrders();
+    } catch {
+      toast.error("Error al cancelar el pedido");
+    }
+  };
+
+  const fetchOrderDetails = async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`);
+      if (!res.ok) throw new Error("No se pudo cargar el detalle");
+      const data = await res.json();
+      setSelectedOrder(data);
+    } catch {
+      toast.error("Error al cargar detalles");
     }
   };
 
@@ -216,24 +247,47 @@ export default function OrdersClient() {
                         {o.orderStatus}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
+                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                       <button
+                          onClick={() => fetchOrderDetails(o._id)}
+                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          Detalles
+                        </button>
+
                        {o.orderStatus === "PENDING_PAYMENT" && o.metodoPago === "EFECTIVO" && (
+                          <button
+                            onClick={() => handleConfirmForDelivery(o._id)}
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30 transition-colors"
+                          >
+                            Confirmar para Entrega
+                          </button>
+                       )}
+
+                       {o.orderStatus === "CONFIRMED" && o.paymentStatus !== "PAID" && (
                           <button
                             onClick={() => handleConfirmCash(o._id)}
                             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/30 transition-colors"
                           >
-                            Recibí Efectivo
+                            Entregar y Cobrar
                           </button>
                        )}
-                       {o.orderStatus === "PENDING_PAYMENT" && o.metodoPago === "QR" && (
-                          <span className="text-xs text-slate-500">QR vía Telegram</span>
-                       )}
-                       {["CONFIRMED", "READY", "IN_TRANSIT"].includes(o.orderStatus) && (
+
+                       {o.orderStatus === "CONFIRMED" && o.paymentStatus === "PAID" && (
                           <button
                             onClick={() => handleDeliver(o._id)}
                             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:hover:bg-indigo-500/30 transition-colors"
                           >
-                            Entregar
+                            Marcar Entregado
+                          </button>
+                       )}
+
+                       {o.orderStatus !== "CANCELLED" && o.orderStatus !== "DELIVERED" && (
+                          <button
+                            onClick={() => handleCancelOrder(o._id)}
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30 transition-colors"
+                          >
+                            Cancelar
                           </button>
                        )}
                     </td>
@@ -268,6 +322,13 @@ export default function OrdersClient() {
           </div>
         )}
       </div>
+
+      {selectedOrder && (
+        <OrderDetailModal 
+          order={selectedOrder} 
+          onClose={() => setSelectedOrder(null)} 
+        />
+      )}
     </div>
   );
 }

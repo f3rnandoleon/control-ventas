@@ -1,0 +1,135 @@
+{
+  "pickupPoints": [
+    {
+      "id": "teleferico-morado-faro-murillo",
+      "name": "Teleferico Morado Estacion Faro Murillo"
+    },
+    {
+      "id": "teleferico-morado-obelisco",
+      "name": "Teleferico Morado Estacion Obelisco"
+    },
+    {
+      "id": "teleferico-rojo-central",
+      "name": "Teleferico Rojo Estacion Central"
+    },
+    {
+      "id": "teleferico-rojo-16-julio",
+      "name": "Teleferico Rojo Estacion 16 de Julio"
+    },
+    {
+      "id": "edificio-el-ceibo",
+      "name": "Edificio El Ceibo"
+    },
+    {
+      "id": "plaza-del-estudiante",
+      "name": "Plaza Del Estudiante"
+    },
+    {
+      "id": "terminal-de-buses-la-paz",
+      "name": "Terminal de Buses La Paz"
+    }
+  ],
+  "pickupSchedules": [
+    {
+      "id": "lunes-1200-1800",
+      "day": "Lunes",
+      "start": "12:00",
+      "end": "18:00",
+      "label": "Lunes: 12:00-18:00"
+    },
+    {
+      "id": "martes-1000-1400",
+      "day": "Martes",
+      "start": "10:00",
+      "end": "14:00",
+      "label": "Martes: 10:00-14:00"
+    },
+    {
+      "id": "martes-1700-1900",
+      "day": "Martes",
+      "start": "17:00",
+      "end": "19:00",
+      "label": "Martes: 17:00-19:00"
+    },
+    {
+      "id": "miercoles-1200-1700",
+      "day": "Miercoles",
+      "start": "12:00",
+      "end": "17:00",
+      "label": "Miercoles: 12:00-17:00"
+    },
+    {
+      "id": "jueves-1000-1900",
+      "day": "Jueves",
+      "start": "10:00",
+      "end": "19:00",
+      "label": "Jueves: 10:00-19:00"
+    },
+    {
+      "id": "viernes-1200-1700",
+      "day": "Viernes",
+      "start": "12:00",
+      "end": "17:00",
+      "label": "Viernes: 12:00-17:00"
+    },
+    {
+      "id": "sabado-1000-1400",
+      "day": "Sabado",
+      "start": "10:00",
+      "end": "14:00",
+      "label": "Sabado: 10:00-14:00"
+    }
+  ],
+  "shippingCompanies": [
+    {
+      "id": "bolivar-cargo",
+      "name": "BolivarCargo",
+      "departments": [
+        {
+          "name": "Cochabamba",
+          "branches": ["Av Melchor"]
+        },
+        {
+          "name": "Santa Cruz",
+          "branches": ["Av. 3 Pasos al Frente"]
+        },
+        {
+          "name": "Trinidad",
+          "branches": ["Bodega Terminal"]
+        },
+        {
+          "name": "Sucre",
+          "branches": ["Bodega Terminal"]
+        },
+        {
+          "name": "Potosi",
+          "branches": ["Bodega Terminal"]
+        }
+      ]
+    },
+    {
+      "id": "trans-copacabana",
+      "name": "Trans Copacabana",
+      "departments": [
+        {
+          "name": "Cochabamba",
+          "branches": [
+            "Terminal de Buses - Av Ayacucho",
+            "Bodega Terminal - Av Ayacucho",
+            "Av Luis Uriona",
+            "Av Aroma Zona Villa Coronilla",
+            "Av Circunvalacion entre Potosi y Luis Calvo"
+          ]
+        },
+        {
+          "name": "Quillacollo",
+          "branches": ["Av Rosendi Zona Central"]
+        },
+        {
+          "name": "Sacaba",
+          "branches": ["Av Villazon Km.2 Frente al Servicio de Caminos"]
+        }
+      ]
+    }
+  ]
+}

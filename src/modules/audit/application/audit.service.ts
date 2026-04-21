@@ -3,8 +3,8 @@ import { connectDB } from "@/libs/mongodb";
 import AuditEvent from "@/models/auditEvent";
 import { logError } from "@/shared/observability/logger";
 
-type AuditStatus = "SUCCESS" | "FAILED";
-type AuditActorRole = "ADMIN" | "VENDEDOR" | "CLIENTE" | "SYSTEM";
+export type AuditStatus = "SUCCESS" | "FAILED";
+export type AuditActorRole = "ADMIN" | "VENDEDOR" | "CLIENTE" | "SYSTEM";
 
 type RecordAuditEventInput = {
   requestId?: string | null;

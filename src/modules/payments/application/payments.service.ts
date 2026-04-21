@@ -683,7 +683,8 @@ export async function confirmCashOrder(orderId: string, actor: AuthActor) {
     const venta = await createSaleFromOrderIfNeeded(order, actor, session);
 
     order.paymentStatus = "PAID";
-    order.orderStatus = "CONFIRMED";
+    order.orderStatus = "DELIVERED";
+    order.fulfillmentStatus = "DELIVERED";
     order.stockReservationStatus = "CONSUMED";
     await order.save({ session });
 
