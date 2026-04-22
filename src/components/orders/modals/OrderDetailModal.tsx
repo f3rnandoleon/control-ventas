@@ -54,22 +54,62 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
 
             <section className="space-y-4">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Datos de Entrega</h3>
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl space-y-2">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">
-                  Método: {DELIVERY_METHOD_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—"}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Lugar: {order.deliverySnapshot?.pickupPoint || "No especificado"}
-                </p>
-                {order.deliverySnapshot?.scheduledAt && (
-                  <p className="text-xs text-slate-500">
-                    Agendado: {order.deliverySnapshot.scheduledAt}
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl space-y-3">
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Método</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {DELIVERY_METHOD_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—"}
                   </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Ubicación / Dirección</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {order.deliverySnapshot?.address || order.deliverySnapshot?.pickupPoint || "No especificado"}
+                    </p>
+                    {order.deliverySnapshot?.department && (
+                      <p className="text-[10px] text-slate-500 mt-0.5">{order.deliverySnapshot.department} {order.deliverySnapshot.city ? `• ${order.deliverySnapshot.city}` : ""}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Programación</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {order.deliverySnapshot?.scheduledAt || "No agendado"}
+                    </p>
+                  </div>
+                </div>
+
+                {(order.deliverySnapshot?.recipientName || order.deliverySnapshot?.senderPhone || order.deliverySnapshot?.senderCI) && (
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700 mt-1">
+                    <p className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase font-bold mb-1">Datos de Recepción / Envío</p>
+                    <div className="space-y-1">
+                      {order.deliverySnapshot?.recipientName && (
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          👤 {order.deliverySnapshot.recipientName}
+                        </p>
+                      )}
+                      <div className="flex gap-4">
+                        {order.deliverySnapshot?.senderCI && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            🪪 CI: <span className="text-slate-700 dark:text-slate-200 font-medium">{order.deliverySnapshot.senderCI}</span>
+                          </p>
+                        )}
+                        {order.deliverySnapshot?.senderPhone && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            📞 Tel: <span className="text-slate-700 dark:text-slate-200 font-medium">{order.deliverySnapshot.senderPhone}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
-                {order.deliverySnapshot?.recipientName && (
-                  <p className="text-xs text-slate-500">
-                    Recibe: {order.deliverySnapshot.recipientName}
-                  </p>
+                
+                {order.deliverySnapshot?.shippingCompany && (
+                  <div className="pt-1">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Transportadora</p>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">{order.deliverySnapshot.shippingCompany} {order.deliverySnapshot.branch ? `(${order.deliverySnapshot.branch})` : ""}</p>
+                  </div>
                 )}
               </div>
             </section>

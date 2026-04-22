@@ -430,7 +430,14 @@ export default function VerificarPagoPage() {
                   <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/20">
                     <p className="text-[10px] text-indigo-400 uppercase font-black mb-2">Datos de Recepción</p>
                     <p className="text-slate-300 text-sm underline decoration-indigo-500/50 underline-offset-4">{order.deliverySnapshot.recipientName}</p>
-                    {order.deliverySnapshot.senderPhone && <p className="text-slate-500 text-xs mt-1">Contacto: {order.deliverySnapshot.senderPhone}</p>}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                       {order.deliverySnapshot.senderCI && (
+                         <p className="text-slate-500 text-xs">🪪 CI: <span className="text-slate-300 font-medium">{order.deliverySnapshot.senderCI}</span></p>
+                       )}
+                       {order.deliverySnapshot.senderPhone && (
+                         <p className="text-slate-500 text-xs">📞 Tel: <span className="text-slate-300 font-medium">{order.deliverySnapshot.senderPhone}</span></p>
+                       )}
+                    </div>
                   </div>
                 )}
               </div>
