@@ -1075,6 +1075,7 @@ Reglas:
   - `productoSnapshot.sku`
   - `variante.variantId`
   - `variante.codigoBarra`
+- **Nota sobre Auditoría:** El campo `usuario` en el modelo de inventario es ahora opcional para permitir movimientos registrados automáticamente por el sistema (ej. confirmación de pagos vía token).
 
 Respuestas:
 - `201`
@@ -1299,7 +1300,7 @@ El backend crea el pedido en `PENDING_PAYMENT` con reserva de 24 horas. El front
 
 Campos comunes opcionales:
 - `addressId`: ID de una dirección guardada del cliente (solo aplica si no se usa el nuevo campo `delivery`).
-- `notes`: Observaciones del pedido (max 300 chars).
+- `notes`: Observaciones o notas especiales del cliente (max 300 chars). Se persiste en el campo `notes` del pedido.
 
 Reglas generales:
 - El backend valida que el carrito no esté vacío.
@@ -1345,7 +1346,7 @@ Respuesta `200`: Detalle del pedido.
 Obtiene el detalle de un pedido.
 
 Reglas:
-- `ADMIN` y `VENDEDOR`: pueden consultar cualquier pedido.
+- `ADMIN` y `VENDEDOR`: pueden consultar cualquier pedido. Incluye `notes` y `cancelReason`.
 - `CLIENTE`: solo puede consultar pedidos propios.
 
 Respuestas:
@@ -1596,6 +1597,8 @@ Respuesta `200`:
       "address": "Zona Sur, Calle 12",
       "phone": "76543210"
     },
+    "notes": "Dejar en portería",
+    "cancelReason": null,
     "items": [
       {
         "productoSnapshot": { "nombre": "Polera Classic", "imagen": "url" },
@@ -1650,6 +1653,7 @@ Flujo interno:
 - Marca el pago como `FAILED`.
 - Libera todas las reservas de stock (`stockReservationStatus = RELEASED`).
 - Cancela el pedido (`orderStatus = CANCELLED`, `paymentStatus = FAILED`).
+- Si se proporciona un `reason`, se guarda en `order.cancelReason` y `paymentTransaction.failureReason`.
 - Marca el `reviewToken` como usado. El link deja de funcionar.
 - Todo corre en una transacción Mongo.
 

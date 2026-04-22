@@ -92,6 +92,8 @@ export interface Order {
   };
   reservedAt?: string | null;
   reservationExpiresAt?: string | null;
+  notes?: string | null;
+  cancelReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

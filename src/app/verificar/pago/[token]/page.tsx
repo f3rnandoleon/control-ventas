@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import { DELIVERY_METHOD_LABELS } from "@/constants/statusLabels";
 
 type PaymentReviewData = {
   payment: {
@@ -53,11 +54,6 @@ type PaymentReviewData = {
 
 type PageState = "loading" | "ready" | "error" | "used" | "confirming" | "rejecting" | "confirmed" | "rejected";
 
-const DELIVERY_LABELS: Record<string, string> = {
-  WHATSAPP: "📱 WhatsApp",
-  PICKUP_POINT: "🏠 Punto de Encuentro",
-  SHIPPING_NATIONAL: "📦 Envío Nacional",
-};
 
 export default function VerificarPagoPage() {
   const { token } = useParams<{ token: string }>();
@@ -191,7 +187,7 @@ export default function VerificarPagoPage() {
 
   const { payment, order } = data;
   const isProcessing = state === "confirming" || state === "rejecting";
-  const deliveryLabel = DELIVERY_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—";
+  const deliveryLabel = DELIVERY_METHOD_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—";
 
   return (
     <div className="min-h-screen bg-gray-950 py-8 px-4">

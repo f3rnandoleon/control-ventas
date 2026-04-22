@@ -205,6 +205,14 @@ const orderSchema = new Schema(
       required: true,
       min: 0,
     },
+    notes: {
+      type: String,
+      default: null,
+    },
+    cancelReason: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,

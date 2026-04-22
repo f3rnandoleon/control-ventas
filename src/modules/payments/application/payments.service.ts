@@ -408,6 +408,7 @@ export async function failPaymentTransaction(
     order.stockReservationStatus = "RELEASED";
     order.reservedAt = null;
     order.reservationExpiresAt = null;
+    (order as any).cancelReason = input.reason || "Pago fallido";
     await order.save({ session });
     await syncFulfillmentForOrder(order, session);
 
@@ -636,6 +637,7 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
     order.paymentStatus = "FAILED"; order.orderStatus = "CANCELLED";
     order.fulfillmentStatus = "CANCELLED"; order.stockReservationStatus = "RELEASED";
     order.reservedAt = null; order.reservationExpiresAt = null;
+    (order as any).cancelReason = reason || "Comprobante rechazado";
     await order.save({ session });
     await syncFulfillmentForOrder(order, session);
     await recordAuditEventSafe({ action: "PAYMENT_FAILED", entityType: "PAYMENT", entityId: payment._id.toString(), actorId: "TOKEN_REVIEW", actorRole: "ADMIN", status: "SUCCESS", metadata: { orderId: order._id.toString(), via: "review_token", reason } }, session);

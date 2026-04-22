@@ -55,7 +55,7 @@ const inventarioSchema = new Schema(
     usuario: {
       type: Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
     },
   },
   {

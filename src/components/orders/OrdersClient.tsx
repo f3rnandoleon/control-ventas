@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { Order } from "@/types/order";
 import OrderDetailModal from "./modals/OrderDetailModal";
+import { 
+  ORDER_STATUS_LABELS, 
+  PAYMENT_STATUS_LABELS, 
+  DELIVERY_METHOD_LABELS 
+} from "@/constants/statusLabels";
 
 export default function OrdersClient() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -216,7 +221,7 @@ export default function OrdersClient() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-slate-900 dark:text-white">
-                        {o.deliverySnapshot?.method === "PICKUP_POINT" ? "Punto de Encuentro" : o.deliverySnapshot?.method}
+                        {DELIVERY_METHOD_LABELS[o.deliverySnapshot?.method ?? ""] || o.deliverySnapshot?.method || "—"}
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
                          {o.deliverySnapshot?.pickupPoint || ""}
@@ -228,7 +233,7 @@ export default function OrdersClient() {
                         o.paymentStatus === "FAILED" ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400" :
                         "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400"
                       }`}>
-                        {o.metodoPago} • {o.paymentStatus}
+                        {o.metodoPago} • {PAYMENT_STATUS_LABELS[o.paymentStatus] || o.paymentStatus}
                       </span>
                       <div className="font-medium text-slate-900 dark:text-white mt-1">
                         Bs {o.total.toFixed(2)}
@@ -244,7 +249,7 @@ export default function OrdersClient() {
                           ? "bg-slate-100 text-slate-800 dark:bg-slate-500/20 dark:text-slate-400"
                           : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400"
                       }`}>
-                        {o.orderStatus}
+                        {ORDER_STATUS_LABELS[o.orderStatus] || o.orderStatus}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">

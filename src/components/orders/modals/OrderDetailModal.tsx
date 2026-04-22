@@ -2,6 +2,12 @@
 
 import Image from "next/image";
 import type { Order, OrderItem } from "@/types/order";
+import { 
+  ORDER_STATUS_LABELS, 
+  PAYMENT_STATUS_LABELS, 
+  FULFILLMENT_STATUS_LABELS,
+  DELIVERY_METHOD_LABELS
+} from "@/constants/statusLabels";
 
 interface OrderDetailModalProps {
   order: Order;
@@ -50,7 +56,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Datos de Entrega</h3>
               <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl space-y-2">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">
-                  Método: {order.deliverySnapshot?.method === "PICKUP_POINT" ? "📍 Punto de Encuentro" : order.deliverySnapshot?.method}
+                  Método: {DELIVERY_METHOD_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—"}
                 </p>
                 <p className="text-xs text-slate-500">
                   Lugar: {order.deliverySnapshot?.pickupPoint || "No especificado"}
@@ -133,12 +139,32 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
           <section className="bg-amber-50 dark:bg-indigo-900/10 border border-amber-200 dark:border-indigo-500/20 p-4 rounded-xl">
             <h4 className="text-xs font-bold text-amber-800 dark:text-indigo-300 uppercase mb-2">Resumen Operativo</h4>
             <div className="grid grid-cols-2 gap-4 text-xs text-amber-700 dark:text-indigo-200">
-              <p>📌 Estado: <span className="font-bold">{order.orderStatus}</span></p>
-              <p>💰 Pago: <span className="font-bold">{order.paymentStatus}</span></p>
-              <p>📦 Fulfillment: <span className="font-bold">{order.fulfillmentStatus}</span></p>
-              <p>🗓️ Creado: <span>{new Date(order.createdAt).toLocaleString()}</span></p>
+              <p>📌 Estado: <span className="font-bold">{ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus}</span></p>
+              <p>💰 Pago: <span className="font-bold">{PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}</span></p>
+              <p>📦 Fulfillment: <span className="font-bold">{FULFILLMENT_STATUS_LABELS[order.fulfillmentStatus] || order.fulfillmentStatus}</span></p>
+              <p>🗓️ Creado: <span>{new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(order.createdAt))}</span></p>
             </div>
           </section>
+
+          {(order.notes || order.cancelReason) && (
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Observaciones y Notas</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {order.notes && (
+                  <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 p-4 rounded-xl">
+                    <p className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase mb-1">Notas del Cliente</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-200 italic">"{order.notes}"</p>
+                  </div>
+                )}
+                {order.cancelReason && (
+                  <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-500/20 p-4 rounded-xl">
+                    <p className="text-[10px] font-bold text-red-800 dark:text-red-300 uppercase mb-1">Motivo de Cancelación / Rechazo</p>
+                    <p className="text-sm text-red-700 dark:text-red-200">{order.cancelReason}</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="p-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex justify-end">

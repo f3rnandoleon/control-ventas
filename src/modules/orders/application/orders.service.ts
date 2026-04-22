@@ -436,6 +436,7 @@ export async function checkoutCartToOrder(
       subtotal,
       descuento: 0,
       total,
+      notes: payload.notes || null,
     }, session);
 
     await syncFulfillmentForOrder(order, session);

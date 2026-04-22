@@ -113,6 +113,10 @@ export async function recordInventoryMovement({
   referencia,
   userId,
 }: RecordInventoryMovementInput, session?: ClientSession) {
+  const validUserId = mongoose.Types.ObjectId.isValid(userId.toString()) 
+    ? userId 
+    : undefined;
+
   return inventoryRepository.create({
     productoId: producto._id,
     productoSnapshot: {
@@ -133,7 +137,7 @@ export async function recordInventoryMovement({
     stockActual,
     motivo,
     referencia,
-    usuario: userId,
+    usuario: validUserId as any,
   }, session);
 }
 
