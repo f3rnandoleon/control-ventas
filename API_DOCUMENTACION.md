@@ -1,13 +1,20 @@
 # Documentacion API - Control Ventas
 
-Base URL en desarrollo: `/api`
+Base URL en desarrollo: `http://localhost:3000/api`
+Base URL en producción: `https://control-ventas-azure.vercel.app/api`
+
+## Acceso desde Web vs Móvil
+
+- **Web (Panel Interno/Admin)**: Utiliza `NextAuth` con cookies `httpOnly`. No es necesario enviar headers manuales si se navega desde el mismo dominio.
+- **Móvil / Aplicaciones Externas**: Utiliza `JWT` tradicional. Es **obligatorio** enviar el token en el header:
+  `Authorization: Bearer <TU_TOKEN_AQUÍ>`
 
 ## Autenticacion y autorizacion
 
 - La API usa un modelo **híbrido**:
   - NextAuth (JWT en cookie httpOnly) para el panel interno.
-  - Token JWT tradicional (`Authorization: Bearer <token>`) emitido por `/api/auth/login` para acceso desde clientes externos o web.
-  - Login cliente con Google mediante `POST /api/auth/google`, que tambien devuelve JWT tradicional para la web cliente.
+  - Token JWT tradicional (`Authorization: Bearer <token>`) emitido por `/api/auth/login` para acceso desde clientes externos o aplicaciones móviles.
+  - Login cliente con Google mediante `POST /api/auth/google`, que tambien devuelve JWT tradicional para la web cliente y aplicaciones móviles.
 - Middleware protege rutas, rechaza spoofing de headers y agrega info interna confiable:
   - `x-user-id`
   - `x-user-role`
@@ -18,13 +25,56 @@ Base URL en desarrollo: `/api`
 - Rutas publicas:
   - `POST /api/auth/signup`
   - `POST /api/auth/google`
+  - `POST /api/auth/login`
   - `GET|POST /api/auth/[...nextauth]`
   - `GET /api/productos/publicos`
   - `GET /api/productos/publicos/:id`
   - `GET /api/verify/payment/:token` *(link de revision de comprobante enviado por Telegram)*
   - `POST /api/verify/payment/:token/confirm` *(autorizado por token UUID de un solo uso)*
   - `POST /api/verify/payment/:token/reject` *(autorizado por token UUID de un solo uso)*
-  - `GET /api/delivery-options` *(publico para la web)*
+  - `GET /api/delivery-options` *(público para web y móvil)*
+  - `GET /api/health`
+
+## Constantes y Etiquetas (UI)
+
+Para mantener la consistencia entre la Web y la App Móvil, se recomienda utilizar las siguientes etiquetas para los estados:
+
+### Estados de Pedido (`orderStatus`)
+| Código | Etiqueta |
+|---|---|
+| `PENDING_PAYMENT` | Pendiente de Pago |
+| `CONFIRMED` | Confirmado |
+| `PREPARING` | En Preparación |
+| `READY` | Listo para Entrega |
+| `IN_TRANSIT` | En Camino |
+| `DELIVERED` | Entregado |
+| `CANCELLED` | Cancelado |
+
+### Estados de Pago (`paymentStatus`)
+| Código | Etiqueta |
+|---|---|
+| `PENDING` | Pendiente |
+| `PAID` | Pagado |
+| `FAILED` | Fallido |
+| `REFUNDED` | Reembolsado |
+
+### Estados de Logística (`fulfillmentStatus`)
+| Código | Etiqueta |
+|---|---|
+| `PENDING` | Pendiente |
+| `READY` | Listo |
+| `IN_TRANSIT` | Enviado |
+| `DELIVERED` | Entregado |
+| `NOT_APPLICABLE` | No Aplica |
+| `CANCELLED` | Cancelado |
+
+### Métodos de Entrega (`deliveryMethod`)
+| Código | Etiqueta |
+|---|---|
+| `WHATSAPP` | 📱 WhatsApp |
+| `PICKUP_POINT` | 🏠 Punto de Encuentro |
+| `SHIPPING_NATIONAL` | 📦 Envío Nacional |
+
 - Rutas protegidas:
   - Solo `ADMIN`: `/api/admin/**`, `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`, `/api/admin/delivery-options`
   - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`, `/api/pos/**`
@@ -2281,25 +2331,71 @@ Respuestas:
 ### Delivery Options
 
 #### `GET /api/delivery-options`
-Obtiene la configuración actual de puntos de encuentro, horarios y empresas de envío.
+Obtiene la configuración actual de puntos de encuentro, horarios y empresas de envío. Es una ruta pública ideal para cargar selectores en el checkout de la web o móvil.
 
 Respuesta `200`:
 ```json
 {
-  "pickupPoints": [{ "id": "...", "name": "..." }],
-  "pickupSchedules": [{ "id": "...", "day": "...", "start": "...", "end": "...", "label": "..." }],
-  "shippingCompanies": [{
-    "id": "...",
-    "name": "...",
-    "departments": [{ "name": "...", "branches": ["..."] }]
-  }]
+  "pickupPoints": [
+    { "id": "teleferico-morado-faro-murillo", "name": "Teleferico Morado Estacion Faro Murillo" },
+    { "id": "plaza-del-estudiante", "name": "Plaza Del Estudiante" }
+  ],
+  "pickupSchedules": [
+    { "id": "lunes-1200-1800", "day": "Lunes", "start": "12:00", "end": "18:00", "label": "Lunes: 12:00-18:00" }
+  ],
+  "shippingCompanies": [
+    {
+      "id": "bolivar-cargo",
+      "name": "BolivarCargo",
+      "departments": [
+        { "name": "Cochabamba", "branches": ["Av Melchor"] },
+        { "name": "Santa Cruz", "branches": ["Av. 3 Pasos al Frente"] }
+      ]
+    }
+  ]
 }
 ```
 
 #### `PATCH /api/admin/delivery-options`
-Actualiza la configuración de opciones de entrega.
+Actualiza la configuración central de opciones de entrega. Solo accesible por `ADMIN`.
 
-Permisos:
-- Solo `ADMIN`.
+Body:
+```json
+{
+  "pickupPoints": [...],
+  "pickupSchedules": [...],
+  "shippingCompanies": [...]
+}
+```
 
-Respuesta `200`: Confirmación de actualización.
+---
+
+## Guía para Desarrolladores Móviles
+
+### 1. Autenticación
+1. Realizar `POST /api/auth/login` o `POST /api/auth/google`.
+2. Guardar el `accessToken` de forma segura (ej. SecureStore en Expo o EncryptedSharedPreferences en Android).
+3. Incluir el token en todos los requests protegidos: `Authorization: Bearer <token>`.
+
+### 2. Flujo de Checkout en Móvil
+1. Obtener catálogo público: `GET /api/productos/publicos`.
+2. Gestionar el carrito localmente o mediante la API `GET /api/cart`.
+3. Consultar opciones de entrega: `GET /api/delivery-options`.
+4. Ejecutar checkout: `POST /api/orders/checkout`.
+5. Si el pago es QR:
+   - El app muestra el QR (generado externamente o estético mientras tanto).
+   - El usuario sube el comprobante desde su galería: `POST /api/payments/:id/upload-comprobante`.
+   - La API notifica al Admin y el app queda en espera de confirmación (pooling o re-consulta de `GET /api/orders/:id`).
+
+### 3. Escaneo en POS Móvil
+Para la aplicación de vendedores:
+1. Usar la cámara para leer el código de barras o QR.
+2. Consultar `GET /api/pos/scan/:code`.
+3. Si el producto existe y tiene stock, agregarlo a la venta.
+4. Finalizar con `POST /api/pos/sales`.
+
+### 4. Manejo de Imágenes
+- Todas las imágenes retornadas son URLs seguras de Cloudinary.
+- Se recomienda usar componentes con cache (ej. `react-native-fast-image`) para mejorar el rendimiento.
+- Las variantes pueden tener múltiples imágenes en el arreglo `imagenes[]`.
+

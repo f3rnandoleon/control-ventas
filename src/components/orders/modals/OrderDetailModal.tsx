@@ -153,7 +153,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                 {order.notes && (
                   <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 p-4 rounded-xl">
                     <p className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase mb-1">Notas del Cliente</p>
-                    <p className="text-sm text-blue-700 dark:text-blue-200 italic">"{order.notes}"</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-200 italic">&quot;{order.notes}&quot;</p>
                   </div>
                 )}
                 {order.cancelReason && (

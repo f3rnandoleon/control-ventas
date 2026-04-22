@@ -137,7 +137,7 @@ export async function recordInventoryMovement({
     stockActual,
     motivo,
     referencia,
-    usuario: validUserId as any,
+    usuario: validUserId as mongoose.Types.ObjectId | undefined,
   }, session);
 }
 
