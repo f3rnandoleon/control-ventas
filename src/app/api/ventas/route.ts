@@ -61,9 +61,16 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const ventas = await listSales();
+    const userAuth = await resolveApiAuth(request);
+    if (!userAuth) {
+      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
+    }
+    const url = new URL(request.url);
+    const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+    const limit = Math.min(100, Number(url.searchParams.get("limit") ?? 50));
+    const ventas = await listSales({ page, limit });
     return NextResponse.json(ventas);
   } catch (error) {
     return handleRouteError(error, {

@@ -31,7 +31,11 @@ export function buildAuthTokenUser(user: {
 }
 
 export function issueAuthTokens(user: AuthTokenUser) {
-  const secret = process.env.JWT_SECRET || "fallback_secret";
+  const secret = process.env.JWT_SECRET;
+  if (!secret) 
+  {
+    throw new Error("JWT_SECRET no está definido en las variables de entorno");
+  }
   const expiresIn = (process.env.JWT_EXPIRES_IN ||
     "1d") as jwt.SignOptions["expiresIn"];
 

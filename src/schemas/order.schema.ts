@@ -46,18 +46,18 @@ export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
 
 export const updateOrderDeliverySchema = z.object({
   method: z.enum(["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL"]).optional(),
-  pickupPoint: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  recipientName: z.string().optional().nullable(),
-  scheduledAt: z.string().optional().nullable(),
-  department: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  shippingCompany: z.string().optional().nullable(),
-  branch: z.string().optional().nullable(),
-  senderName: z.string().optional().nullable(),
-  senderCI: z.string().optional().nullable(),
-  senderPhone: z.string().optional().nullable(),
+  pickupPoint: z.string().max(250).optional().nullable(),
+  address: z.string().max(250).optional().nullable(),
+  phone: z.string().max(20).optional().nullable(),
+  recipientName: z.string().max(100).optional().nullable(),
+  scheduledAt: z.string().max(100).optional().nullable(),
+  department: z.string().max(100).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  shippingCompany: z.string().max(150).optional().nullable(),
+  branch: z.string().max(150).optional().nullable(),
+  senderName: z.string().max(100).optional().nullable(),
+  senderCI: z.string().max(20).optional().nullable(),
+  senderPhone: z.string().max(20).optional().nullable(),
 });
 
 export type UpdateOrderDeliveryInput = z.infer<typeof updateOrderDeliverySchema>;

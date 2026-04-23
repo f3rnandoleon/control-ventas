@@ -218,6 +218,17 @@ export async function listSales() {
   await connectDB();
   return Venta.find().populate("vendedor", "fullname email").sort({ createdAt: -1 });
 }
+export async function listSales(opts?: { page?: number; limit?: number }) {
+  await connectDB();
+  const page = opts?.page ?? 1;
+  const limit = opts?.limit ?? 50;
+  const skip = (page - 1) * limit;
+  return Venta.find()
+    .populate("vendedor", "fullname email")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+}
 
 export async function getSaleById(id: string) {
   await connectDB();

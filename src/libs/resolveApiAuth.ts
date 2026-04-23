@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
-
+import User from "@/models/user";
+import { connectDB } from "@/libs/mongodb";
 export type AuthUser = {
   id: string;
   email?: string;
@@ -29,10 +30,16 @@ export async function resolveApiAuth(
     const token = authHeader.split(" ")[1];
     if (token) {
       try {
-        const secret = process.env.JWT_SECRET || "fallback_secret";
+        const secret = process.env.JWT_SECRET;
+        if (!secret) 
+        {
+          throw new Error("JWT_SECRET no está definido en las variables de entorno");
+        }
         // En Node.js (el runtime de App Router API Routes) `jsonwebtoken` funciona perfectamente.
         const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
-
+        await connectDB();
+        const dbUser = await User.findById(decoded.id).select("isActive").lean();
+        if (!dbUser || !dbUser.isActive) return null;
         if (decoded && decoded.id && decoded.role) {
           return {
             id: decoded.id,
