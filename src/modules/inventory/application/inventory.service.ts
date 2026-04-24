@@ -11,6 +11,7 @@ import {
   getVariantReservedStock,
 } from "@/modules/catalog/domain/variant.utils";
 import { runInTransaction } from "@/shared/db/runTransaction";
+import { assertObjectId } from "@/utils/validacion";
 
 type VariantLookup = {
   variantId?: string;
@@ -51,6 +52,7 @@ type AdjustInventoryInput = VariantLookup & {
   motivo?: string;
   referencia?: string;
   userIdRaw: string;
+  actorRole: "ADMIN" | "VENDEDOR";
 };
 
 type ConsumeStockForSaleInput = {
@@ -72,11 +74,7 @@ type AdjustInventoryResult = {
   movimiento: InventoryMovementRecord;
 };
 
-function assertObjectId(value: string, message: string) {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    throw new AppError(message, 400);
-  }
-}
+
 
 function resolveVariant(
   variants: Variante[],
@@ -113,8 +111,8 @@ export async function recordInventoryMovement({
   referencia,
   userId,
 }: RecordInventoryMovementInput, session?: ClientSession) {
-  const validUserId = mongoose.Types.ObjectId.isValid(userId.toString()) 
-    ? userId 
+  const validUserId = mongoose.Types.ObjectId.isValid(userId.toString())
+    ? userId
     : undefined;
 
   return inventoryRepository.create({
@@ -249,6 +247,7 @@ export async function adjustInventoryStock({
   motivo,
   referencia = "AJUSTE_MANUAL",
   userIdRaw,
+  actorRole,
 }: AdjustInventoryInput, session?: ClientSession): Promise<AdjustInventoryResult> {
   if (!session) {
     return runInTransaction(async (transactionSession) =>
@@ -264,6 +263,7 @@ export async function adjustInventoryStock({
           motivo,
           referencia,
           userIdRaw,
+          actorRole,
         },
         transactionSession
       )
@@ -331,7 +331,7 @@ export async function adjustInventoryStock({
       entityType: "INVENTORY_MOVEMENT",
       entityId: movimiento._id.toString(),
       actorId: userIdRaw,
-      actorRole: "ADMIN",
+      actorRole,
       status: "SUCCESS",
       metadata: {
         productoId,

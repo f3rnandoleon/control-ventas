@@ -27,6 +27,8 @@ import { AppError } from "@/shared/errors/AppError";
 import { runInTransaction } from "@/shared/db/runTransaction";
 import type { CheckoutCartInput } from "@/schemas/cart.schema";
 import type { UpdateOrderStatusInput, UpdateOrderDeliveryInput } from "@/schemas/order.schema";
+import { generateOrderedId } from "@/utils/generarId";
+import { assertObjectId } from "@/utils/validacion";
 
 type OrderItemInput = {
   productoId: string;
@@ -61,23 +63,26 @@ type CreateOrderFromSaleInput = {
   customerId?: string;
   sellerId?: string;
   delivery?: {
-    method: "WHATSAPP" | "PICKUP_POINT";
+    method: "WHATSAPP" | "PICKUP_POINT" | "SHIPPING_NATIONAL";
     pickupPoint?: string | null;
     address?: string | null;
     phone?: string | null;
+    recipientName?: string | null;
+    scheduledAt?: string | null;
+    department?: string | null;
+    city?: string | null;
+    shippingCompany?: string | null;
+    branch?: string | null;
+    senderName?: string | null;
+    senderCI?: string | null;
+    senderPhone?: string | null;
   };
 };
 
-function assertObjectId(value: string, message: string) {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    throw new AppError(message, 400);
-  }
-}
 
 function createOrderNumber() {
-  return `O-${Date.now()}`;
+  return generateOrderedId("O");
 }
-
 function mapSaleStatusToOrderState(saleStatus: CreateOrderFromSaleInput["saleStatus"]) {
   if (saleStatus === "PENDIENTE") {
     return {
@@ -156,7 +161,7 @@ async function releaseOrderReservation(order: {
         candidate.color === item.variante.color &&
         (item.variante.colorSecundario === undefined ||
           (candidate.colorSecundario || "") ===
-            (item.variante.colorSecundario || "")) &&
+          (item.variante.colorSecundario || "")) &&
         candidate.talla === item.variante.talla
       );
     });
@@ -228,8 +233,8 @@ export async function createOrderFromSale(
   let customerSnapshot: Record<string, unknown> | null = null;
   let deliverySnapshot: Record<string, unknown> | null = input.delivery
     ? {
-        ...input.delivery,
-      }
+      ...input.delivery,
+    }
     : null;
 
   if (input.customerId) {
@@ -352,7 +357,7 @@ export async function checkoutCartToOrder(
 
   // WhatsApp necesita más tiempo (confirmación manual)
   // Igual si es en efectivo se le da 48 horas por defecto
-  const reservationMinutes = 
+  const reservationMinutes =
     (method === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
 
   return runInTransaction(async (session) => {

@@ -13,7 +13,6 @@ const varianteSchema = new Schema(
     reservedStock: { type: Number, default: 0, min: 0 },
     descripcion: { type: String, trim: true },
     imagenes: { type: [String], default: [] },
-    imagen: { type: String, trim: true },
     codigoBarra: { type: String },
     qrCode: { type: String },
   },

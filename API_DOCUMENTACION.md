@@ -1342,9 +1342,15 @@ El backend crea el pedido en `PENDING_PAYMENT` con reserva de 24 horas. El front
 }
 ```
 - `metodoPago` debe ser **`QR`** (validado por el backend).
-- `department`, `shippingCompany`, `senderName`, `senderCI` y `senderPhone` son **obligatorios**.
-- `city`, `branch` y `recipientName` son opcionales.
+- **Campos Obligatorios:**
+  - `department`: Departamento destino.
+  - `shippingCompany`: Empresa de transporte.
+  - `senderName`: Nombre del destinatario real (quien recoge).
+  - `senderCI`: Documento de identidad del destinatario.
+  - `senderPhone`: Teléfono de contacto del destinatario.
+- **Campos Opcionales:** `city`, `branch` y `recipientName`.
 - El siguiente paso es subir el comprobante con `POST /api/payments/:id/upload-comprobante`.
+- **Nota técnica:** Internamente estos campos se mapean al modelo de `Venta` para auditoría y logística.
 
 ---
 
@@ -2383,19 +2389,19 @@ Body:
 3. Consultar opciones de entrega: `GET /api/delivery-options`.
 4. Ejecutar checkout: `POST /api/orders/checkout`.
 5. Si el pago es QR:
-   - El app muestra el QR (generado externamente o estético mientras tanto).
+   - El app muestra el QR del negocio.
    - El usuario sube el comprobante desde su galería: `POST /api/payments/:id/upload-comprobante`.
-   - La API notifica al Admin y el app queda en espera de confirmación (pooling o re-consulta de `GET /api/orders/:id`).
+   - La API genera un `reviewToken` interno y notifica al Admin mediante Telegram.
+   - El Admin revisa el pago en una interfaz optimizada que muestra **todos los datos de envío**.
+   - La APP debe quedar en espera de confirmación (pooling o re-consulta de `GET /api/orders/:id`).
 
-### 3. Escaneo en POS Móvil
-Para la aplicación de vendedores:
-1. Usar la cámara para leer el código de barras o QR.
-2. Consultar `GET /api/pos/scan/:code`.
-3. Si el producto existe y tiene stock, agregarlo a la venta.
-4. Finalizar con `POST /api/pos/sales`.
+### 3. Detalles de Envío Nacional (SHIPPING_NATIONAL)
+Para envíos nacionales, es CRÍTICO capturar los siguientes datos del usuario final, ya que sin ellos el Admin no podrá procesar la guía de transporte:
+- **Nombre Completo**: Se envía en `delivery.senderName`.
+- **CI / Carnet**: Se envía en `delivery.senderCI`.
+- **Celular**: Se envía en `delivery.senderPhone`.
+- **Empresa/Departamento**: Seleccionados de la lista de `GET /api/delivery-options`.
 
-### 4. Manejo de Imágenes
-- Todas las imágenes retornadas son URLs seguras de Cloudinary.
-- Se recomienda usar componentes con cache (ej. `react-native-fast-image`) para mejorar el rendimiento.
-- Las variantes pueden tener múltiples imágenes en el arreglo `imagenes[]`.
+---
+*Documentación actualizada para la sincronización de modelos Order/Venta y soporte multi-plataforma.*
 

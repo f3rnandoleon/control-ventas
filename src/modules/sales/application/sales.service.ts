@@ -12,6 +12,7 @@ import { createImmediatePaidPaymentForOrder } from "@/modules/payments/applicati
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
 import { AppError } from "@/shared/errors/AppError";
 import { runInTransaction } from "@/shared/db/runTransaction";
+import { generateOrderedId } from "@/utils/generarId";
 
 export type SalesActor = {
   id: string;
@@ -127,7 +128,7 @@ export async function createDirectSale(
     }
 
     const total = subtotal - descuento + impuesto;
-    const numeroVenta = `V-${Date.now()}`;
+    const numeroVenta = generateOrderedId("V");
     const ventaPayload: Record<string, unknown> = {
       numeroVenta,
       items: itemsProcesados,
@@ -214,10 +215,7 @@ export async function createDirectSale(
   });
 }
 
-export async function listSales() {
-  await connectDB();
-  return Venta.find().populate("vendedor", "fullname email").sort({ createdAt: -1 });
-}
+
 export async function listSales(opts?: { page?: number; limit?: number }) {
   await connectDB();
   const page = opts?.page ?? 1;

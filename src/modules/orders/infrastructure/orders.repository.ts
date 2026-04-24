@@ -1,19 +1,24 @@
 import type { ClientSession } from "mongoose";
 import Order from "@/models/order";
+import type { CreateOrderPayload } from "@/modules/orders/domain/order.types";
 
 export const ordersRepository = {
-  create(payload: Record<string, unknown>, session?: ClientSession) {
+  create(payload: CreateOrderPayload, session?: ClientSession) {
     return Order.create([payload], session ? { session } : {}).then(
       ([order]) => order
     );
   },
-
-  listAll() {
+  listAll(opts?: { page?: number; limit?: number }) {
+    const page = opts?.page ?? 1;
+    const limit = opts?.limit ?? 50;
     return Order.find()
       .populate("customer", "fullname email")
       .populate("seller", "fullname email")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
   },
+
 
   listByCustomer(userId: string) {
     return Order.find({ customer: userId })
