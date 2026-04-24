@@ -182,6 +182,7 @@ export async function releaseExpiredReservations(limit = 100) {
   await connectDB();
   const expiredOrders = await ordersRepository.findExpiredReserved(limit);
   let releasedCount = 0;
+  const details: string[] = [];
 
   for (const expiredOrder of expiredOrders) {
     const wasReleased = await runInTransaction(async (session) => {
@@ -214,10 +215,11 @@ export async function releaseExpiredReservations(limit = 100) {
 
     if (wasReleased) {
       releasedCount += 1;
+      details.push(expiredOrder._id.toString());
     }
   }
 
-  return releasedCount;
+  return { releasedCount, details };
 }
 
 export async function createOrderFromSale(
@@ -306,7 +308,6 @@ export async function checkoutCartToOrder(
   assertObjectId(customerId, "Usuario no valido");
   await connectDB();
 
-  await releaseExpiredReservations();
   const customer = await getCustomerContextByUserId(customerId, {
     ensureProfile: true,
   });
@@ -472,7 +473,6 @@ export async function checkoutCartToOrder(
 
 export async function listOrdersForActor(role: string, userId: string) {
   await connectDB();
-  await releaseExpiredReservations();
 
   if (role === "CLIENTE") {
     return ordersRepository.listByCustomer(userId);
@@ -488,7 +488,6 @@ export async function listOrdersForActor(role: string, userId: string) {
 export async function getOrderForActor(role: string, userId: string, id: string) {
   assertObjectId(id, "ID de pedido invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   const order =
     role === "CLIENTE"
@@ -508,7 +507,6 @@ export async function updateOrderStatusForStaff(
 ) {
   assertObjectId(id, "ID de pedido invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   return runInTransaction(async (session) => {
     const currentOrder = await ordersRepository.findById(id, session);
@@ -562,7 +560,6 @@ export async function updateOrderStatusForStaff(
 export async function listCustomerOrdersWithLegacyFallback(customerId: string) {
   assertObjectId(customerId, "Usuario no valido");
   await connectDB();
-  await releaseExpiredReservations();
 
   const orders = await ordersRepository.listByCustomer(customerId);
   const sourceSaleIds = orders
@@ -592,7 +589,6 @@ export async function getCustomerOrderWithLegacyFallback(
   assertObjectId(customerId, "Usuario no valido");
   assertObjectId(id, "ID de pedido invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   const order = await ordersRepository.findByIdForCustomer(id, customerId);
 

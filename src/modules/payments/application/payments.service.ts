@@ -9,7 +9,6 @@ import {
   releaseReservedStockForOrder,
 } from "@/modules/inventory/application/inventory.service";
 import { syncFulfillmentForOrder } from "@/modules/fulfillment/application/fulfillment.service";
-import { releaseExpiredReservations } from "@/modules/orders/application/orders.service";
 import { paymentsRepository } from "@/modules/payments/infrastructure/payments.repository";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
 import { findVariantByIdentity } from "@/utils/variantIdentity";
@@ -197,7 +196,6 @@ export async function createPaymentTransaction(
 ) {
   assertObjectId(input.orderId, "Pedido invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   return runInTransaction(async (session) => {
     if (input.idempotencyKey) {
@@ -277,7 +275,6 @@ export async function confirmPaymentTransaction(
 ) {
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   return runInTransaction(async (session) => {
     const payment = await paymentsRepository.findById(paymentId, session);
@@ -353,7 +350,6 @@ export async function failPaymentTransaction(
 ) {
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   return runInTransaction(async (session) => {
     const payment = await paymentsRepository.findById(paymentId, session);
@@ -648,7 +644,6 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
 export async function confirmCashOrder(orderId: string, actor: AuthActor) {
   assertObjectId(orderId, "Pedido invalido");
   await connectDB();
-  await releaseExpiredReservations();
 
   return runInTransaction(async (session) => {
     const order = await getOrderForPayment(orderId, session);
@@ -656,7 +651,7 @@ export async function confirmCashOrder(orderId: string, actor: AuthActor) {
     if (order.metodoPago !== "EFECTIVO") {
       throw new AppError("El pedido no es en efectivo", 400);
     }
-    
+
     if (order.paymentStatus === "PAID") {
       throw new AppError("El pedido ya está pagado", 400);
     }
