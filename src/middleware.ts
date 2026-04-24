@@ -86,7 +86,7 @@ export async function middleware(request: NextRequest) {
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
-  const role = token?.role as string | undefined;
+  const role = token?.rol as string | undefined;
   const userId = token?.id as string | undefined;
 
   if (isAuthPage && token) {

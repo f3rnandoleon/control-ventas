@@ -1,7 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
 import { connectDB } from "@/libs/mongodb";
 import User, { type AuthProvider } from "@/models/user";
-import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
+import { asegurarPerfilClienteParaUsuario } from "@/modules/clientes/application/clientes.service";
 import { AppError } from "@/shared/errors/AppError";
 import { buildAuthTokenUser, issueAuthTokens } from "./auth-tokens.service";
 
@@ -10,22 +10,22 @@ type UserRole = "ADMIN" | "VENDEDOR" | "CLIENTE";
 type GoogleIdentity = {
   googleId: string;
   email: string;
-  fullname: string;
-  avatarUrl: string | null;
-  emailVerified: boolean;
+  nombreCompleto: string;
+  urlAvatar: string | null;
+  emailVerificado: boolean;
 };
 
 type AuthUserDocument = {
   _id: { toString(): string };
   email: string;
-  fullname: string;
-  role: UserRole;
-  isActive: boolean;
-  authProviders?: AuthProvider[];
+  nombreCompleto: string;
+  rol: UserRole;
+  estaActivo: boolean;
+  proveedoresAuth?: AuthProvider[];
   googleId?: string | null;
-  avatarUrl?: string | null;
-  emailVerified?: boolean;
-  lastLogin?: Date;
+  urlAvatar?: string | null;
+  emailVerificado?: boolean;
+  ultimoAcceso?: Date;
   save: () => Promise<unknown>;
 };
 
@@ -35,8 +35,8 @@ export type GoogleAuthResult = {
   user: {
     id: string;
     email: string;
-    fullname: string;
-    role: UserRole;
+    nombreCompleto: string;
+    rol: UserRole;
   };
   message: string;
   created: boolean;
@@ -62,7 +62,7 @@ function createGoogleClient() {
 }
 
 function getAuthProviders(user: AuthUserDocument) {
-  return Array.isArray(user.authProviders) ? [...user.authProviders] : [];
+  return Array.isArray(user.proveedoresAuth) ? [...user.proveedoresAuth] : [];
 }
 
 function includeProvider(
@@ -104,14 +104,14 @@ async function verifyGoogleIdentity(idToken: string): Promise<GoogleIdentity> {
   return {
     googleId: payload.sub,
     email: payload.email.toLowerCase(),
-    fullname: payload.name?.trim() || getFallbackFullname(payload.email),
-    avatarUrl: payload.picture || null,
-    emailVerified: Boolean(payload.email_verified),
+    nombreCompleto: payload.name?.trim() || getFallbackFullname(payload.email),
+    urlAvatar: payload.picture || null,
+    emailVerificado: Boolean(payload.email_verified),
   };
 }
 
 function assertGoogleLoginAllowed(user: AuthUserDocument) {
-  if (!user.isActive) {
+  if (!user.estaActivo) {
     throw new AppError(
       "Tu cuenta existe pero esta deshabilitada. No puedes ingresar con Google.",
       403,
@@ -119,7 +119,7 @@ function assertGoogleLoginAllowed(user: AuthUserDocument) {
     );
   }
 
-  if (user.role !== "CLIENTE") {
+  if (user.rol !== "CLIENTE") {
     throw new AppError(
       "El acceso con Google esta disponible solo para cuentas de clientes.",
       403,
@@ -129,7 +129,7 @@ function assertGoogleLoginAllowed(user: AuthUserDocument) {
 }
 
 async function updateLastLogin(user: AuthUserDocument) {
-  user.lastLogin = new Date();
+  user.ultimoAcceso = new Date();
   await user.save();
 }
 
@@ -164,17 +164,17 @@ export async function authenticateWithGoogleIdToken(
       userByGoogleId.email = identity.email;
     }
 
-    userByGoogleId.fullname = identity.fullname || userByGoogleId.fullname;
-    userByGoogleId.avatarUrl = identity.avatarUrl;
-    userByGoogleId.emailVerified = identity.emailVerified;
-    userByGoogleId.authProviders = includeProvider(userByGoogleId, "google");
+    userByGoogleId.nombreCompleto = identity.nombreCompleto || userByGoogleId.nombreCompleto;
+    userByGoogleId.urlAvatar = identity.urlAvatar;
+    userByGoogleId.emailVerificado = identity.emailVerificado;
+    userByGoogleId.proveedoresAuth = includeProvider(userByGoogleId, "google");
     await updateLastLogin(userByGoogleId);
 
     const authUser = buildAuthTokenUser({
       _id: userByGoogleId._id,
       email: userByGoogleId.email,
-      fullname: userByGoogleId.fullname,
-      role: userByGoogleId.role,
+      nombreCompleto: userByGoogleId.nombreCompleto,
+      rol: userByGoogleId.rol,
     });
 
     return {
@@ -202,12 +202,12 @@ export async function authenticateWithGoogleIdToken(
     }
 
     userByEmail.googleId = identity.googleId;
-    userByEmail.avatarUrl = identity.avatarUrl;
-    userByEmail.emailVerified = identity.emailVerified;
-    userByEmail.authProviders = includeProvider(userByEmail, "google");
+    userByEmail.urlAvatar = identity.urlAvatar;
+    userByEmail.emailVerificado = identity.emailVerificado;
+    userByEmail.proveedoresAuth = includeProvider(userByEmail, "google");
 
-    if (!userByEmail.fullname?.trim()) {
-      userByEmail.fullname = identity.fullname;
+    if (!userByEmail.nombreCompleto?.trim()) {
+      userByEmail.nombreCompleto = identity.nombreCompleto;
     }
 
     await updateLastLogin(userByEmail);
@@ -215,8 +215,8 @@ export async function authenticateWithGoogleIdToken(
     const authUser = buildAuthTokenUser({
       _id: userByEmail._id,
       email: userByEmail.email,
-      fullname: userByEmail.fullname,
-      role: userByEmail.role,
+      nombreCompleto: userByEmail.nombreCompleto,
+      rol: userByEmail.rol,
     });
 
     return {
@@ -231,23 +231,23 @@ export async function authenticateWithGoogleIdToken(
 
   const createdUser = (await User.create({
     email: identity.email,
-    fullname: identity.fullname,
-    role: "CLIENTE",
-    isActive: true,
-    authProviders: ["google"],
+    nombreCompleto: identity.nombreCompleto,
+    rol: "CLIENTE",
+    estaActivo: true,
+    proveedoresAuth: ["google"],
     googleId: identity.googleId,
-    avatarUrl: identity.avatarUrl,
-    emailVerified: identity.emailVerified,
-    lastLogin: new Date(),
+    urlAvatar: identity.urlAvatar,
+    emailVerificado: identity.emailVerificado,
+    ultimoAcceso: new Date(),
   })) as AuthUserDocument;
 
-  await ensureCustomerProfileForUser(createdUser._id.toString());
+  await asegurarPerfilClienteParaUsuario(createdUser._id.toString());
 
   const authUser = buildAuthTokenUser({
     _id: createdUser._id,
     email: createdUser.email,
-    fullname: createdUser.fullname,
-    role: createdUser.role,
+    nombreCompleto: createdUser.nombreCompleto,
+    rol: createdUser.rol,
   });
 
   return {

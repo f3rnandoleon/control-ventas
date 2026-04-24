@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { Order } from "@/types/order";
+import type { Pedido } from "@/types/pedido";
 import OrderDetailModal from "./modals/OrderDetailModal";
 import { 
   ORDER_STATUS_LABELS, 
@@ -11,11 +11,11 @@ import {
 } from "@/constants/statusLabels";
 
 export default function OrdersClient() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("TODOS");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Pedido | null>(null);
   const itemsPerPage = 10;
 
   const fetchOrders = async () => {
@@ -79,7 +79,7 @@ export default function OrdersClient() {
       const patchRes = await fetch(`/api/fulfillment/${data._id || data.fulfillment?._id || data.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "DELIVERED" }),
+        body: JSON.stringify({ estado: "DELIVERED" }),
       });
       
       if (!patchRes.ok) {
@@ -87,7 +87,7 @@ export default function OrdersClient() {
         const fallbackRes = await fetch(`/api/orders/${orderId}`, {
            method: "PATCH",
            headers: { "Content-Type": "application/json" },
-           body: JSON.stringify({ orderStatus: "DELIVERED", fulfillmentStatus: "DELIVERED" })
+           body: JSON.stringify({ estadoPedido: "DELIVERED", estadoEntrega: "DELIVERED" })
         });
         if (!fallbackRes.ok) throw new Error("Falló al actualizar estado de entrega");
       }
@@ -106,7 +106,7 @@ export default function OrdersClient() {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderStatus: "CANCELLED" }),
+        body: JSON.stringify({ estadoPedido: "CANCELLED" }),
       });
       if (!res.ok) throw new Error("Falló cancelación");
       toast.success("Pedido cancelado y stock liberado");
@@ -128,10 +128,10 @@ export default function OrdersClient() {
   };
 
   const filteredOrders = orders.filter((o) => {
-    if (tab === "PENDING_PAYMENT") return o.orderStatus === "PENDING_PAYMENT";
-    if (tab === "CONFIRMED") return ["CONFIRMED", "READY", "IN_TRANSIT"].includes(o.orderStatus);
-    if (tab === "DELIVERED") return o.orderStatus === "DELIVERED";
-    if (tab === "CANCELLED") return o.orderStatus === "CANCELLED";
+    if (tab === "PENDING_PAYMENT") return o.estadoPedido === "PENDING_PAYMENT";
+    if (tab === "CONFIRMED") return ["CONFIRMED", "READY", "IN_TRANSIT"].includes(o.estadoPedido);
+    if (tab === "DELIVERED") return o.estadoPedido === "DELIVERED";
+    if (tab === "CANCELLED") return o.estadoPedido === "CANCELLED";
     return true;
   });
 
@@ -205,7 +205,7 @@ export default function OrdersClient() {
                   <tr key={o._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-medium text-slate-900 dark:text-white">
-                        {o.orderNumber}
+                        {o.numeroPedido}
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
                         {new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(o.createdAt))}
@@ -213,27 +213,27 @@ export default function OrdersClient() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-slate-900 dark:text-white">
-                        {o.customerSnapshot?.fullname || "Usuario anónimo"}
+                        {o.snapshotCliente?.nombreCompleto || "Usuario anónimo"}
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
-                        {o.customerSnapshot?.phone || "Sin teléfono"}
+                        {o.snapshotCliente?.telefono || "Sin teléfono"}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-slate-900 dark:text-white">
-                        {DELIVERY_METHOD_LABELS[o.deliverySnapshot?.method ?? ""] || o.deliverySnapshot?.method || "—"}
+                        {DELIVERY_METHOD_LABELS[o.snapshotEntrega?.metodo ?? ""] || o.snapshotEntrega?.metodo || "—"}
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
-                         {o.deliverySnapshot?.pickupPoint || ""}
+                         {o.snapshotEntrega?.puntoRecojo || ""}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        o.paymentStatus === "PAID" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400" :
-                        o.paymentStatus === "FAILED" ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400" :
+                        o.estadoPago === "PAID" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400" :
+                        o.estadoPago === "FAILED" ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400" :
                         "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400"
                       }`}>
-                        {o.metodoPago} • {PAYMENT_STATUS_LABELS[o.paymentStatus] || o.paymentStatus}
+                        {o.metodoPago} • {PAYMENT_STATUS_LABELS[o.estadoPago] || o.estadoPago}
                       </span>
                       <div className="font-medium text-slate-900 dark:text-white mt-1">
                         Bs {o.total.toFixed(2)}
@@ -241,15 +241,15 @@ export default function OrdersClient() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        o.orderStatus === "CONFIRMED" || o.orderStatus === "READY" || o.orderStatus === "IN_TRANSIT"
+                        o.estadoPedido === "CONFIRMED" || o.estadoPedido === "READY" || o.estadoPedido === "IN_TRANSIT"
                           ? "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400"
-                          : o.orderStatus === "DELIVERED"
+                          : o.estadoPedido === "DELIVERED"
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400"
-                          : o.orderStatus === "CANCELLED"
+                          : o.estadoPedido === "CANCELLED"
                           ? "bg-slate-100 text-slate-800 dark:bg-slate-500/20 dark:text-slate-400"
                           : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400"
                       }`}>
-                        {ORDER_STATUS_LABELS[o.orderStatus] || o.orderStatus}
+                        {ORDER_STATUS_LABELS[o.estadoPedido] || o.estadoPedido}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
@@ -260,7 +260,7 @@ export default function OrdersClient() {
                           Detalles
                         </button>
 
-                       {o.orderStatus === "PENDING_PAYMENT" && o.metodoPago === "EFECTIVO" && (
+                       {o.estadoPedido === "PENDING_PAYMENT" && o.metodoPago === "EFECTIVO" && (
                           <button
                             onClick={() => handleConfirmForDelivery(o._id)}
                             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30 transition-colors"
@@ -269,7 +269,7 @@ export default function OrdersClient() {
                           </button>
                        )}
 
-                       {o.orderStatus === "CONFIRMED" && o.paymentStatus !== "PAID" && (
+                       {o.estadoPedido === "CONFIRMED" && o.estadoPago !== "PAID" && (
                           <button
                             onClick={() => handleConfirmCash(o._id)}
                             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/30 transition-colors"
@@ -278,7 +278,7 @@ export default function OrdersClient() {
                           </button>
                        )}
 
-                       {o.orderStatus === "CONFIRMED" && o.paymentStatus === "PAID" && (
+                       {o.estadoPedido === "CONFIRMED" && o.estadoPago === "PAID" && (
                           <button
                             onClick={() => handleDeliver(o._id)}
                             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:hover:bg-indigo-500/30 transition-colors"
@@ -287,7 +287,7 @@ export default function OrdersClient() {
                           </button>
                        )}
 
-                       {o.orderStatus !== "CANCELLED" && o.orderStatus !== "DELIVERED" && (
+                       {o.estadoPedido !== "CANCELLED" && o.estadoPedido !== "DELIVERED" && (
                           <button
                             onClick={() => handleCancelOrder(o._id)}
                             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30 transition-colors"
@@ -330,7 +330,7 @@ export default function OrdersClient() {
 
       {selectedOrder && (
         <OrderDetailModal 
-          order={selectedOrder} 
+          Pedido={selectedOrder} 
           onClose={() => setSelectedOrder(null)} 
         />
       )}

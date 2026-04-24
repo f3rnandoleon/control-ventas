@@ -1,19 +1,17 @@
-import CustomerAddress from "@/models/customerAddress";
-import CustomerProfile from "@/models/customerProfile";
-import Fulfillment from "@/models/fulfillment";
+import CustomerAddress from "@/models/direccionCliente";
+import CustomerProfile from "@/models/perfilCliente";
+import Fulfillment from "@/models/entrega";
 import Inventario from "@/models/inventario";
-import Order from "@/models/order";
-import PaymentTransaction from "@/models/paymentTransaction";
-import Producto from "@/models/product";
+import Pedido from "@/models/pedido";
+import PaymentTransaction from "@/models/transaccionPago";
+import Producto from "@/models/producto";
 import User from "@/models/user";
-import Venta from "@/models/venta";
-import { createCustomerAddressByUserId } from "@/modules/customers/application/customers.service";
+import { crearDireccionClientePorUsuario } from "@/modules/clientes/application/clientes.service";
 import { addCartItemByUserId, clearCartByUserId } from "@/modules/cart/application/cart.service";
 import { updateFulfillmentStatusById } from "@/modules/fulfillment/application/fulfillment.service";
-import { runLegacyMigration, getLegacyMigrationStatus } from "@/modules/migrations/application/legacy-migration.service";
 import { createPaymentTransaction, confirmPaymentTransaction, failPaymentTransaction, refundPaymentTransaction } from "@/modules/payments/application/payments.service";
 import { createPosSale, scanVariantForPos } from "@/modules/pos/application/pos.service";
-import { checkoutCartToOrder } from "@/modules/orders/application/orders.service";
+import { crearPedidoDesdeCarrito } from "@/modules/orders/application/pedidos.service";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
 import { connectDB } from "@/libs/mongodb";
 import type { RunCoreVerificationInput } from "@/schemas/core-verification.schema";
@@ -21,7 +19,7 @@ import { logError, logInfo } from "@/shared/observability/logger";
 
 type Actor = {
   id: string;
-  role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+  rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
 };
 
 type VerificationContext = {
@@ -29,12 +27,11 @@ type VerificationContext = {
   customerId?: string;
   sellerId?: string;
   profileId?: string;
-  addressId?: string;
+  direccionId?: string;
   productId?: string;
-  createdOrderIds: string[];
+  createdPedidoIds: string[];
   createdPaymentIds: string[];
   createdFulfillmentIds: string[];
-  createdSaleIds: string[];
 };
 
 function createStamp() {
@@ -62,16 +59,16 @@ async function createTempUsers(stamp: string) {
     {
       email: `e2e.customer.${stamp}@fitandes.local`,
       password: "e2e-password",
-      fullname: `E2E Customer ${stamp}`,
-      role: "CLIENTE",
-      isActive: true,
+      nombreCompleto: `E2E Customer ${stamp}`,
+      rol: "CLIENTE",
+      estaActivo: true,
     },
     {
       email: `e2e.seller.${stamp}@fitandes.local`,
       password: "e2e-password",
-      fullname: `E2E Seller ${stamp}`,
-      role: "VENDEDOR",
-      isActive: true,
+      nombreCompleto: `E2E Seller ${stamp}`,
+      rol: "VENDEDOR",
+      estaActivo: true,
     },
   ]);
 
@@ -89,7 +86,7 @@ async function createTempProduct(sellerId: string, stamp: string) {
     precioCosto: 70,
     variantes: [
       {
-        variantId: buildVariantCode("variant", stamp, "web"),
+        varianteId: buildVariantCode("variant", stamp, "web"),
         color: "Negro",
         talla: "M",
         stock: 12,
@@ -100,7 +97,7 @@ async function createTempProduct(sellerId: string, stamp: string) {
         qrCode: buildVariantCode("qr", stamp, "web"),
       },
       {
-        variantId: buildVariantCode("variant", stamp, "pos"),
+        varianteId: buildVariantCode("variant", stamp, "pos"),
         color: "Blanco",
         talla: "L",
         stock: 8,
@@ -117,8 +114,8 @@ async function createTempProduct(sellerId: string, stamp: string) {
   return product;
 }
 
-async function trackFulfillment(orderId: string, context: VerificationContext) {
-  const fulfillment = await Fulfillment.findOne({ orderId });
+async function trackFulfillment(pedidoId: string, context: VerificationContext) {
+  const fulfillment = await Fulfillment.findOne({ pedidoId: pedidoId });
   if (fulfillment) {
     context.createdFulfillmentIds.push(fulfillment._id.toString());
   }
@@ -133,11 +130,8 @@ async function cleanupVerificationData(context: VerificationContext) {
     context.createdFulfillmentIds.length > 0
       ? Fulfillment.deleteMany({ _id: { $in: context.createdFulfillmentIds } })
       : Promise.resolve(),
-    context.createdOrderIds.length > 0
-      ? Order.deleteMany({ _id: { $in: context.createdOrderIds } })
-      : Promise.resolve(),
-    context.createdSaleIds.length > 0
-      ? Venta.deleteMany({ _id: { $in: context.createdSaleIds } })
+    context.createdPedidoIds.length > 0
+      ? Pedido.deleteMany({ _id: { $in: context.createdPedidoIds } })
       : Promise.resolve(),
     context.productId
       ? Inventario.deleteMany({ productoId: context.productId })
@@ -164,10 +158,9 @@ export async function runCoreEndToEndVerification(
 
   const context: VerificationContext = {
     stamp: createStamp(),
-    createdOrderIds: [],
+    createdPedidoIds: [],
     createdPaymentIds: [],
     createdFulfillmentIds: [],
-    createdSaleIds: [],
   };
 
   const steps: Array<Record<string, unknown>> = [];
@@ -177,51 +170,34 @@ export async function runCoreEndToEndVerification(
     context: "ops.core-verification",
     requestId,
     data: {
-      actorId: actor.id,
+      idActor: actor.id,
       cleanup: input.cleanup,
-      runLegacyMigration: input.runLegacyMigration,
     },
   });
 
   try {
-    const legacyBefore = await getLegacyMigrationStatus();
-    let legacyRunResult: Record<string, unknown> | null = null;
-
-    if (input.runLegacyMigration) {
-      legacyRunResult = await runLegacyMigration({
-        limit: input.legacyMigrationLimit,
-        dryRun: false,
-        steps: ["ORDERS", "PAYMENTS", "FULFILLMENTS"],
-      });
-      steps.push({
-        name: "legacy-migration",
-        success: true,
-        details: legacyRunResult,
-      });
-    }
-
     const { customer, seller } = await createTempUsers(context.stamp);
     context.customerId = customer._id.toString();
     context.sellerId = seller._id.toString();
     const customerId = requireId(context.customerId, "No se pudo crear el cliente temporal");
     const sellerId = requireId(context.sellerId, "No se pudo crear el vendedor temporal");
 
-    const address = await createCustomerAddressByUserId(customerId, {
-      label: "Casa",
-      recipientName: customer.fullname,
-      phone: "76543210",
-      department: "La Paz",
-      city: "La Paz",
-      zone: "Zona Sur",
-      addressLine: `E2E Street ${context.stamp}`,
-      reference: "Porton negro",
-      postalCode: null,
-      country: "Bolivia",
-      isDefault: true,
+    const address = await crearDireccionClientePorUsuario(customerId, {
+      etiqueta: "Casa",
+      nombreDestinatario: customer.nombreCompleto,
+      telefono: "76543210",
+      departamento: "La Paz",
+      ciudad: "La Paz",
+      zona: "Zona Sur",
+      direccion: `E2E Street ${context.stamp}`,
+      referencia: "Porton negro",
+      codigoPostal: null,
+      pais: "Bolivia",
+      esPredeterminada: true,
     });
-    context.addressId = address._id.toString();
+    context.direccionId = address._id.toString();
     context.profileId = address.customerProfileId.toString();
-    const addressId = requireId(context.addressId, "No se pudo crear la direccion temporal");
+    const direccionId = requireId(context.direccionId, "No se pudo crear la direccion temporal");
 
     const product = await createTempProduct(sellerId, context.stamp);
     context.productId = product._id.toString();
@@ -229,11 +205,11 @@ export async function runCoreEndToEndVerification(
 
     const customerActor: Actor = {
       id: customerId,
-      role: "CLIENTE",
+      rol: "CLIENTE",
     };
     const sellerActor: Actor = {
       id: sellerId,
-      role: "VENDEDOR",
+      rol: "VENDEDOR",
     };
 
     const webVariant = product.variantes[0];
@@ -241,40 +217,37 @@ export async function runCoreEndToEndVerification(
 
     await addCartItemByUserId(customerId, {
       productoId: productId,
-      variantId: webVariant.variantId,
+      varianteId: webVariant.varianteId,
       color: webVariant.color,
       talla: webVariant.talla,
       cantidad: 1,
     });
     await waitUniqueTick();
 
-    const checkoutOrder = await checkoutCartToOrder(customerId, {
+    const checkoutOrder = await crearPedidoDesdeCarrito(customerId, {
       metodoPago: "QR",
-      addressId,
+      direccionId,
     });
-    context.createdOrderIds.push(checkoutOrder._id.toString());
+    context.createdPedidoIds.push(checkoutOrder._id.toString());
     await trackFulfillment(checkoutOrder._id.toString(), context);
 
     await waitUniqueTick();
     const payment = await createPaymentTransaction(customerActor, {
-      orderId: checkoutOrder._id.toString(),
+      pedidoId: checkoutOrder._id.toString(),
       metodoPago: "QR",
       idempotencyKey: `e2e-checkout-${context.stamp}`,
-      externalReference: `e2e-qr-${context.stamp}`,
+      referenciaExterna: `e2e-qr-${context.stamp}`,
     });
     context.createdPaymentIds.push(payment._id.toString());
 
     await waitUniqueTick();
-    const confirmed = await confirmPaymentTransaction(
+    await confirmPaymentTransaction(
       customerActor,
       payment._id.toString(),
       {
-        externalReference: `e2e-confirmed-${context.stamp}`,
+        referenciaExterna: `e2e-confirmed-${context.stamp}`,
       }
     );
-    if (confirmed.venta?._id) {
-      context.createdSaleIds.push(confirmed.venta._id.toString());
-    }
 
     const confirmedFulfillment = await trackFulfillment(
       checkoutOrder._id.toString(),
@@ -283,25 +256,25 @@ export async function runCoreEndToEndVerification(
 
     if (confirmedFulfillment) {
       await updateFulfillmentStatusById(confirmedFulfillment._id.toString(), {
-        status: "READY",
-        trackingCode: null,
-        courierName: null,
-        assignedTo: null,
-        notes: "E2E ready",
+        estado: "READY",
+        codigoSeguimiento: null,
+        nombreTransportista: null,
+        asignadoA: null,
+        notas: "E2E ready",
       });
       await updateFulfillmentStatusById(confirmedFulfillment._id.toString(), {
-        status: "IN_TRANSIT",
-        trackingCode: `TRK-${context.stamp}`,
-        courierName: "E2E Courier",
-        assignedTo: null,
-        notes: null,
+        estado: "IN_TRANSIT",
+        codigoSeguimiento: `TRK-${context.stamp}`,
+        nombreTransportista: "E2E Courier",
+        asignadoA: null,
+        notas: null,
       });
       await updateFulfillmentStatusById(confirmedFulfillment._id.toString(), {
-        status: "DELIVERED",
-        trackingCode: `TRK-${context.stamp}`,
-        courierName: "E2E Courier",
-        assignedTo: null,
-        notes: "E2E delivered",
+        estado: "DELIVERED",
+        codigoSeguimiento: `TRK-${context.stamp}`,
+        nombreTransportista: "E2E Courier",
+        asignadoA: null,
+        notas: "E2E delivered",
       });
     }
 
@@ -309,9 +282,8 @@ export async function runCoreEndToEndVerification(
       name: "checkout-confirm-fulfillment",
       success: true,
       details: {
-        orderId: checkoutOrder._id.toString(),
+        pedidoId: checkoutOrder._id.toString(),
         paymentId: payment._id.toString(),
-        saleId: confirmed.venta?._id?.toString() || null,
         fulfillmentId: confirmedFulfillment?._id?.toString() || null,
       },
     });
@@ -319,36 +291,36 @@ export async function runCoreEndToEndVerification(
     await clearCartByUserId(customerId);
     await addCartItemByUserId(customerId, {
       productoId: productId,
-      variantId: webVariant.variantId,
+      varianteId: webVariant.varianteId,
       color: webVariant.color,
       talla: webVariant.talla,
       cantidad: 1,
     });
     await waitUniqueTick();
 
-    const failedOrder = await checkoutCartToOrder(customerId, {
+    const failedOrder = await crearPedidoDesdeCarrito(customerId, {
       metodoPago: "QR",
-      addressId,
+      direccionId,
     });
-    context.createdOrderIds.push(failedOrder._id.toString());
+    context.createdPedidoIds.push(failedOrder._id.toString());
     await trackFulfillment(failedOrder._id.toString(), context);
 
     await waitUniqueTick();
     const failedPayment = await createPaymentTransaction(customerActor, {
-      orderId: failedOrder._id.toString(),
+      pedidoId: failedOrder._id.toString(),
       metodoPago: "QR",
       idempotencyKey: `e2e-failed-${context.stamp}`,
     });
     context.createdPaymentIds.push(failedPayment._id.toString());
     await failPaymentTransaction(customerActor, failedPayment._id.toString(), {
-      reason: "E2E failure path",
+      motivo: "E2E failure path",
     });
 
     steps.push({
       name: "payment-failure",
       success: true,
       details: {
-        orderId: failedOrder._id.toString(),
+        pedidoId: failedOrder._id.toString(),
         paymentId: failedPayment._id.toString(),
       },
     });
@@ -356,44 +328,41 @@ export async function runCoreEndToEndVerification(
     await clearCartByUserId(customerId);
     await addCartItemByUserId(customerId, {
       productoId: productId,
-      variantId: webVariant.variantId,
+      varianteId: webVariant.varianteId,
       color: webVariant.color,
       talla: webVariant.talla,
       cantidad: 1,
     });
     await waitUniqueTick();
 
-    const refundOrder = await checkoutCartToOrder(customerId, {
+    const refundOrder = await crearPedidoDesdeCarrito(customerId, {
       metodoPago: "QR",
-      addressId,
+      direccionId,
     });
-    context.createdOrderIds.push(refundOrder._id.toString());
+    context.createdPedidoIds.push(refundOrder._id.toString());
     await trackFulfillment(refundOrder._id.toString(), context);
 
     await waitUniqueTick();
     const refundPayment = await createPaymentTransaction(customerActor, {
-      orderId: refundOrder._id.toString(),
+      pedidoId: refundOrder._id.toString(),
       metodoPago: "QR",
       idempotencyKey: `e2e-refund-${context.stamp}`,
     });
     context.createdPaymentIds.push(refundPayment._id.toString());
-    const refundConfirmed = await confirmPaymentTransaction(
+    await confirmPaymentTransaction(
       customerActor,
       refundPayment._id.toString(),
       {}
     );
-    if (refundConfirmed.venta?._id) {
-      context.createdSaleIds.push(refundConfirmed.venta._id.toString());
-    }
     await refundPaymentTransaction(sellerActor, refundPayment._id.toString(), {
-      reason: "E2E refund path",
+      motivo: "E2E refund path",
     });
 
     steps.push({
       name: "refund",
       success: true,
       details: {
-        orderId: refundOrder._id.toString(),
+        pedidoId: refundOrder._id.toString(),
         paymentId: refundPayment._id.toString(),
       },
     });
@@ -411,7 +380,7 @@ export async function runCoreEndToEndVerification(
       items: [
         {
           productoId: productId,
-          variantId: posVariant.variantId,
+          varianteId: posVariant.varianteId,
           color: posVariant.color,
           talla: posVariant.talla,
           cantidad: 1,
@@ -420,30 +389,26 @@ export async function runCoreEndToEndVerification(
       metodoPago: "EFECTIVO",
       descuento: 0,
     });
-    context.createdSaleIds.push(posSale.venta._id.toString());
-    context.createdOrderIds.push(posSale.order._id.toString());
-    await trackFulfillment(posSale.order._id.toString(), context);
+    context.createdPedidoIds.push((posSale as unknown as { _id: string })._id.toString());
+    await trackFulfillment((posSale as unknown as { _id: string })._id.toString(), context);
 
     steps.push({
       name: "pos-sale",
       success: true,
       details: {
         scanSource: scanned.scanSource,
-        saleId: posSale.venta._id.toString(),
-        orderId: posSale.order._id.toString(),
+        pedidoId: (posSale as unknown as { _id: string })._id.toString(),
       },
     });
 
-    const legacyAfter = await getLegacyMigrationStatus();
-
     await recordAuditEventSafe({
       requestId,
-      action: "CORE_VERIFICATION_RUN",
-      entityType: "SYSTEM",
-      entityId: context.stamp,
-      actorId: actor.id,
-      actorRole: actor.role,
-      status: "SUCCESS",
+      accion: "CORE_VERIFICATION_RUN",
+      tipoEntidad: "SYSTEM",
+      idEntidad: context.stamp,
+      idActor: actor.id,
+      rolActor: actor.rol,
+      estado: "SUCCESS",
       metadata: {
         steps: steps.map((step) => step.name),
         cleanup: input.cleanup,
@@ -455,19 +420,14 @@ export async function runCoreEndToEndVerification(
       requestId: requestId || null,
       stamp: context.stamp,
       cleanup: input.cleanup,
-      legacyBefore,
-      legacyRunResult,
-      legacyAfter,
-      legacyFallbackStillRequired: legacyAfter.compatibility.legacyFallbackStillRequired,
       steps,
       artifacts: {
         customerId: context.customerId,
         sellerId: context.sellerId,
         productId: context.productId,
-        orderIds: context.createdOrderIds,
+        orderIds: context.createdPedidoIds,
         paymentIds: context.createdPaymentIds,
         fulfillmentIds: context.createdFulfillmentIds,
-        saleIds: context.createdSaleIds,
       },
     };
 
@@ -496,13 +456,13 @@ export async function runCoreEndToEndVerification(
 
     await recordAuditEventSafe({
       requestId,
-      action: "CORE_VERIFICATION_RUN",
-      entityType: "SYSTEM",
-      entityId: context.stamp,
-      actorId: actor.id,
-      actorRole: actor.role,
-      status: "FAILED",
-      errorMessage: error instanceof Error ? error.message : "Error desconocido",
+      accion: "CORE_VERIFICATION_RUN",
+      tipoEntidad: "SYSTEM",
+      idEntidad: context.stamp,
+      idActor: actor.id,
+      rolActor: actor.rol,
+      estado: "FAILED",
+      mensajeError: error instanceof Error ? error.message : "Error desconocido",
       metadata: {
         cleanup: input.cleanup,
       },

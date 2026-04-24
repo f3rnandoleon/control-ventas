@@ -4,7 +4,7 @@ import { normalizeVariantImages, cleanupRemovedVariantImages } from "@/libs/clou
 import { generarSKU } from "@/utils/generarSKU";
 import { generarCodigoVariante } from "@/utils/generarCodigoVariante";
 import { getVarianteImagenPrincipal, getVarianteImagenes } from "@/utils/varianteImagen";
-import { ensureVariantIdentities } from "@/utils/variantIdentity";
+import { ensureVariantIdentities } from "@/utils/varianteIdentity";
 import { AppError } from "@/shared/errors/AppError";
 import { catalogRepository } from "@/modules/catalog/infrastructure/catalog.repository";
 import { PUBLIC_PRODUCT_PROJECTION } from "@/modules/catalog/domain/catalog.constants";
@@ -23,7 +23,7 @@ type ProductoPayload = Partial<Producto> & {
 
 type CatalogVariantLike = Record<string, unknown> & {
   stock?: number | null;
-  reservedStock?: number | null;
+  stockReservado?: number | null;
 };
 
 type CatalogProductLike = Record<string, unknown> & {
@@ -89,7 +89,7 @@ export async function createCatalogProduct(
     if (variante.codigoBarra && variante.qrCode) {
       return {
         ...variante,
-        reservedStock: 0,
+        stockReservado: 0,
       };
     }
 
@@ -103,7 +103,7 @@ export async function createCatalogProduct(
 
     return {
       ...variante,
-      reservedStock: 0,
+      stockReservado: 0,
       codigoBarra: variante.codigoBarra || codigoBarra,
       qrCode: variante.qrCode || qrCode,
     };
@@ -168,12 +168,12 @@ export async function updateCatalogProduct(
       const existentes = (productoAntes.variantes as Variante[]).filter((actual) =>
         matchesVariant(actual, variante)
       );
-      const reservedStock = existentes[0]?.reservedStock || 0;
+      const stockReservado = existentes[0]?.stockReservado || 0;
 
       if (variante.codigoBarra && variante.qrCode) {
         return {
           ...variante,
-          reservedStock,
+          stockReservado,
         };
       }
 
@@ -188,7 +188,7 @@ export async function updateCatalogProduct(
 
       return {
         ...variante,
-        reservedStock: existentes[0]?.reservedStock || 0,
+        stockReservado: existentes[0]?.stockReservado || 0,
         codigoBarra: variante.codigoBarra || codigoBarra,
         qrCode: variante.qrCode || qrCode,
       };
@@ -262,7 +262,7 @@ export async function deleteCatalogProduct(id: string) {
   }
 
   const hasReservedStock = (producto.variantes as Variante[]).some(
-    (variante) => (variante.reservedStock || 0) > 0
+    (variante) => (variante.stockReservado || 0) > 0
   );
 
   if (hasReservedStock) {
@@ -329,12 +329,12 @@ export async function findCatalogProductByCode(code: string) {
     modelo: producto.modelo,
     precioVenta: producto.precioVenta,
     variante: {
-      variantId: variante.variantId,
+      varianteId: variante.varianteId,
       color: variante.color,
       colorSecundario: variante.colorSecundario,
       talla: variante.talla,
       stock: variante.stock,
-      reservedStock: variante.reservedStock || 0,
+      stockReservado: variante.stockReservado || 0,
       stockDisponible,
       imagen: getVarianteImagenPrincipal(variante),
       imagenes: getVarianteImagenes(variante),

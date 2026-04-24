@@ -19,7 +19,7 @@ export interface Fulfillment {
   seller?: string | null;
   channel: "WEB" | "APP_QR" | "TIENDA";
   method: FulfillmentMethod;
-  status: FulfillmentStatus;
+  estado: FulfillmentStatus;
   pickupPoint?: string | null;
   address?: string | null;
   phone?: string | null;
@@ -45,7 +45,7 @@ export interface CreateFulfillmentDTO {
 }
 
 export interface UpdateFulfillmentStatusDTO {
-  status: FulfillmentStatus;
+  estado: FulfillmentStatus;
   trackingCode?: string | null;
   courierName?: string | null;
   assignedTo?: string | null;

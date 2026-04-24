@@ -1,15 +1,15 @@
 "use client";
 
-import { Venta } from "@/types/venta";
+import { Pedido } from "@/types/pedido";
 
 export default function VentaDetalleModal({
-  venta,
+  Pedido,
   onClose,
 }: {
-  venta: Venta | null;
+  Pedido: Pedido | null;
   onClose: () => void;
 }) {
-  if (!venta) return null;
+  if (!Pedido) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center">
@@ -20,7 +20,7 @@ export default function VentaDetalleModal({
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-cyan-400">
-            Detalle de Venta
+            Detalle de Pedido
           </h2>
           <button onClick={onClose} className="text-gray-300 hover:text-white">
             ✕
@@ -29,10 +29,10 @@ export default function VentaDetalleModal({
 
         {/* Info general */}
         <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 mb-6">
-          <p><strong>N° Venta:</strong> {venta.numeroVenta}</p>
-          <p><strong>Fecha:</strong> {new Date(venta.createdAt).toLocaleString()}</p>
-          <p><strong>Vendedor:</strong> {venta.vendedor?.fullname || "-"}</p>
-          <p><strong>Método:</strong> {venta.metodoPago}</p>
+          <p><strong>N° Pedido:</strong> {Pedido.numeroPedido}</p>
+          <p><strong>Fecha:</strong> {new Date(Pedido.createdAt).toLocaleString()}</p>
+          <p><strong>Vendedor:</strong> {Pedido.vendedor?.nombreCompleto || "-"}</p>
+          <p><strong>Método:</strong> {Pedido.metodoPago}</p>
         </div>
 
         {/* Items */}
@@ -47,12 +47,10 @@ export default function VentaDetalleModal({
             </tr>
           </thead>
           <tbody>
-            {venta.items.map((item, idx) => (
+            {Pedido.items.map((item, idx) => (
               <tr key={idx} className="border-b border-white/5">
                 <td className="py-2">
-                  {typeof item.productoId === "string"
-                    ? "Producto"
-                    : item.productoId.nombre}
+                  {item.productoSnapshot.nombre}
                 </td>
                 <td>
                   {item.variante.color} / {item.variante.talla}
@@ -70,13 +68,13 @@ export default function VentaDetalleModal({
         {/* Totales */}
         <div className="text-right space-y-1">
           <p className="text-gray-400">
-            Subtotal: Bs {venta.subtotal}
+            Subtotal: Bs {Pedido.subtotal}
           </p>
           <p className="text-gray-400">
-            Descuento: Bs {venta.descuento}
+            Descuento: Bs {Pedido.descuento}
           </p>
           <p className="text-xl font-bold text-cyan-400">
-            Total: Bs {venta.total}
+            Total: Bs {Pedido.total}
           </p>
         </div>
       </div>

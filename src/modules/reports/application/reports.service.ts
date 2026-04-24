@@ -1,7 +1,6 @@
 import { connectDB } from "@/libs/mongodb";
-import Venta from "@/models/venta";
-import Order from "@/models/order";
-import PaymentTransaction from "@/models/paymentTransaction";
+import Pedido from "@/models/pedido";
+import PaymentTransaction from "@/models/transaccionPago";
 import Inventario from "@/models/inventario";
 import { AppError } from "@/shared/errors/AppError";
 
@@ -64,14 +63,19 @@ export async function getGeneralReport(request: Request) {
   await connectDB();
 
   const { dateMatch } = parseReportFilters(request);
-  const ventaMatch = buildMatch(dateMatch);
-  const paymentDateField =
-    Object.keys(dateMatch).length > 0 ? { createdAt: dateMatch } : {};
+  const pedidoMatch = buildMatch(dateMatch);
+  const paymentDateField = Object.keys(dateMatch).length > 0 ? { createdAt: dateMatch } : {};
+
+  // Solo consideramos pedidos que NO esten cancelados y que representen una venta real para summary de ventas
+  const salesMatch = {
+    ...pedidoMatch,
+    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
+  };
 
   const [salesSummary, channelBreakdown, paymentBreakdown, orderBreakdown] =
     await Promise.all([
-      Venta.aggregate([
-        { $match: ventaMatch },
+      Pedido.aggregate([
+        { $match: salesMatch },
         {
           $group: {
             _id: null,
@@ -82,11 +86,11 @@ export async function getGeneralReport(request: Request) {
           },
         },
       ]),
-      Venta.aggregate([
-        { $match: ventaMatch },
+      Pedido.aggregate([
+        { $match: salesMatch },
         {
           $group: {
-            _id: "$tipoVenta",
+            _id: "$canal",
             totalVentas: { $sum: "$total" },
             cantidad: { $sum: 1 },
           },
@@ -97,26 +101,26 @@ export async function getGeneralReport(request: Request) {
         { $match: paymentDateField },
         {
           $group: {
-            _id: "$status",
+            _id: "$estado",
             cantidad: { $sum: 1 },
-            monto: { $sum: "$amount" },
+            monto: { $sum: "$monto" },
           },
         },
         { $sort: { cantidad: -1 } },
       ]),
-      Order.aggregate([
-        { $match: buildMatch(dateMatch) },
+      Pedido.aggregate([
+        { $match: pedidoMatch },
         {
           $group: {
             _id: null,
             pedidosCancelados: {
               $sum: {
-                $cond: [{ $eq: ["$orderStatus", "CANCELLED"] }, 1, 0],
+                $cond: [{ $eq: ["$estadoPedido", "CANCELLED"] }, 1, 0],
               },
             },
             pedidosEntregados: {
               $sum: {
-                $cond: [{ $eq: ["$orderStatus", "DELIVERED"] }, 1, 0],
+                $cond: [{ $eq: ["$estadoPedido", "DELIVERED"] }, 1, 0],
               },
             },
           },
@@ -140,8 +144,13 @@ export async function getDailySalesReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  return Venta.aggregate([
-    { $match: buildMatch(dateMatch) },
+  const salesMatch = {
+    ...buildMatch(dateMatch),
+    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
+  };
+
+  return Pedido.aggregate([
+    { $match: salesMatch },
     {
       $group: {
         _id: {
@@ -160,8 +169,13 @@ export async function getMonthlySalesReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  return Venta.aggregate([
-    { $match: buildMatch(dateMatch) },
+  const salesMatch = {
+    ...buildMatch(dateMatch),
+    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
+  };
+
+  return Pedido.aggregate([
+    { $match: salesMatch },
     {
       $group: {
         _id: {
@@ -181,8 +195,13 @@ export async function getTopProductsReport(request: Request) {
   await connectDB();
   const { dateMatch, limit } = parseReportFilters(request);
 
-  return Venta.aggregate([
-    { $match: buildMatch(dateMatch) },
+  const salesMatch = {
+    ...buildMatch(dateMatch),
+    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
+  };
+
+  return Pedido.aggregate([
+    { $match: salesMatch },
     { $unwind: "$items" },
     {
       $group: {
@@ -208,13 +227,18 @@ export async function getTopVariantsReport(request: Request) {
   await connectDB();
   const { dateMatch, limit } = parseReportFilters(request);
 
-  return Venta.aggregate([
-    { $match: buildMatch(dateMatch) },
+  const salesMatch = {
+    ...buildMatch(dateMatch),
+    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
+  };
+
+  return Pedido.aggregate([
+    { $match: salesMatch },
     { $unwind: "$items" },
     {
       $group: {
         _id: {
-          variantId: "$items.variante.variantId",
+          varianteId: "$items.variante.varianteId",
           color: "$items.variante.color",
           talla: "$items.variante.talla",
           productoId: "$items.productoId",
@@ -240,11 +264,16 @@ export async function getSalesByChannelReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  return Venta.aggregate([
-    { $match: buildMatch(dateMatch) },
+  const salesMatch = {
+    ...buildMatch(dateMatch),
+    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
+  };
+
+  return Pedido.aggregate([
+    { $match: salesMatch },
     {
       $group: {
-        _id: "$tipoVenta",
+        _id: "$canal",
         totalVentas: { $sum: "$total" },
         gananciaTotal: { $sum: "$gananciaTotal" },
         cantidadVentas: { $sum: 1 },
@@ -258,10 +287,11 @@ export async function getSalesBySellerReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  return Venta.aggregate([
+  return Pedido.aggregate([
     {
       $match: {
         ...buildMatch(dateMatch),
+        estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] },
         vendedor: { $ne: null },
       },
     },
@@ -292,7 +322,7 @@ export async function getSalesBySellerReport(request: Request) {
             vars: { seller: { $arrayElemAt: ["$vendedor", 0] } },
             in: {
               _id: "$$seller._id",
-              fullname: "$$seller.fullname",
+              nombreCompleto: "$$seller.nombreCompleto",
               email: "$$seller.email",
             },
           },
@@ -306,26 +336,27 @@ export async function getSalesBySellerReport(request: Request) {
 export async function getCancellationsReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
+  const pedidoMatch = buildMatch(dateMatch);
 
-  const [orders, payments, cancellationByChannel] = await Promise.all([
-    Order.aggregate([
-      { $match: buildMatch(dateMatch) },
+  const [pedidos, payments, cancellationByChannel] = await Promise.all([
+    Pedido.aggregate([
+      { $match: pedidoMatch },
       {
         $group: {
           _id: null,
           pedidosCancelados: {
             $sum: {
-              $cond: [{ $eq: ["$orderStatus", "CANCELLED"] }, 1, 0],
+              $cond: [{ $eq: ["$estadoPedido", "CANCELLED"] }, 1, 0],
             },
           },
           pedidosRefunded: {
             $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "REFUNDED"] }, 1, 0],
+              $cond: [{ $eq: ["$estadoPago", "REFUNDED"] }, 1, 0],
             },
           },
           pedidosFailed: {
             $sum: {
-              $cond: [{ $eq: ["$paymentStatus", "FAILED"] }, 1, 0],
+              $cond: [{ $eq: ["$estadoPago", "FAILED"] }, 1, 0],
             },
           },
         },
@@ -335,23 +366,23 @@ export async function getCancellationsReport(request: Request) {
       { $match: buildMatch(dateMatch) },
       {
         $group: {
-          _id: "$status",
+          _id: "$estado",
           cantidad: { $sum: 1 },
-          monto: { $sum: "$amount" },
+          monto: { $sum: "$monto" },
         },
       },
       { $sort: { cantidad: -1 } },
     ]),
-    Order.aggregate([
+    Pedido.aggregate([
       {
         $match: {
-          ...buildMatch(dateMatch),
-          orderStatus: "CANCELLED",
+          ...pedidoMatch,
+          estadoPedido: "CANCELLED",
         },
       },
       {
         $group: {
-          _id: "$channel",
+          _id: "$canal",
           cantidad: { $sum: 1 },
         },
       },
@@ -360,9 +391,9 @@ export async function getCancellationsReport(request: Request) {
   ]);
 
   return {
-    pedidosCancelados: orders[0]?.pedidosCancelados || 0,
-    pedidosRefunded: orders[0]?.pedidosRefunded || 0,
-    pedidosFailed: orders[0]?.pedidosFailed || 0,
+    pedidosCancelados: pedidos[0]?.pedidosCancelados || 0,
+    pedidosRefunded: pedidos[0]?.pedidosRefunded || 0,
+    pedidosFailed: pedidos[0]?.pedidosFailed || 0,
     transaccionesPorEstado: payments,
     cancelacionesPorCanal: cancellationByChannel,
   };
@@ -383,7 +414,7 @@ export async function getInventoryRotationReport(request: Request) {
       $group: {
         _id: {
           productoId: "$productoId",
-          variantId: "$variante.variantId",
+          varianteId: "$variante.varianteId",
           color: "$variante.color",
           talla: "$variante.talla",
         },

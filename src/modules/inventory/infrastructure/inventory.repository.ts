@@ -5,13 +5,13 @@ export const inventoryRepository = {
   listAll() {
     return Inventario.find()
       .populate("productoId", "nombre modelo")
-      .populate("usuario", "fullname email")
+      .populate("usuario", "nombreCompleto email")
       .sort({ createdAt: -1 });
   },
 
   listByProduct(productoId: string) {
     return Inventario.find({ productoId })
-      .populate("usuario", "fullname")
+      .populate("usuario", "nombreCompleto")
       .sort({ createdAt: -1 });
   },
 

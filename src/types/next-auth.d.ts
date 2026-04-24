@@ -6,24 +6,24 @@ declare module "next-auth" {
         user: {
             id: string;
             email: string;
-            fullname: string;
-            role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+            nombreCompleto: string;
+            rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
         };
     }
 
     interface User {
         id: string;
         email: string;
-        fullname: string;
-        role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+        nombreCompleto: string;
+        rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
     }
 }
 
 declare module "next-auth/jwt" {
     interface JWT {
         id: string;
-        role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+        rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
         email?: string;
-        fullname?: string;
+        nombreCompleto?: string;
     }
 }

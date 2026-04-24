@@ -27,7 +27,7 @@ export const authOptions: AuthOptions = {
           throw new Error("Credenciales incorrectas");
         }
 
-        if (!user.isActive) {
+        if (!user.estaActivo) {
           throw new Error("Usuario deshabilitado");
         }
 
@@ -47,17 +47,17 @@ export const authOptions: AuthOptions = {
         }
 
         try {
-          user.lastLogin = new Date();
+          user.ultimoAcceso = new Date();
           await user.save();
         } catch (error) {
-          console.error("Error actualizando lastLogin:", error);
+          console.error("Error actualizando ultimoAcceso:", error);
         }
 
         return {
           id: user._id.toString(),
           email: user.email,
-          fullname: user.fullname,
-          role: user.role,
+          nombreCompleto: user.nombreCompleto,
+          rol: user.rol,
         };
       },
     }),
@@ -66,9 +66,9 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.rol = user.rol;
         token.email = user.email;
-        token.fullname = user.fullname;
+        token.nombreCompleto = user.nombreCompleto;
       }
 
       if (trigger === "update") {
@@ -76,8 +76,8 @@ export const authOptions: AuthOptions = {
           token.email = session.email;
         }
 
-        if (session?.fullname) {
-          token.fullname = session.fullname;
+        if (session?.nombreCompleto) {
+          token.nombreCompleto = session.nombreCompleto;
         }
       }
 
@@ -86,10 +86,10 @@ export const authOptions: AuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
-        session.user.role = token.role;
+        session.user.rol = token.rol as "ADMIN" | "VENDEDOR" | "CLIENTE";
         session.user.email = (token.email as string) || session.user.email;
-        session.user.fullname =
-          (token.fullname as string) || session.user.fullname;
+        session.user.nombreCompleto =
+          (token.nombreCompleto as string) || session.user.nombreCompleto;
       }
       return session;
     },

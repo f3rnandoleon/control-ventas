@@ -9,7 +9,7 @@ export async function PATCH(request: Request) {
   try {
     const userAuth = await resolveApiAuth(request);
 
-    if (!userAuth || userAuth.role !== "ADMIN") {
+    if (!userAuth || userAuth.rol !== "ADMIN") {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   try {
     const userAuth = await resolveApiAuth(request);
 
-    if (!userAuth || userAuth.role !== "ADMIN") {
+    if (!userAuth || userAuth.rol !== "ADMIN") {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const result = await runCoreEndToEndVerification(
       {
         id: userAuth.id,
-        role: userAuth.role,
+        rol: userAuth.rol,
       },
       parsed,
       requestId

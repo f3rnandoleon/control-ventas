@@ -1,9 +1,8 @@
-import Producto from "@/models/product";
-import Order from "@/models/order";
-import PaymentTransaction from "@/models/paymentTransaction";
+import Producto from "@/models/producto";
+import Pedido from "@/models/pedido";
+import PaymentTransaction from "@/models/transaccionPago";
 import { getMongoRuntimeInfo } from "@/libs/mongodb";
 import { listAuditEvents } from "@/modules/audit/application/audit.service";
-import { getLegacyMigrationStatus } from "@/modules/migrations/application/legacy-migration.service";
 
 type OpsAlertSeverity = "info" | "warning" | "critical";
 
@@ -73,7 +72,6 @@ function buildAlert(
 export async function getOpsOverview() {
   const runtime = await getMongoRuntimeInfo({ refresh: true });
   const backup = getBackupStatus();
-  const legacy = await getLegacyMigrationStatus();
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -85,21 +83,21 @@ export async function getOpsOverview() {
     productsWithInvalidReservedStock,
     recentAuditEvents,
   ] = await Promise.all([
-    Order.countDocuments({
-      stockReservationStatus: "RESERVED",
-      reservationExpiresAt: { $lt: now },
+    Pedido.countDocuments({
+      estadoReservaStock: "RESERVED",
+      reservaExpiraEn: { $lt: now },
     }),
-    Order.countDocuments({
-      paymentStatus: "PAID",
-      fulfillmentStatus: { $in: ["PENDING", "READY", "IN_TRANSIT"] },
-      channel: { $in: ["WEB", "APP_QR"] },
+    Pedido.countDocuments({
+      estadoPago: "PAID",
+      estadoEntrega: { $in: ["PENDING", "READY", "IN_TRANSIT"] },
+      canal: { $in: ["WEB", "APP_QR"] },
     }),
     PaymentTransaction.countDocuments({
-      status: "FAILED",
+      estado: "FAILED",
       createdAt: { $gte: twentyFourHoursAgo },
     }),
     PaymentTransaction.countDocuments({
-      status: "REFUNDED",
+      estado: "REFUNDED",
       createdAt: { $gte: twentyFourHoursAgo },
     }),
     Producto.aggregate([
@@ -151,19 +149,6 @@ export async function getOpsOverview() {
     );
   }
 
-  if (legacy.pendingBackfill.salesWithoutOrder > 0) {
-    alerts.push(
-      buildAlert(
-        "warning",
-        "LEGACY_BACKFILL_PENDING",
-        "Aun existen ventas legacy sin Order migrado; el fallback sigue siendo necesario.",
-        {
-          salesWithoutOrder: legacy.pendingBackfill.salesWithoutOrder,
-        }
-      )
-    );
-  }
-
   if (staleReservations > 0) {
     alerts.push(
       buildAlert(
@@ -201,7 +186,6 @@ export async function getOpsOverview() {
     timestamp: now.toISOString(),
     runtime,
     backup,
-    legacy,
     metrics: {
       staleReservations,
       paidOrdersWithoutFulfillment,

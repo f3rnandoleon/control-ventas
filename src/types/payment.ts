@@ -11,7 +11,7 @@ export interface PaymentTransaction {
   customer?: string | null;
   metodoPago: "EFECTIVO" | "QR";
   amount: number;
-  status: PaymentTransactionStatus;
+  estado: PaymentTransactionStatus;
   idempotencyKey?: string | null;
   externalReference?: string | null;
   failureReason?: string | null;

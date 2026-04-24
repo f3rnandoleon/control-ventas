@@ -10,47 +10,47 @@ import {
 type PaymentReviewData = {
   payment: {
     _id: string;
-    paymentNumber: string;
+    numeroPago: string;
     metodoPago: string;
-    amount: number;
-    status: string;
-    comprobanteUrl: string | null;
+    monto: number;
+    estado: string;
+    urlComprobante: string | null;
     createdAt: string;
   };
   order: {
     _id: string;
-    orderNumber: string;
-    channel: string;
+    numeroPedido: string;
+    canal: string;
     metodoPago: string;
     subtotal: number;
     descuento: number;
     total: number;
-    orderStatus: string;
-    paymentStatus: string;
-    fulfillmentStatus: string;
+    estadoPedido: string;
+    estadoPago: string;
+    estadoEntrega: string;
     createdAt: string;
-    notes?: string | null;
-    customerSnapshot?: {
-      fullname?: string;
+    notas?: string | null;
+    snapshotCliente?: {
+      nombreCompleto?: string;
       email?: string;
-      phone?: string;
-      documentType?: string;
-      documentNumber?: string;
+      telefono?: string;
+      tipoDocumento?: string;
+      numeroDocumento?: string;
     };
-    deliverySnapshot?: {
-      method?: string;
-      address?: string;
-      phone?: string;
-      department?: string;
-      city?: string;
-      shippingCompany?: string;
-      branch?: string;
-      senderName?: string;
-      senderCI?: string;
-      senderPhone?: string;
-      recipientName?: string;
-      scheduledAt?: string;
-      pickupPoint?: string;
+    snapshotEntrega?: {
+      metodo?: string;
+      direccion?: string;
+      telefono?: string;
+      departamento?: string;
+      ciudad?: string;
+      empresaEnvio?: string;
+      sucursal?: string;
+      nombreRemitente?: string;
+      ciRemitente?: string;
+      telefonoRemitente?: string;
+      nombreDestinatario?: string;
+      programadoPara?: string;
+      puntoRecojo?: string;
     };
     items: Array<{
       productoSnapshot: { 
@@ -62,7 +62,7 @@ type PaymentReviewData = {
       variante: { 
         color: string; 
         talla: string;
-        variantId?: string;
+        varianteId?: string;
         colorSecundario?: string;
       };
       cantidad: number;
@@ -195,7 +195,7 @@ export default function VerificarPagoPage() {
             <span className="text-5xl text-emerald-400">✓</span>
           </div>
           <h1 className="text-3xl font-bold text-emerald-400 mb-3">¡Confirmado!</h1>
-          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.order.orderNumber}</span> ha sido aprobado.</p>
+          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.order.numeroPedido}</span> ha sido aprobado.</p>
           <p className="text-slate-500 text-sm">El cliente recibirá su confirmación en breve.</p>
         </div>
       </div>
@@ -210,7 +210,7 @@ export default function VerificarPagoPage() {
             <span className="text-5xl text-red-500">✕</span>
           </div>
           <h1 className="text-3xl font-bold text-red-400 mb-3">Pago Rechazado</h1>
-          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.order.orderNumber}</span> fue cancelado.</p>
+          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.order.numeroPedido}</span> fue cancelado.</p>
           <p className="text-slate-500 text-sm">El stock ha sido liberado automáticamente.</p>
         </div>
       </div>
@@ -221,7 +221,7 @@ export default function VerificarPagoPage() {
 
   const { payment, order } = data;
   const isProcessing = state === "confirming" || state === "rejecting";
-  const deliveryLabel = DELIVERY_METHOD_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—";
+  const deliveryLabel = DELIVERY_METHOD_LABELS[order.snapshotEntrega?.metodo ?? ""] || order.snapshotEntrega?.metodo || "—";
   const createdAtFormatted = new Intl.DateTimeFormat('es-BO', { 
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
   }).format(new Date(order.createdAt));
@@ -240,9 +240,9 @@ export default function VerificarPagoPage() {
               <span className="text-slate-500 text-xs font-medium">{createdAtFormatted}</span>
             </div>
             <h1 className="text-3xl font-black text-white tracking-tight">
-              Pedido <span className="text-indigo-400">{order.orderNumber}</span>
+              Pedido <span className="text-indigo-400">{order.numeroPedido}</span>
             </h1>
-            <p className="text-slate-400 text-sm font-medium mt-1">Transacción QR: <span className="text-slate-300">{payment.paymentNumber}</span></p>
+            <p className="text-slate-400 text-sm font-medium mt-1">Transacción QR: <span className="text-slate-300">{payment.numeroPago}</span></p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
@@ -264,10 +264,10 @@ export default function VerificarPagoPage() {
                 <span className="text-[10px] bg-slate-700 px-2 py-1 rounded text-slate-300 font-mono italic">COMPROBANTE_UPLOADED</span>
               </div>
               <div className="p-4 bg-slate-950/20">
-                {payment.comprobanteUrl ? (
+                {payment.urlComprobante ? (
                   <div className="relative aspect-[3/4] md:aspect-auto md:h-[500px] w-full rounded-2xl overflow-hidden ring-1 ring-white/10 group-hover:ring-indigo-500/30 transition-all duration-500">
                     <Image
-                      src={payment.comprobanteUrl}
+                      src={payment.urlComprobante}
                       alt="Comprobante de pago QR"
                       fill
                       className="object-contain"
@@ -345,7 +345,7 @@ export default function VerificarPagoPage() {
           <div className="space-y-8">
             
             {/* Customer Details Card */}
-            {order.customerSnapshot && (
+            {order.snapshotCliente && (
               <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                   <span className="text-5xl">👤</span>
@@ -358,18 +358,18 @@ export default function VerificarPagoPage() {
                 </h3>
                 <div className="space-y-5">
                   <div>
-                    <p className="text-white text-xl font-bold mb-0.5">{order.customerSnapshot.fullname || "Cliente sin nombre"}</p>
-                    <p className="text-slate-500 text-sm">{order.customerSnapshot.email}</p>
+                    <p className="text-white text-xl font-bold mb-0.5">{order.snapshotCliente.nombreCompleto || "Cliente sin nombre"}</p>
+                    <p className="text-slate-500 text-sm">{order.snapshotCliente.email}</p>
                   </div>
                   <div className="flex flex-wrap gap-4 pt-2">
                     <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-white/5">
                       <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Teléfono</p>
-                      <p className="text-slate-200 text-sm font-bold leading-none">{order.customerSnapshot.phone || "—"}</p>
+                      <p className="text-slate-200 text-sm font-bold leading-none">{order.snapshotCliente.telefono || "—"}</p>
                     </div>
-                    {order.customerSnapshot.documentNumber && (
+                    {order.snapshotCliente.numeroDocumento && (
                       <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-white/5">
-                        <p className="text-[10px] text-slate-500 uppercase font-black mb-1">{order.customerSnapshot.documentType || "ID"}</p>
-                        <p className="text-slate-200 text-sm font-bold leading-none">{order.customerSnapshot.documentNumber}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-black mb-1">{order.snapshotCliente.tipoDocumento || "ID"}</p>
+                        <p className="text-slate-200 text-sm font-bold leading-none">{order.snapshotCliente.numeroDocumento}</p>
                       </div>
                     )}
                   </div>
@@ -400,42 +400,42 @@ export default function VerificarPagoPage() {
                     <div>
                       <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Ubicación / Punto</p>
                       <p className="text-slate-200 text-sm font-bold leading-tight">
-                        {order.deliverySnapshot?.address || order.deliverySnapshot?.pickupPoint || "No especificado"}
+                        {order.snapshotEntrega?.direccion || order.snapshotEntrega?.puntoRecojo || "No especificado"}
                       </p>
                     </div>
-                    {order.deliverySnapshot?.scheduledAt && (
+                    {order.snapshotEntrega?.programadoPara && (
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Programado para</p>
-                        <p className="text-indigo-300 text-sm font-bold">{order.deliverySnapshot.scheduledAt}</p>
+                        <p className="text-indigo-300 text-sm font-bold">{order.snapshotEntrega.programadoPara}</p>
                       </div>
                     )}
                   </div>
                   <div className="space-y-4">
-                    {order.deliverySnapshot?.department && (
+                    {order.snapshotEntrega?.departamento && (
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Origen / Destino</p>
-                        <p className="text-slate-200 text-sm font-bold">{order.deliverySnapshot.department} {order.deliverySnapshot.city ? `• ${order.deliverySnapshot.city}` : ""}</p>
+                        <p className="text-slate-200 text-sm font-bold">{order.snapshotEntrega.departamento} {order.snapshotEntrega.ciudad ? `• ${order.snapshotEntrega.ciudad}` : ""}</p>
                       </div>
                     )}
-                    {order.deliverySnapshot?.shippingCompany && (
+                    {order.snapshotEntrega?.empresaEnvio && (
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Transportadora</p>
-                        <p className="text-slate-200 text-sm font-bold">{order.deliverySnapshot.shippingCompany}</p>
+                        <p className="text-slate-200 text-sm font-bold">{order.snapshotEntrega.empresaEnvio}</p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {order.deliverySnapshot?.recipientName && (
+                {order.snapshotEntrega?.nombreDestinatario && (
                   <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/20">
                     <p className="text-[10px] text-indigo-400 uppercase font-black mb-2">Datos de Recepción</p>
-                    <p className="text-slate-300 text-sm underline decoration-indigo-500/50 underline-offset-4">{order.deliverySnapshot.recipientName}</p>
+                    <p className="text-slate-300 text-sm underline decoration-indigo-500/50 underline-offset-4">{order.snapshotEntrega.nombreDestinatario}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                       {order.deliverySnapshot.senderCI && (
-                         <p className="text-slate-500 text-xs">🪪 CI: <span className="text-slate-300 font-medium">{order.deliverySnapshot.senderCI}</span></p>
+                       {order.snapshotEntrega.ciRemitente && (
+                         <p className="text-slate-500 text-xs">🪪 CI: <span className="text-slate-300 font-medium">{order.snapshotEntrega.ciRemitente}</span></p>
                        )}
-                       {order.deliverySnapshot.senderPhone && (
-                         <p className="text-slate-500 text-xs">📞 Tel: <span className="text-slate-300 font-medium">{order.deliverySnapshot.senderPhone}</span></p>
+                       {order.snapshotEntrega.telefonoRemitente && (
+                         <p className="text-slate-500 text-xs">📞 Tel: <span className="text-slate-300 font-medium">{order.snapshotEntrega.telefonoRemitente}</span></p>
                        )}
                     </div>
                   </div>
@@ -444,13 +444,13 @@ export default function VerificarPagoPage() {
             </div>
 
             {/* Notes Section */}
-            {order.notes && (
+            {order.notas && (
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-3xl p-6 relative">
                  <div className="absolute -top-3 left-6 px-3 bg-slate-900 border border-amber-500/30 rounded-full">
                   <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Notas del Cliente</span>
                  </div>
                  <p className="text-amber-200/80 text-sm italic py-2">
-                   &quot;{order.notes}&quot;
+                   &quot;{order.notas}&quot;
                  </p>
               </div>
             )}
@@ -461,7 +461,7 @@ export default function VerificarPagoPage() {
               <div className="grid grid-cols-2 gap-4 text-[10px] font-mono text-slate-500">
                 <p>ORDER_ID: <span className="text-slate-400">{order._id}</span></p>
                 <p>PAYMENT_ID: <span className="text-slate-400">{payment._id}</span></p>
-                <p>CHANNEL: <span className="text-slate-400">{order.channel}</span></p>
+                <p>CHANNEL: <span className="text-slate-400">{order.canal}</span></p>
                 <p>METHOD: <span className="text-slate-400">{payment.metodoPago}</span></p>
               </div>
             </div>

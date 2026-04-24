@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { Order, OrderItem } from "@/types/order";
+import type { Pedido, PedidoItem } from "@/types/pedido";
 import { 
   ORDER_STATUS_LABELS, 
   PAYMENT_STATUS_LABELS, 
@@ -10,19 +10,19 @@ import {
 } from "@/constants/statusLabels";
 
 interface OrderDetailModalProps {
-  order: Order;
+  Pedido: Pedido;
   onClose: () => void;
 }
 
-export default function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
-  if (!order) return null;
+export default function OrderDetailModal({ Pedido, onClose }: OrderDetailModalProps) {
+  if (!Pedido) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800">
         <div className="sticky top-0 bg-white dark:bg-slate-900 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center z-10">
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-            Detalles del Pedido: <span className="text-indigo-600 dark:text-indigo-400">{order.orderNumber}</span>
+            Detalles del Pedido: <span className="text-indigo-600 dark:text-indigo-400">{Pedido.numeroPedido}</span>
           </h2>
           <button
             onClick={onClose}
@@ -41,13 +41,13 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Información del Cliente</h3>
               <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl space-y-2">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">
-                  {order.customerSnapshot?.fullname || "Anónimo"}
+                  {Pedido.snapshotCliente?.nombreCompleto || "Anónimo"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  📞 {order.customerSnapshot?.phone || "Sin teléfono"}
+                  📞 {Pedido.snapshotCliente?.telefono || "Sin teléfono"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  📧 {order.customerSnapshot?.email || "Sin email registrado"}
+                  📧 {Pedido.snapshotCliente?.email || "Sin email registrado"}
                 </p>
               </div>
             </section>
@@ -58,7 +58,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Método</p>
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {DELIVERY_METHOD_LABELS[order.deliverySnapshot?.method ?? ""] || order.deliverySnapshot?.method || "—"}
+                    {DELIVERY_METHOD_LABELS[Pedido.snapshotEntrega?.metodo ?? ""] || Pedido.snapshotEntrega?.metodo || "—"}
                   </p>
                 </div>
 
@@ -66,38 +66,38 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                   <div>
                     <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Ubicación / Dirección</p>
                     <p className="text-xs text-slate-600 dark:text-slate-300">
-                      {order.deliverySnapshot?.address || order.deliverySnapshot?.pickupPoint || "No especificado"}
+                      {Pedido.snapshotEntrega?.direccion || Pedido.snapshotEntrega?.puntoRecojo || "No especificado"}
                     </p>
-                    {order.deliverySnapshot?.department && (
-                      <p className="text-[10px] text-slate-500 mt-0.5">{order.deliverySnapshot.department} {order.deliverySnapshot.city ? `• ${order.deliverySnapshot.city}` : ""}</p>
+                    {Pedido.snapshotEntrega?.departamento && (
+                      <p className="text-[10px] text-slate-500 mt-0.5">{Pedido.snapshotEntrega.departamento} {Pedido.snapshotEntrega.ciudad ? `• ${Pedido.snapshotEntrega.ciudad}` : ""}</p>
                     )}
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Programación</p>
                     <p className="text-xs text-slate-600 dark:text-slate-300">
-                      {order.deliverySnapshot?.scheduledAt || "No agendado"}
+                      {Pedido.snapshotEntrega?.programadoPara || "No agendado"}
                     </p>
                   </div>
                 </div>
 
-                {(order.deliverySnapshot?.recipientName || order.deliverySnapshot?.senderPhone || order.deliverySnapshot?.senderCI) && (
+                {(Pedido.snapshotEntrega?.nombreDestinatario || Pedido.snapshotEntrega?.telefonoRemitente || Pedido.snapshotEntrega?.ciRemitente) && (
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-700 mt-1">
                     <p className="text-[10px] text-indigo-600 dark:text-indigo-400 uppercase font-bold mb-1">Datos de Recepción / Envío</p>
                     <div className="space-y-1">
-                      {order.deliverySnapshot?.recipientName && (
+                      {Pedido.snapshotEntrega?.nombreDestinatario && (
                         <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                          👤 {order.deliverySnapshot.recipientName}
+                          👤 {Pedido.snapshotEntrega.nombreDestinatario}
                         </p>
                       )}
                       <div className="flex gap-4">
-                        {order.deliverySnapshot?.senderCI && (
+                        {Pedido.snapshotEntrega?.ciRemitente && (
                           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            🪪 CI: <span className="text-slate-700 dark:text-slate-200 font-medium">{order.deliverySnapshot.senderCI}</span>
+                            🪪 CI: <span className="text-slate-700 dark:text-slate-200 font-medium">{Pedido.snapshotEntrega.ciRemitente}</span>
                           </p>
                         )}
-                        {order.deliverySnapshot?.senderPhone && (
+                        {Pedido.snapshotEntrega?.telefonoRemitente && (
                           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            📞 Tel: <span className="text-slate-700 dark:text-slate-200 font-medium">{order.deliverySnapshot.senderPhone}</span>
+                            📞 Tel: <span className="text-slate-700 dark:text-slate-200 font-medium">{Pedido.snapshotEntrega.telefonoRemitente}</span>
                           </p>
                         )}
                       </div>
@@ -105,10 +105,10 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                   </div>
                 )}
                 
-                {order.deliverySnapshot?.shippingCompany && (
+                {Pedido.snapshotEntrega?.empresaEnvio && (
                   <div className="pt-1">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Transportadora</p>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">{order.deliverySnapshot.shippingCompany} {order.deliverySnapshot.branch ? `(${order.deliverySnapshot.branch})` : ""}</p>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">{Pedido.snapshotEntrega.empresaEnvio} {Pedido.snapshotEntrega.sucursal ? `(${Pedido.snapshotEntrega.sucursal})` : ""}</p>
                   </div>
                 )}
               </div>
@@ -129,7 +129,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {order.items?.map((item: OrderItem, idx: number) => (
+                  {Pedido.items?.map((item: PedidoItem, idx: number) => (
                     <tr key={idx} className="text-slate-700 dark:text-slate-300">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -167,7 +167,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                   <tr>
                     <td colSpan={3} className="px-4 py-3 text-right font-semibold text-slate-500 uppercase tracking-tight">Total Pedido</td>
                     <td className="px-4 py-3 text-right font-bold text-lg text-indigo-600 dark:text-indigo-400 tabular-nums">
-                      Bs {order.total?.toFixed(2)}
+                      Bs {Pedido.total?.toFixed(2)}
                     </td>
                   </tr>
                 </tfoot>
@@ -179,27 +179,27 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
           <section className="bg-amber-50 dark:bg-indigo-900/10 border border-amber-200 dark:border-indigo-500/20 p-4 rounded-xl">
             <h4 className="text-xs font-bold text-amber-800 dark:text-indigo-300 uppercase mb-2">Resumen Operativo</h4>
             <div className="grid grid-cols-2 gap-4 text-xs text-amber-700 dark:text-indigo-200">
-              <p>📌 Estado: <span className="font-bold">{ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus}</span></p>
-              <p>💰 Pago: <span className="font-bold">{PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}</span></p>
-              <p>📦 Fulfillment: <span className="font-bold">{FULFILLMENT_STATUS_LABELS[order.fulfillmentStatus] || order.fulfillmentStatus}</span></p>
-              <p>🗓️ Creado: <span>{new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(order.createdAt))}</span></p>
+              <p>📌 Estado: <span className="font-bold">{ORDER_STATUS_LABELS[Pedido.estadoPedido] || Pedido.estadoPedido}</span></p>
+              <p>💰 Pago: <span className="font-bold">{PAYMENT_STATUS_LABELS[Pedido.estadoPago] || Pedido.estadoPago}</span></p>
+              <p>📦 Fulfillment: <span className="font-bold">{FULFILLMENT_STATUS_LABELS[Pedido.estadoEntrega] || Pedido.estadoEntrega}</span></p>
+              <p>🗓️ Creado: <span>{new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(Pedido.createdAt))}</span></p>
             </div>
           </section>
 
-          {(order.notes || order.cancelReason) && (
+          {(Pedido.notas || Pedido.motivoCancelacion) && (
             <section className="space-y-4">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Observaciones y Notas</h3>
               <div className="grid grid-cols-1 gap-4">
-                {order.notes && (
+                {Pedido.notas && (
                   <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 p-4 rounded-xl">
                     <p className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase mb-1">Notas del Cliente</p>
-                    <p className="text-sm text-blue-700 dark:text-blue-200 italic">&quot;{order.notes}&quot;</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-200 italic">&quot;{Pedido.notas}&quot;</p>
                   </div>
                 )}
-                {order.cancelReason && (
+                {Pedido.motivoCancelacion && (
                   <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-500/20 p-4 rounded-xl">
                     <p className="text-[10px] font-bold text-red-800 dark:text-red-300 uppercase mb-1">Motivo de Cancelación / Rechazo</p>
-                    <p className="text-sm text-red-700 dark:text-red-200">{order.cancelReason}</p>
+                    <p className="text-sm text-red-700 dark:text-red-200">{Pedido.motivoCancelacion}</p>
                   </div>
                 )}
               </div>

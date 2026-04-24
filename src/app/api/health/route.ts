@@ -7,7 +7,7 @@ export async function GET() {
     const mongo = await getMongoRuntimeInfo({ refresh: true });
 
     return NextResponse.json({
-      status:
+      estado:
         mongo.connected && mongo.transactionsSupported ? "ok" : "degraded",
       timestamp: new Date().toISOString(),
       services: {

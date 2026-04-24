@@ -9,7 +9,7 @@ export interface InventarioItem {
   } | null;
 
   variante: {
-    variantId?: string;
+    varianteId?: string;
     color: string;
     colorSecundario?: string;
     talla: string;
@@ -32,7 +32,7 @@ export interface InventarioItem {
   referencia?: string;
 
   usuario?: {
-    fullname: string;
+    nombreCompleto: string;
     email: string;
   };
 

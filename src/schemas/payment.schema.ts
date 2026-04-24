@@ -15,22 +15,22 @@ const optionalTrimmedString = (max: number) =>
   );
 
 export const createPaymentTransactionSchema = z.object({
-  orderId: objectIdSchema,
+  pedidoId: objectIdSchema,
   metodoPago: metodoPagoSchema,
   idempotencyKey: optionalTrimmedString(100),
-  externalReference: optionalTrimmedString(150),
+  referenciaExterna: optionalTrimmedString(150),
 });
 
 export const confirmPaymentSchema = z.object({
-  externalReference: optionalTrimmedString(150),
+  referenciaExterna: optionalTrimmedString(150),
 });
 
 export const failPaymentSchema = z.object({
-  reason: optionalTrimmedString(250),
+  motivo: optionalTrimmedString(250),
 });
 
 export const refundPaymentSchema = z.object({
-  reason: optionalTrimmedString(250),
+  motivo: optionalTrimmedString(250),
 });
 
 export type CreatePaymentTransactionInput = z.infer<

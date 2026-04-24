@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { releaseExpiredReservations } from "@/modules/orders/application/orders.service";
+import { releaseExpiredReservations } from "@/modules/orders/application/pedidos.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export async function POST(request: Request) {

@@ -33,10 +33,10 @@ export default function UsuarioModal({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(Schema) as any,
     defaultValues: {
-      fullname: "",
+      nombreCompleto: "",
       email: "",
-      role: "VENDEDOR",
-      isActive: true,
+      rol: "VENDEDOR",
+      estaActivo: true,
       password: "",
     },
   });
@@ -45,18 +45,18 @@ export default function UsuarioModal({
     if (open) {
       if (initialData) {
         reset({
-          fullname: initialData.fullname,
+          nombreCompleto: initialData.nombreCompleto,
           email: initialData.email,
-          role: initialData.role,
-          isActive: initialData.isActive,
+          rol: initialData.rol,
+          estaActivo: initialData.estaActivo,
           password: "",
         });
       } else {
         reset({
-          fullname: "",
+          nombreCompleto: "",
           email: "",
-          role: "VENDEDOR",
-          isActive: true,
+          rol: "VENDEDOR",
+          estaActivo: true,
           password: "",
         });
       }
@@ -82,13 +82,13 @@ export default function UsuarioModal({
         {/* Nombre */}
         <div className="mb-4">
           <input
-            {...register("fullname")}
+            {...register("nombreCompleto")}
             className="input w-full"
             placeholder="Nombre completo"
           />
-          {errors.fullname && (
+          {errors.nombreCompleto && (
             <p className="text-xs text-red-400 mt-1">
-              {errors.fullname.message}
+              {errors.nombreCompleto.message}
             </p>
           )}
         </div>
@@ -125,16 +125,16 @@ export default function UsuarioModal({
         {/* Rol */}
         <div className="mb-4">
           <select
-            {...register("role")}
+            {...register("rol")}
             className="input w-full"
           >
             <option value="ADMIN">ADMIN</option>
             <option value="VENDEDOR">VENDEDOR</option>
             <option value="CLIENTE">CLIENTE</option>
           </select>
-          {errors.role && (
+          {errors.rol && (
             <p className="text-xs text-red-400 mt-1">
-              {errors.role.message}
+              {errors.rol.message}
             </p>
           )}
         </div>
@@ -144,7 +144,7 @@ export default function UsuarioModal({
           <label className="flex items-center gap-2 text-sm text-gray-300">
             <input
               type="checkbox"
-              {...register("isActive")}
+              {...register("estaActivo")}
               className="rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500"
             />
             Usuario activo

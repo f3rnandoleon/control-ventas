@@ -1,21 +1,21 @@
 import type { ClientSession } from "mongoose";
 import { connectDB } from "@/libs/mongodb";
-import AuditEvent from "@/models/auditEvent";
+import AuditEvent from "@/models/eventoAuditoria";
 import { logError } from "@/shared/observability/logger";
 
-export type AuditStatus = "SUCCESS" | "FAILED";
+export type EstadoAuditoria = "SUCCESS" | "FAILED";
 export type AuditActorRole = "ADMIN" | "VENDEDOR" | "CLIENTE" | "SYSTEM";
 
 type RecordAuditEventInput = {
   requestId?: string | null;
-  action: string;
-  entityType: string;
-  entityId?: string | null;
-  actorId?: string | null;
-  actorRole?: AuditActorRole | null;
-  status: AuditStatus;
+  accion: string;
+  tipoEntidad: string;
+  idEntidad?: string | null;
+  idActor?: string | null;
+  rolActor?: AuditActorRole | null;
+  estado: EstadoAuditoria;
   metadata?: Record<string, unknown>;
-  errorMessage?: string | null;
+  mensajeError?: string | null;
 };
 
 export async function recordAuditEvent(
@@ -28,14 +28,14 @@ export async function recordAuditEvent(
     [
       {
         requestId: input.requestId || null,
-        action: input.action,
-        entityType: input.entityType,
-        entityId: input.entityId || null,
-        actorId: input.actorId || null,
-        actorRole: input.actorRole || null,
-        status: input.status,
+        accion: input.accion,
+        tipoEntidad: input.tipoEntidad,
+        idEntidad: input.idEntidad || null,
+        idActor: input.idActor || null,
+        rolActor: input.rolActor || null,
+        estado: input.estado,
         metadata: input.metadata || {},
-        errorMessage: input.errorMessage || null,
+        mensajeError: input.mensajeError || null,
       },
     ],
     session ? { session } : {}
@@ -53,9 +53,9 @@ export async function recordAuditEventSafe(
       message: "No se pudo registrar el evento de auditoria",
       context: "audit.service",
       data: {
-        action: input.action,
-        entityType: input.entityType,
-        entityId: input.entityId || null,
+        accion: input.accion,
+        tipoEntidad: input.tipoEntidad,
+        idEntidad: input.idEntidad || null,
       },
       error,
     });
@@ -68,7 +68,7 @@ export async function listAuditEvents(limit = 50) {
   await connectDB();
 
   return AuditEvent.find()
-    .populate("actorId", "fullname email role")
+    .populate("idActor", "nombreCompleto email rol")
     .sort({ createdAt: -1 })
     .limit(limit);
 }

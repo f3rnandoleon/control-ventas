@@ -10,7 +10,7 @@ const optionalPerfilPasswordSchema = z
   .transform((value) => (value === "" ? undefined : value));
 
 export const updatePerfilSchema = z.object({
-  fullname: nonEmptyStringSchema
+  nombreCompleto: nonEmptyStringSchema
     .min(3, "El nombre completo debe tener al menos 3 caracteres")
     .max(100, "El nombre completo no puede exceder 100 caracteres"),
   email: emailSchema,

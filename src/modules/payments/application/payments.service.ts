@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
-import Order from "@/models/order";
-import Producto from "@/models/product";
-import Venta from "@/models/venta";
+import Pedido from "@/models/pedido";
+import Producto from "@/models/producto";
 import {
   consumeReservedStockForOrder,
   recordInventoryMovement,
@@ -11,7 +10,7 @@ import {
 import { syncFulfillmentForOrder } from "@/modules/fulfillment/application/fulfillment.service";
 import { paymentsRepository } from "@/modules/payments/infrastructure/payments.repository";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
-import { findVariantByIdentity } from "@/utils/variantIdentity";
+import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import type {
   ConfirmPaymentInput,
   CreatePaymentTransactionInput,
@@ -24,7 +23,7 @@ import { runInTransaction } from "@/shared/db/runTransaction";
 
 type AuthActor = {
   id: string;
-  role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+  rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
 };
 
 function assertObjectId(value: string, message: string) {
@@ -37,8 +36,8 @@ function createPaymentNumber() {
   return `P-${Date.now()}`;
 }
 
-function createDirectSalePaymentIdempotencyKey(orderId: string) {
-  return `direct-sale-payment-${orderId}`;
+function createDirectSalePaymentIdempotencyKey(pedidoId: string) {
+  return `direct-sale-payment-${pedidoId}`;
 }
 
 export async function createImmediatePaidPaymentForOrder(
@@ -62,59 +61,55 @@ export async function createImmediatePaidPaymentForOrder(
 
   return paymentsRepository.create(
     {
-      paymentNumber: createPaymentNumber(),
-      orderId: input.orderId,
-      customer: input.customerId || null,
+      numeroPago: createPaymentNumber(),
+      pedidoId: input.orderId,
+      cliente: input.customerId || null,
       metodoPago: input.metodoPago,
-      amount: input.amount,
-      status: "PAID",
+      monto: input.amount,
+      estado: "PAID",
       idempotencyKey: createDirectSalePaymentIdempotencyKey(input.orderId),
-      externalReference: input.externalReference || null,
-      confirmedAt: new Date(),
-      failedAt: null,
-      refundedAt: null,
-      failureReason: null,
+      referenciaExterna: input.externalReference || null,
+      confirmadoEn: new Date(),
+      falladoEn: null,
+      reembolsadoEn: null,
+      motivoFallo: null,
     },
     session
   );
 }
 
-async function getOrderForPayment(
-  orderId: string,
+async function getPedidoForPayment(
+  pedidoId: string,
   session?: mongoose.ClientSession
 ) {
-  const order = await Order.findById(orderId).session(session ?? null);
+  const pedido = await Pedido.findById(pedidoId).session(session ?? null);
 
-  if (!order) {
+  if (!pedido) {
     throw new AppError("Pedido no encontrado", 404);
   }
 
-  return order;
+  return pedido;
 }
 
-function assertOrderAccess(actor: AuthActor, order: { customer?: mongoose.Types.ObjectId | null }) {
+function assertPedidoAccess(actor: AuthActor, pedido: { cliente?: mongoose.Types.ObjectId | null }) {
   if (
-    actor.role === "CLIENTE" &&
-    order.customer?.toString() !== actor.id
+    actor.rol === "CLIENTE" &&
+    pedido.cliente?.toString() !== actor.id
   ) {
     throw new AppError("No autorizado", 403);
   }
 }
 
-async function createSaleFromOrderIfNeeded(
-  order: InstanceType<typeof Order>,
+async function consumeStockForPedido(
+  pedido: InstanceType<typeof Pedido>,
   actor: AuthActor,
   session?: mongoose.ClientSession
 ) {
-  if (order.sourceSaleId) {
-    return Venta.findById(order.sourceSaleId).session(session ?? null);
+  if (pedido.estadoReservaStock === "CONSUMED") {
+    return;
   }
 
-  let subtotal = 0;
-  let gananciaTotal = 0;
-  const itemsProcesados: Array<Record<string, unknown>> = [];
-
-  for (const item of order.items) {
+  for (const item of pedido.items) {
     const producto = await Producto.findById(item.productoId).session(
       session ?? null
     );
@@ -124,7 +119,7 @@ async function createSaleFromOrderIfNeeded(
     }
 
     const variante = findVariantByIdentity(producto.variantes as Variante[], {
-      variantId: item.variante.variantId,
+      varianteId: item.variante.varianteId,
       color: item.variante.color,
       colorSecundario: item.variante.colorSecundario,
       talla: item.variante.talla,
@@ -140,61 +135,23 @@ async function createSaleFromOrderIfNeeded(
         variante,
         cantidad: item.cantidad,
         userId: actor.id,
-        motivo: "Venta web confirmada",
+        motivo: "Pedido web confirmado",
         referencia: "ORDER_PAYMENT_CONFIRM",
       },
       session
     );
-
-    subtotal += item.precioUnitario * item.cantidad;
-    gananciaTotal += (item.precioUnitario - producto.precioCosto) * item.cantidad;
-
-    itemsProcesados.push({
-      productoId: item.productoId,
-      variante: item.variante,
-      productoSnapshot: item.productoSnapshot,
-      cantidad: item.cantidad,
-      precioUnitario: item.precioUnitario,
-      precioCosto: producto.precioCosto,
-      ganancia: (item.precioUnitario - producto.precioCosto) * item.cantidad,
-    });
   }
 
-  const venta = await Venta.create(
-    [
-      {
-        numeroVenta: `V-${Date.now()}`,
-        items: itemsProcesados,
-        subtotal,
-        descuento: order.descuento,
-        total: order.total,
-        gananciaTotal,
-        metodoPago: order.metodoPago,
-        tipoVenta: order.channel,
-        estado: "PAGADA",
-        cliente: order.customer || null,
-        vendedor: order.seller || null,
-        delivery: order.deliverySnapshot || undefined,
-      },
-    ],
-    session ? { session } : {}
-  ).then(([createdVenta]) => createdVenta);
-
-  order.sourceSaleId = venta._id;
-  order.sourceSaleNumber = venta.numeroVenta;
-  order.stockReservationStatus = "CONSUMED";
-  order.reservedAt = null;
-  order.reservationExpiresAt = null;
-  await order.save(session ? { session } : undefined);
-
-  return venta;
+  pedido.estadoReservaStock = "CONSUMED";
+  pedido.reservadoEn = null;
+  pedido.reservaExpiraEn = null;
 }
 
 export async function createPaymentTransaction(
   actor: AuthActor,
   input: CreatePaymentTransactionInput
 ) {
-  assertObjectId(input.orderId, "Pedido invalido");
+  assertObjectId(input.pedidoId, "ID de pedido invalido");
   await connectDB();
 
   return runInTransaction(async (session) => {
@@ -209,12 +166,12 @@ export async function createPaymentTransaction(
       }
     }
 
-    const order = await getOrderForPayment(input.orderId, session);
-    assertOrderAccess(actor, order);
+    const pedido = await getPedidoForPayment(input.pedidoId, session);
+    assertPedidoAccess(actor, pedido);
 
     if (
-      order.stockReservationStatus === "RELEASED" &&
-      order.paymentStatus !== "PAID"
+      pedido.estadoReservaStock === "RELEASED" &&
+      pedido.estadoPago !== "PAID"
     ) {
       throw new AppError(
         "La reserva de stock de este pedido ya no esta activa",
@@ -223,7 +180,7 @@ export async function createPaymentTransaction(
     }
 
     const paidPayment = await paymentsRepository.findLatestPaidByOrder(
-      input.orderId,
+      input.pedidoId,
       session
     );
 
@@ -232,13 +189,13 @@ export async function createPaymentTransaction(
     }
 
     const paymentPayload: Record<string, unknown> = {
-      paymentNumber: createPaymentNumber(),
-      orderId: order._id,
-      customer: order.customer || null,
+      numeroPago: createPaymentNumber(),
+      pedidoId: pedido._id,
+      cliente: pedido.cliente || null,
       metodoPago: input.metodoPago,
-      amount: order.total,
-      status: "PENDING",
-      externalReference: input.externalReference || null,
+      monto: pedido.total,
+      estado: "PENDING",
+      referenciaExterna: input.referenciaExterna || null,
     };
 
     if (input.idempotencyKey) {
@@ -249,15 +206,15 @@ export async function createPaymentTransaction(
 
     await recordAuditEventSafe(
       {
-        action: "PAYMENT_CREATED",
-        entityType: "PAYMENT",
-        entityId: payment._id.toString(),
-        actorId: actor.id,
-        actorRole: actor.role,
-        status: "SUCCESS",
+        accion: "PAYMENT_CREATED",
+        tipoEntidad: "PAYMENT",
+        idEntidad: payment._id.toString(),
+        idActor: actor.id,
+        rolActor: actor.rol,
+        estado: "SUCCESS",
         metadata: {
-          orderId: order._id.toString(),
-          amount: payment.amount,
+          orderId: pedido._id.toString(),
+          monto: payment.monto,
           metodoPago: payment.metodoPago,
         },
       },
@@ -283,63 +240,59 @@ export async function confirmPaymentTransaction(
       throw new AppError("Pago no encontrado", 404);
     }
 
-    const order = await getOrderForPayment(payment.orderId.toString(), session);
-    assertOrderAccess(actor, order);
+    const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
+    assertPedidoAccess(actor, pedido);
 
     if (
-      order.orderStatus === "CANCELLED" &&
-      order.stockReservationStatus === "RELEASED"
+      pedido.estadoPedido === "CANCELLED" &&
+      pedido.estadoReservaStock === "RELEASED"
     ) {
       throw new AppError("La reserva de stock de este pedido ya expiro", 409);
     }
 
-    if (payment.status === "REFUNDED") {
+    if (payment.estado === "REFUNDED") {
       throw new AppError("El pago ya fue reembolsado", 400);
     }
 
-    const venta = await createSaleFromOrderIfNeeded(order, actor, session);
+    await consumeStockForPedido(pedido, actor, session);
 
-    if (payment.status !== "PAID") {
-      payment.status = "PAID";
-      payment.confirmedAt = new Date();
-      payment.failedAt = null;
-      payment.failureReason = null;
-      if (input.externalReference) {
-        payment.externalReference = input.externalReference;
+    if (payment.estado !== "PAID") {
+      payment.estado = "PAID";
+      payment.confirmadoEn = new Date();
+      payment.falladoEn = null;
+      payment.motivoFallo = null;
+      if (input.referenciaExterna) {
+        payment.referenciaExterna = input.referenciaExterna;
       }
       await payment.save({ session });
     }
 
-    order.paymentStatus = "PAID";
-    order.orderStatus = "CONFIRMED";
-    order.stockReservationStatus = "CONSUMED";
-    order.reservedAt = null;
-    order.reservationExpiresAt = null;
-    if (order.fulfillmentStatus === "CANCELLED") {
-      order.fulfillmentStatus = order.deliverySnapshot?.method
+    pedido.estadoPago = "PAID";
+    pedido.estadoPedido = "CONFIRMED";
+    if (pedido.estadoEntrega === "CANCELLED") {
+      pedido.estadoEntrega = pedido.snapshotEntrega?.metodo
         ? "PENDING"
         : "NOT_APPLICABLE";
     }
-    await order.save({ session });
-    await syncFulfillmentForOrder(order, session);
+    await pedido.save({ session });
+    await syncFulfillmentForOrder(pedido, session);
 
     await recordAuditEventSafe(
       {
-        action: "PAYMENT_CONFIRMED",
-        entityType: "PAYMENT",
-        entityId: payment._id.toString(),
-        actorId: actor.id,
-        actorRole: actor.role,
-        status: "SUCCESS",
+        accion: "PAYMENT_CONFIRMED",
+        tipoEntidad: "PAYMENT",
+        idEntidad: payment._id.toString(),
+        idActor: actor.id,
+        rolActor: actor.rol,
+        estado: "SUCCESS",
         metadata: {
-          orderId: order._id.toString(),
-          saleId: venta?._id?.toString() || null,
+          orderId: pedido._id.toString(),
         },
       },
       session
     );
 
-    return { payment, order, venta };
+    return { payment, order: pedido };
   });
 }
 
@@ -358,11 +311,11 @@ export async function failPaymentTransaction(
       throw new AppError("Pago no encontrado", 404);
     }
 
-    const order = await getOrderForPayment(payment.orderId.toString(), session);
-    assertOrderAccess(actor, order);
+    const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
+    assertPedidoAccess(actor, pedido);
 
-    if (order.stockReservationStatus === "RESERVED") {
-      for (const item of order.items) {
+    if (pedido.estadoReservaStock === "RESERVED") {
+      for (const item of pedido.items) {
         const producto = await Producto.findById(item.productoId).session(
           session
         );
@@ -372,7 +325,7 @@ export async function failPaymentTransaction(
         }
 
         const variante = findVariantByIdentity(producto.variantes as Variante[], {
-          variantId: item.variante.variantId,
+          varianteId: item.variante.varianteId,
           color: item.variante.color,
           colorSecundario: item.variante.colorSecundario,
           talla: item.variante.talla,
@@ -393,38 +346,38 @@ export async function failPaymentTransaction(
       }
     }
 
-    payment.status = "FAILED";
-    payment.failedAt = new Date();
-    payment.failureReason = input.reason || null;
+    payment.estado = "FAILED";
+    payment.falladoEn = new Date();
+    payment.motivoFallo = input.motivo || "Pago fallido";
     await payment.save({ session });
 
-    order.paymentStatus = "FAILED";
-    order.orderStatus = "CANCELLED";
-    order.fulfillmentStatus = "CANCELLED";
-    order.stockReservationStatus = "RELEASED";
-    order.reservedAt = null;
-    order.reservationExpiresAt = null;
-    (order as { cancelReason?: string | null }).cancelReason = input.reason || "Pago fallido";
-    await order.save({ session });
-    await syncFulfillmentForOrder(order, session);
+    pedido.estadoPago = "FAILED";
+    pedido.estadoPedido = "CANCELLED";
+    pedido.estadoEntrega = "CANCELLED";
+    pedido.estadoReservaStock = "RELEASED";
+    pedido.reservadoEn = null;
+    pedido.reservaExpiraEn = null;
+    pedido.motivoCancelacion = input.motivo || "Pago fallido";
+    await pedido.save({ session });
+    await syncFulfillmentForOrder(pedido, session);
 
     await recordAuditEventSafe(
       {
-        action: "PAYMENT_FAILED",
-        entityType: "PAYMENT",
-        entityId: payment._id.toString(),
-        actorId: actor.id,
-        actorRole: actor.role,
-        status: "SUCCESS",
+        accion: "PAYMENT_FAILED",
+        tipoEntidad: "PAYMENT",
+        idEntidad: payment._id.toString(),
+        idActor: actor.id,
+        rolActor: actor.rol,
+        estado: "SUCCESS",
         metadata: {
-          orderId: order._id.toString(),
-          reason: input.reason || null,
+          orderId: pedido._id.toString(),
+          reason: input.motivo || null,
         },
       },
       session
     );
 
-    return { payment, order };
+    return { payment, order: pedido };
   });
 }
 
@@ -433,10 +386,6 @@ export async function refundPaymentTransaction(
   paymentId: string,
   input: RefundPaymentInput
 ) {
-  if (!["ADMIN", "VENDEDOR"].includes(actor.role)) {
-    throw new AppError("No autorizado", 403);
-  }
-
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
 
@@ -447,43 +396,28 @@ export async function refundPaymentTransaction(
       throw new AppError("Pago no encontrado", 404);
     }
 
-    const order = await getOrderForPayment(payment.orderId.toString(), session);
-
-    if (payment.status === "REFUNDED") {
-      return { payment, order, venta: null };
+    if (payment.estado !== "PAID") {
+      throw new AppError("Solo se pueden reembolsar pagos completados", 400);
     }
 
-    const venta = order.sourceSaleId
-      ? await Venta.findById(order.sourceSaleId).session(session)
-      : null;
+    const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
+    assertPedidoAccess(actor, pedido);
 
-    if (venta && venta.estado !== "CANCELADA") {
-      for (const item of venta.items) {
-        const producto = await Producto.findById(item.productoId).session(
-          session
-        );
+    // 1. Restaurar stock
+    for (const item of pedido.items) {
+      const producto = await Producto.findById(item.productoId).session(session);
+      if (!producto) continue;
 
-        if (!producto) {
-          continue;
-        }
+      const variante = findVariantByIdentity(producto.variantes as Variante[], {
+        varianteId: item.variante.varianteId,
+        color: item.variante.color,
+        colorSecundario: item.variante.colorSecundario,
+        talla: item.variante.talla,
+      });
 
-        const variante = findVariantByIdentity(producto.variantes as Variante[], {
-          variantId: item.variante.variantId,
-          color: item.variante.color,
-          colorSecundario: item.variante.colorSecundario,
-          talla: item.variante.talla,
-        });
-
-        if (!variante) {
-          continue;
-        }
-
+      if (variante) {
         const stockAnterior = variante.stock;
         variante.stock += item.cantidad;
-        producto.totalVendidos = Math.max(
-          0,
-          producto.totalVendidos - item.cantidad
-        );
         await producto.save({ session });
 
         await recordInventoryMovement(
@@ -494,50 +428,49 @@ export async function refundPaymentTransaction(
             cantidad: item.cantidad,
             stockAnterior,
             stockActual: variante.stock,
-            motivo: input.reason || "Reembolso de pedido",
+            motivo: input.motivo || "Reembolso de pedido",
             referencia: "ORDER_PAYMENT_REFUND",
             userId: actor.id,
           },
           session
         );
       }
-
-      venta.estado = "CANCELADA";
-      await venta.save({ session });
     }
 
-    payment.status = "REFUNDED";
-    payment.refundedAt = new Date();
-    payment.failureReason = input.reason || payment.failureReason || null;
+    payment.estado = "REFUNDED";
+    payment.reembolsadoEn = new Date();
+    if (input.motivo) {
+      payment.motivoFallo = `Reembolso: ${input.motivo}`;
+    }
     await payment.save({ session });
 
-    order.paymentStatus = "REFUNDED";
-    order.orderStatus = "CANCELLED";
-    order.fulfillmentStatus = "CANCELLED";
-    order.stockReservationStatus = "RELEASED";
-    order.reservedAt = null;
-    order.reservationExpiresAt = null;
-    await order.save({ session });
-    await syncFulfillmentForOrder(order, session);
+    pedido.estadoPago = "REFUNDED";
+    pedido.estadoPedido = "CANCELLED";
+    pedido.estadoEntrega = "CANCELLED";
+    pedido.estadoReservaStock = "RELEASED";
+    pedido.reservadoEn = null;
+    pedido.reservaExpiraEn = null;
+    pedido.motivoCancelacion = input.motivo || "Reembolsado";
+    await pedido.save({ session });
+    await syncFulfillmentForOrder(pedido, session);
 
     await recordAuditEventSafe(
       {
-        action: "PAYMENT_REFUNDED",
-        entityType: "PAYMENT",
-        entityId: payment._id.toString(),
-        actorId: actor.id,
-        actorRole: actor.role,
-        status: "SUCCESS",
+        accion: "PAYMENT_REFUNDED",
+        tipoEntidad: "PAYMENT",
+        idEntidad: payment._id.toString(),
+        idActor: actor.id,
+        rolActor: actor.rol,
+        estado: "SUCCESS",
         metadata: {
-          orderId: order._id.toString(),
-          saleId: venta?._id?.toString() || null,
-          reason: input.reason || null,
+          orderId: pedido._id.toString(),
+          motivo: input.motivo || null,
         },
       },
       session
     );
 
-    return { payment, order, venta };
+    return { payment, order: pedido };
   });
 }
 
@@ -548,30 +481,28 @@ export async function refundPaymentTransaction(
 export async function uploadComprobanteAndGenerateToken(
   paymentId: string,
   comprobanteUrl: string,
-  actorId: string
+  idActor: string
 ) {
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
 
   const payment = await paymentsRepository.findById(paymentId);
   if (!payment) throw new AppError("Pago no encontrado", 404);
-  if (payment.customer?.toString() !== actorId) throw new AppError("No autorizado", 403);
-  if (payment.status !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
+  if (payment.cliente?.toString() !== idActor) throw new AppError("No autorizado", 403);
+  if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
 
   const reviewToken = crypto.randomUUID();
-  payment.comprobanteUrl = comprobanteUrl;
-  payment.reviewToken = reviewToken;
-  payment.reviewTokenUsed = false;
+  payment.urlComprobante = comprobanteUrl;
+  payment.tokenRevision = reviewToken;
+  payment.tokenRevisionUsado = false;
   await payment.save();
 
-  // Pausar la expiración del pedido para darle tiempo al admin de revisar el comprobante
-  const order = await Order.findById(payment.orderId);
-  if (order && order.stockReservationStatus === "RESERVED") {
-    // Le damos 48 horas adicionales desde que subió el comprobante para que el Admin revise
+  const pedido = await Pedido.findById(payment.pedidoId);
+  if (pedido && pedido.estadoReservaStock === "RESERVED") {
     const extendedDate = new Date();
     extendedDate.setHours(extendedDate.getHours() + 48);
-    order.reservationExpiresAt = extendedDate;
-    await order.save();
+    pedido.reservaExpiraEn = extendedDate;
+    await pedido.save();
   }
 
   return { payment, reviewToken };
@@ -581,12 +512,12 @@ export async function getPaymentByReviewToken(token: string) {
   await connectDB();
   const payment = await paymentsRepository.findByReviewToken(token);
   if (!payment) throw new AppError("Link de verificacion invalido", 404);
-  if (payment.reviewTokenUsed) throw new AppError("Este link ya fue utilizado", 410);
-  const order = await Order.findById(payment.orderId)
-    .populate("customer", "fullname email")
+  if (payment.tokenRevisionUsado) throw new AppError("Este link ya fue utilizado", 410);
+  const pedido = await Pedido.findById(payment.pedidoId)
+    .populate("cliente", "nombreCompleto email")
     .lean();
-  if (!order) throw new AppError("Pedido no encontrado", 404);
-  return { payment, order };
+  if (!pedido) throw new AppError("Pedido no encontrado", 404);
+  return { payment, order: pedido };
 }
 
 export async function confirmPaymentByToken(token: string) {
@@ -594,20 +525,22 @@ export async function confirmPaymentByToken(token: string) {
   return runInTransaction(async (session) => {
     const payment = await paymentsRepository.findByReviewToken(token, session);
     if (!payment) throw new AppError("Link invalido", 404);
-    if (payment.reviewTokenUsed) throw new AppError("Este link ya fue utilizado", 410);
-    const order = await getOrderForPayment(payment.orderId.toString(), session);
-    if (order.orderStatus === "CANCELLED") throw new AppError("El pedido ya fue cancelado", 409);
-    const tokenActor: AuthActor = { id: "token-review", role: "ADMIN" };
-    const venta = await createSaleFromOrderIfNeeded(order, tokenActor, session);
-    payment.status = "PAID"; payment.confirmedAt = new Date(); payment.reviewTokenUsed = true;
+    if (payment.tokenRevisionUsado) throw new AppError("Este link ya fue utilizado", 410);
+    const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
+    if (pedido.estadoPedido === "CANCELLED") throw new AppError("El pedido ya fue cancelado", 409);
+    
+    const tokenActor: AuthActor = { id: "token-review", rol: "ADMIN" };
+    await consumeStockForPedido(pedido, tokenActor, session);
+
+    payment.estado = "PAID"; payment.confirmadoEn = new Date(); payment.tokenRevisionUsado = true;
     await payment.save({ session });
-    order.paymentStatus = "PAID"; order.orderStatus = "CONFIRMED";
-    order.stockReservationStatus = "CONSUMED"; order.reservedAt = null; order.reservationExpiresAt = null;
-    if (order.fulfillmentStatus !== "DELIVERED") order.fulfillmentStatus = "PENDING";
-    await order.save({ session });
-    await syncFulfillmentForOrder(order, session);
-    await recordAuditEventSafe({ action: "PAYMENT_CONFIRMED", entityType: "PAYMENT", entityId: payment._id.toString(), actorId: "TOKEN_REVIEW", actorRole: "ADMIN", status: "SUCCESS", metadata: { orderId: order._id.toString(), via: "review_token" } }, session);
-    return { payment, order, venta };
+    pedido.estadoPago = "PAID"; pedido.estadoPedido = "CONFIRMED";
+    
+    if (pedido.estadoEntrega !== "DELIVERED") pedido.estadoEntrega = "PENDING";
+    await pedido.save({ session });
+    await syncFulfillmentForOrder(pedido, session);
+    await recordAuditEventSafe({ accion: "PAYMENT_CONFIRMED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { orderId: pedido._id.toString(), via: "review_token" } }, session);
+    return { payment, order: pedido };
   });
 }
 
@@ -616,28 +549,28 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
   return runInTransaction(async (session) => {
     const payment = await paymentsRepository.findByReviewToken(token, session);
     if (!payment) throw new AppError("Link invalido", 404);
-    if (payment.reviewTokenUsed) throw new AppError("Este link ya fue utilizado", 410);
-    const order = await getOrderForPayment(payment.orderId.toString(), session);
-    if (order.stockReservationStatus === "RESERVED") {
-      for (const item of order.items) {
+    if (payment.tokenRevisionUsado) throw new AppError("Este link ya fue utilizado", 410);
+    const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
+    if (pedido.estadoReservaStock === "RESERVED") {
+      for (const item of pedido.items) {
         const producto = await Producto.findById(item.productoId).session(session);
         if (!producto) continue;
-        const variante = findVariantByIdentity(producto.variantes as Variante[], { variantId: item.variante.variantId, color: item.variante.color, colorSecundario: item.variante.colorSecundario, talla: item.variante.talla });
+        const variante = findVariantByIdentity(producto.variantes as Variante[], { varianteId: item.variante.varianteId, color: item.variante.color, colorSecundario: item.variante.colorSecundario, talla: item.variante.talla });
         if (!variante) continue;
         await releaseReservedStockForOrder({ producto, variante, cantidad: item.cantidad }, session);
       }
     }
-    payment.status = "FAILED"; payment.failedAt = new Date();
-    payment.failureReason = reason || "Comprobante rechazado"; payment.reviewTokenUsed = true;
+    payment.estado = "FAILED"; payment.falladoEn = new Date();
+    payment.motivoFallo = reason || "Comprobante rechazado"; payment.tokenRevisionUsado = true;
     await payment.save({ session });
-    order.paymentStatus = "FAILED"; order.orderStatus = "CANCELLED";
-    order.fulfillmentStatus = "CANCELLED"; order.stockReservationStatus = "RELEASED";
-    order.reservedAt = null; order.reservationExpiresAt = null;
-    (order as { cancelReason?: string | null }).cancelReason = reason || "Comprobante rechazado";
-    await order.save({ session });
-    await syncFulfillmentForOrder(order, session);
-    await recordAuditEventSafe({ action: "PAYMENT_FAILED", entityType: "PAYMENT", entityId: payment._id.toString(), actorId: "TOKEN_REVIEW", actorRole: "ADMIN", status: "SUCCESS", metadata: { orderId: order._id.toString(), via: "review_token", reason } }, session);
-    return { payment, order };
+    pedido.estadoPago = "FAILED"; pedido.estadoPedido = "CANCELLED";
+    pedido.estadoEntrega = "CANCELLED"; pedido.estadoReservaStock = "RELEASED";
+    pedido.reservadoEn = null; pedido.reservaExpiraEn = null;
+    pedido.motivoCancelacion = reason || "Comprobante rechazado";
+    await pedido.save({ session });
+    await syncFulfillmentForOrder(pedido, session);
+    await recordAuditEventSafe({ accion: "PAYMENT_FAILED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { orderId: pedido._id.toString(), via: "review_token", reason } }, session);
+    return { payment, order: pedido };
   });
 }
 
@@ -646,19 +579,19 @@ export async function confirmCashOrder(orderId: string, actor: AuthActor) {
   await connectDB();
 
   return runInTransaction(async (session) => {
-    const order = await getOrderForPayment(orderId, session);
+    const pedido = await getPedidoForPayment(orderId, session);
 
-    if (order.metodoPago !== "EFECTIVO") {
+    if (pedido.metodoPago !== "EFECTIVO") {
       throw new AppError("El pedido no es en efectivo", 400);
     }
 
-    if (order.paymentStatus === "PAID") {
+    if (pedido.estadoPago === "PAID") {
       throw new AppError("El pedido ya está pagado", 400);
     }
 
     if (
-      order.stockReservationStatus === "RELEASED" &&
-      order.paymentStatus !== "PAID"
+      pedido.estadoReservaStock === "RELEASED" &&
+      pedido.estadoPago !== "PAID"
     ) {
       throw new AppError(
         "La reserva de stock de este pedido ya no esta activa",
@@ -669,38 +602,36 @@ export async function confirmCashOrder(orderId: string, actor: AuthActor) {
     const payment = await createImmediatePaidPaymentForOrder(
       {
         orderId,
-        customerId: order.customer?.toString(),
+        customerId: pedido.cliente?.toString(),
         metodoPago: "EFECTIVO",
-        amount: order.total,
+        amount: pedido.total,
         externalReference: "CASH_PANEL_CONFIRM_BY_ADMIN",
       },
       session
     );
 
-    const venta = await createSaleFromOrderIfNeeded(order, actor, session);
+    await consumeStockForPedido(pedido, actor, session);
 
-    order.paymentStatus = "PAID";
-    order.orderStatus = "DELIVERED";
-    order.fulfillmentStatus = "DELIVERED";
-    order.stockReservationStatus = "CONSUMED";
-    await order.save({ session });
+    pedido.estadoPago = "PAID";
+    pedido.estadoPedido = "DELIVERED";
+    pedido.estadoEntrega = "DELIVERED";
+    await pedido.save({ session });
 
     await recordAuditEventSafe(
       {
-        action: "ORDER_PAYMENT_CONFIRMED_CASH",
-        entityType: "ORDER",
-        entityId: order._id.toString(),
-        actorId: actor.id,
-        actorRole: actor.role,
-        status: "SUCCESS",
+        accion: "ORDER_PAYMENT_CONFIRMED_CASH",
+        tipoEntidad: "ORDER",
+        idEntidad: pedido._id.toString(),
+        idActor: actor.id,
+        rolActor: actor.rol,
+        estado: "SUCCESS",
         metadata: {
           paymentId: payment._id.toString(),
-          saleId: venta._id.toString(),
         },
       },
       session
     );
 
-    return { order, payment, venta };
+    return { order: pedido, payment };
   });
 }

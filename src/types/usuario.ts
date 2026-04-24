@@ -1,41 +1,41 @@
-import type { CustomerAddress, CustomerProfile } from "@/types/customer";
+import type { DireccionCliente, PerfilCliente } from "@/types/cliente";
 
 export type UserRole = "ADMIN" | "VENDEDOR" | "CLIENTE";
 
 export interface Usuario {
   _id: string;
-  fullname: string;
+  nombreCompleto: string;
   email: string;
-  role: UserRole;
-  isActive: boolean;
+  rol: UserRole;
+  estaActivo: boolean;
   createdAt: string;
 }
 
 export interface PerfilUsuario extends Usuario {
   updatedAt: string;
-  lastLogin?: string;
-  customerProfile?: CustomerProfile | null;
-  defaultAddress?: CustomerAddress | null;
+  ultimoAcceso?: string;
+  perfilCliente?: PerfilCliente | null;
+  direccionPredeterminada?: DireccionCliente | null;
 }
 
 export type CreateUsuarioDTO = {
-  fullname: string;
+  nombreCompleto: string;
   email: string;
-  role: UserRole;
-  isActive?: boolean;
+  rol: UserRole;
+  estaActivo?: boolean;
   password: string;
 };
 
 export type UpdateUsuarioDTO = {
-  fullname?: string;
+  nombreCompleto?: string;
   email?: string;
-  role?: UserRole;
-  isActive?: boolean;
+  rol?: UserRole;
+  estaActivo?: boolean;
   password?: string;
 };
 
 export type UpdatePerfilDTO = {
-  fullname: string;
+  nombreCompleto: string;
   email: string;
   password?: string;
 };

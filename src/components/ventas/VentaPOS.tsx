@@ -4,15 +4,15 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
-import { createVentaSchema } from "@/schemas/venta.schema";
-import { createVenta } from "@/services/venta.service";
+import { createPedidoSchema } from "@/schemas/pedido.schema";
+import { createVenta } from "@/services/pedidos.service";
 import { Producto } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 // Tipo extendido para incluir stock disponible en el formulario (no se envía al backend)
-type VentaFormValues = z.input<typeof createVentaSchema>;
-type VentaFormSubmitValues = z.output<typeof createVentaSchema>;
+type VentaFormValues = z.input<typeof createPedidoSchema>;
+type VentaFormSubmitValues = z.output<typeof createPedidoSchema>;
 
 export default function VentaPOS({
   productos,
@@ -30,11 +30,11 @@ export default function VentaPOS({
     reset,
     formState: { isSubmitting },
   } = useForm<VentaFormValues, unknown, VentaFormSubmitValues>({
-    resolver: zodResolver(createVentaSchema),
+    resolver: zodResolver(createPedidoSchema),
     defaultValues: {
       items: [],
       metodoPago: "EFECTIVO",
-      tipoVenta: "TIENDA",
+      canal: "TIENDA",
       descuento: 0,
     },
     mode: "onChange",
@@ -52,7 +52,7 @@ export default function VentaPOS({
   const agregarItem = () => {
     append({
       productoId: "",
-      variantId: undefined,
+      varianteId: undefined,
       color: "",
       talla: "",
       cantidad: 1,
@@ -94,19 +94,19 @@ export default function VentaPOS({
       }
 
       await createVenta({
-        items: data.items.map(({ productoId, variantId, color, talla, cantidad }) => ({
+        items: data.items.map(({ productoId, varianteId, color, talla, cantidad }) => ({
           productoId,
-          variantId,
+          varianteId,
           color,
           talla,
           cantidad,
         })),
         metodoPago: data.metodoPago,
-        tipoVenta: "TIENDA",
+        canal: "TIENDA",
         descuento: montoDescuento,
       });
 
-      reset({ items: [], metodoPago: "EFECTIVO", tipoVenta: "TIENDA", descuento: 0 });
+      reset({ items: [], metodoPago: "EFECTIVO", canal: "TIENDA", descuento: 0 });
       setValorDescuento(0);
 
       toast.success("Venta registrada correctamente");
@@ -145,7 +145,7 @@ export default function VentaPOS({
         {fields.map((field, index) => {
           const currentItem = watchedItems[index] ?? {
             productoId: "",
-            variantId: undefined,
+            varianteId: undefined,
             color: "",
             talla: "",
             cantidad: 1,
@@ -153,7 +153,7 @@ export default function VentaPOS({
           const productoSeleccionado = productos.find(p => p._id === currentItem.productoId);
           const varianteSeleccionada = productoSeleccionado?.variantes.find(
             (v) =>
-              (currentItem.variantId && v.variantId === currentItem.variantId) ||
+              (currentItem.varianteId && v.varianteId === currentItem.varianteId) ||
               (v.color === currentItem.color && v.talla === currentItem.talla)
           );
           const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
@@ -162,8 +162,8 @@ export default function VentaPOS({
             ? `${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`
             : "Variante sin seleccionar";
           const selectedVariantValue =
-            typeof currentItem.variantId === "string" && currentItem.variantId
-              ? currentItem.variantId
+            typeof currentItem.varianteId === "string" && currentItem.varianteId
+              ? currentItem.varianteId
               : currentItem.color && currentItem.talla
                 ? `${currentItem.color}|${currentItem.talla}`
                 : "";
@@ -201,7 +201,7 @@ export default function VentaPOS({
                 onChange={(e) => {
                   const pid = e.target.value;
                   setValue(`items.${index}.productoId`, pid);
-                  setValue(`items.${index}.variantId`, undefined);
+                  setValue(`items.${index}.varianteId`, undefined);
                   setValue(`items.${index}.color`, "");
                   setValue(`items.${index}.talla`, "");
                   setValue(`items.${index}.cantidad`, 1);
@@ -226,12 +226,12 @@ export default function VentaPOS({
                     if (!val) return;
                     const variante = productoSeleccionado?.variantes.find(
                       (v) =>
-                        v.variantId === val ||
+                        v.varianteId === val ||
                         `${v.color}|${v.talla}` === val
                     );
 
                     if (variante) {
-                      setValue(`items.${index}.variantId`, variante.variantId);
+                      setValue(`items.${index}.varianteId`, variante.varianteId);
                       setValue(`items.${index}.color`, variante.color);
                       setValue(`items.${index}.talla`, variante.talla);
                       // Reset cantidad si excede stock
@@ -244,8 +244,8 @@ export default function VentaPOS({
                   <option value="">Variante...</option>
                   {productoSeleccionado?.variantes.map((v) => (
                     <option
-                      key={v.variantId || `${v.color}-${v.talla}`}
-                      value={v.variantId || `${v.color}|${v.talla}`}
+                      key={v.varianteId || `${v.color}-${v.talla}`}
+                      value={v.varianteId || `${v.color}|${v.talla}`}
                       disabled={v.stock <= 0}
                     >
                       {v.color} - {v.talla} ({v.stock})
@@ -253,7 +253,7 @@ export default function VentaPOS({
                   ))}
                 </select>
                 {/* Campos ocultos */}
-                <input type="hidden" {...register(`items.${index}.variantId`)} />
+                <input type="hidden" {...register(`items.${index}.varianteId`)} />
                 <input type="hidden" {...register(`items.${index}.color`)} />
                 <input type="hidden" {...register(`items.${index}.talla`)} />
               </div>

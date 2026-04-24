@@ -14,7 +14,7 @@ import {
  * Schema para crear un nuevo usuario
  */
 export const createUsuarioSchema = z.object({
-    fullname: nonEmptyStringSchema
+    nombreCompleto: nonEmptyStringSchema
         .min(3, "El nombre completo debe tener al menos 3 caracteres")
         .max(100, "El nombre completo no puede exceder 100 caracteres"),
 
@@ -22,16 +22,16 @@ export const createUsuarioSchema = z.object({
 
     password: passwordSchema,
 
-    role: userRoleSchema.default("CLIENTE"),
+    rol: userRoleSchema.default("CLIENTE"),
 
-    isActive: z.boolean().default(true),
+    estaActivo: z.boolean().default(true),
 });
 
 /**
  * Schema para actualizar un usuario
  */
 export const updateUsuarioSchema = z.object({
-    fullname: nonEmptyStringSchema
+    nombreCompleto: nonEmptyStringSchema
         .min(3, "El nombre completo debe tener al menos 3 caracteres")
         .max(100, "El nombre completo no puede exceder 100 caracteres")
         .optional(),
@@ -42,9 +42,9 @@ export const updateUsuarioSchema = z.object({
       message: "La contraseña debe tener al menos 6 caracteres"
     }).transform(val => val === "" ? undefined : val),
 
-    role: userRoleSchema.optional(),
+    rol: userRoleSchema.optional(),
 
-    isActive: z.boolean().optional(),
+    estaActivo: z.boolean().optional(),
 });
 
 /**

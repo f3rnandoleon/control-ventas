@@ -9,7 +9,7 @@ import {
 import { updatePerfilSchema } from "@/schemas/perfil.schema";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { handleRouteError } from "@/shared/http/handleRouteError";
-import { getCustomerContextByUserId } from "@/modules/customers/application/customers.service";
+import { obtenerContextoClientePorUsuario } from "@/modules/clientes/application/clientes.service";
 
 export async function GET(request: Request) {
   try {
@@ -22,8 +22,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const context = await getCustomerContextByUserId(userAuth.id, {
-      ensureProfile: userAuth.role === "CLIENTE",
+    const context = await obtenerContextoClientePorUsuario(userAuth.id, {
+      ensureProfile: userAuth.rol === "CLIENTE",
     });
 
     return NextResponse.json({
@@ -75,11 +75,11 @@ export async function PUT(request: Request) {
     }
 
     const updateData: {
-      fullname: string;
+      nombreCompleto: string;
       email: string;
       password?: string;
     } = {
-      fullname: data.fullname,
+      nombreCompleto: data.nombreCompleto,
       email: data.email,
     };
 
@@ -98,8 +98,8 @@ export async function PUT(request: Request) {
       );
     }
 
-    const context = await getCustomerContextByUserId(userAuth.id, {
-      ensureProfile: user.role === "CLIENTE",
+    const context = await obtenerContextoClientePorUsuario(userAuth.id, {
+      ensureProfile: user.rol === "CLIENTE",
     });
 
     return NextResponse.json({

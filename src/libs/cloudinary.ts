@@ -41,8 +41,8 @@ function signCloudinaryParams(
     .digest("hex");
 }
 
-function buildCloudinaryUrl(cloudName: string, action: "upload" | "destroy") {
-  return `https://api.cloudinary.com/v1_1/${cloudName}/image/${action}`;
+function buildCloudinaryUrl(cloudName: string, accion: "upload" | "destroy") {
+  return `https://api.cloudinary.com/v1_1/${cloudName}/image/${accion}`;
 }
 
 async function parseCloudinaryResponse(response: Response) {

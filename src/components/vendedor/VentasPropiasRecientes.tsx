@@ -1,11 +1,11 @@
 "use client";
 
-import { Venta } from "@/types/venta";
+import { Pedido } from "@/types/pedido";
 
 export default function VentasPropiasRecientes({
   ventas,
 }: {
-  ventas: Venta[];
+  ventas: Pedido[];
 }) {
   return (
     <div
@@ -30,7 +30,7 @@ export default function VentasPropiasRecientes({
               <td className="py-2">
                 {new Date(v.createdAt).toLocaleString()}
               </td>
-              <td>{v.numeroVenta}</td>
+              <td>{v.numeroPedido}</td>
               <td className="text-cyan-400 font-semibold">
                 Bs {v.total}
               </td>

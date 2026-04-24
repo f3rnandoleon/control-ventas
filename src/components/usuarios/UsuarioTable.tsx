@@ -29,7 +29,7 @@ export default function UsuarioTable({
               className="border-t border-white/5 hover:bg-white/5 transition"
             >
               <td className="px-6 py-4">
-                <p className="font-semibold">{u.fullname}</p>
+                <p className="font-semibold">{u.nombreCompleto}</p>
                 <p className="text-xs text-gray-400">
                   Creado: {new Date(u.createdAt).toLocaleDateString()}
                 </p>
@@ -39,7 +39,7 @@ export default function UsuarioTable({
 
               <td>
                 <span className="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">
-                  {u.role}
+                  {u.rol}
                 </span>
               </td>
 
@@ -47,12 +47,12 @@ export default function UsuarioTable({
                 <span
                   className={`px-2 py-1 rounded text-xs
                   ${
-                    u.isActive
+                    u.estaActivo
                       ? "bg-green-500/20 text-green-400"
                       : "bg-red-500/20 text-red-400"
                   }`}
                 >
-                  {u.isActive ? "Activo" : "Inactivo"}
+                  {u.estaActivo ? "Activo" : "Inactivo"}
                 </span>
               </td>
 
