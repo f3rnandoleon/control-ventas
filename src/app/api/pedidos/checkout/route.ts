@@ -28,19 +28,19 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const order = await crearPedidoDesdeCarrito(userAuth.id, validation.data);
+    const pedido = await crearPedidoDesdeCarrito(userAuth.id, validation.data);
 
     return NextResponse.json(
       {
         message: "Pedido creado correctamente desde el carrito",
-        order,
+        pedido,
       },
       { status: 201 }
     );
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al crear pedido desde el carrito",
-      logLabel: "POST orders/checkout error:",
+      logLabel: "POST pedidos/checkout error:",
     });
   }
 }

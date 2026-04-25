@@ -18,17 +18,17 @@ export async function GET(request: Request, context: Context) {
     }
 
     const { id } = await context.params;
-    const fulfillment = await getFulfillmentByOrderForActor(
+    const entrega = await getFulfillmentByOrderForActor(
       userAuth.rol,
       userAuth.id,
       id
     );
 
-    return NextResponse.json(fulfillment);
+    return NextResponse.json(entrega);
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Error al obtener fulfillment",
-      logLabel: "GET fulfillment error:",
+      fallbackMessage: "Error al obtener la entrega",
+      logLabel: "GET entregas/[id] error:",
     });
   }
 }

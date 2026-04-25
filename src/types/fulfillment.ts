@@ -1,4 +1,4 @@
-export type FulfillmentStatus =
+export type EstadoEntrega =
   | "PENDING"
   | "READY"
   | "IN_TRANSIT"
@@ -6,48 +6,49 @@ export type FulfillmentStatus =
   | "NOT_APPLICABLE"
   | "CANCELLED";
 
-export type FulfillmentMethod =
+export type MetodoEntrega =
   | "WHATSAPP"
   | "PICKUP_POINT"
+  | "SHIPPING_NATIONAL"
   | null;
 
-export interface Fulfillment {
+export interface Entrega {
   _id: string;
-  orderId: string;
-  orderNumber: string;
-  customer?: string | null;
-  seller?: string | null;
-  channel: "WEB" | "APP_QR" | "TIENDA";
-  method: FulfillmentMethod;
-  estado: FulfillmentStatus;
-  pickupPoint?: string | null;
-  address?: string | null;
-  phone?: string | null;
-  recipientName?: string | null;
-  trackingCode?: string | null;
-  courierName?: string | null;
-  assignedTo?: string | null;
-  notes?: string | null;
-  preparedAt?: string | null;
-  inTransitAt?: string | null;
-  deliveredAt?: string | null;
-  cancelledAt?: string | null;
+  pedidoId: string;
+  numeroPedido: string;
+  cliente?: string | null;
+  vendedor?: string | null;
+  canal: "WEB" | "APP_QR" | "TIENDA";
+  metodo: MetodoEntrega;
+  estado: EstadoEntrega;
+  puntoRecojo?: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  nombreDestinatario?: string | null;
+  codigoSeguimiento?: string | null;
+  nombreTransportista?: string | null;
+  asignadoA?: string | null;
+  notas?: string | null;
+  preparadoEn?: string | null;
+  enTransitoEn?: string | null;
+  entregadoEn?: string | null;
+  canceladoEn?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateFulfillmentDTO {
-  orderId: string;
-  trackingCode?: string | null;
-  courierName?: string | null;
-  assignedTo?: string | null;
-  notes?: string | null;
+export interface CrearEntregaDTO {
+  pedidoId: string;
+  codigoSeguimiento?: string | null;
+  nombreTransportista?: string | null;
+  asignadoA?: string | null;
+  notas?: string | null;
 }
 
-export interface UpdateFulfillmentStatusDTO {
-  estado: FulfillmentStatus;
-  trackingCode?: string | null;
-  courierName?: string | null;
-  assignedTo?: string | null;
-  notes?: string | null;
+export interface ActualizarEstadoEntregaDTO {
+  estado: EstadoEntrega;
+  codigoSeguimiento?: string | null;
+  nombreTransportista?: string | null;
+  asignadoA?: string | null;
+  notas?: string | null;
 }

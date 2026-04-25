@@ -8,14 +8,14 @@ const dashboardRoutes = ["/dashboard"];
 const protectedApiRoutes = [
   "/api/admin",
   "/api/perfil",
-  "/api/cart",
+  "/api/carrito",
+  "/api/clientes",
+  "/api/entregas",
+  "/api/pagos",
+  "/api/pedidos",
   "/api/productos",
   "/api/uploads",
-  "/api/ventas",
-  "/api/orders",
-  "/api/fulfillment",
   "/api/pos",
-  "/api/payments",
   "/api/mis-pedidos",
   "/api/inventario",
   "/api/reportes",
@@ -23,7 +23,7 @@ const protectedApiRoutes = [
 ];
 
 const adminApiRoutes = ["/api/admin", "/api/reportes", "/api/usuarios", "/api/uploads"];
-const staffApiRoutes = ["/api/productos", "/api/ventas", "/api/inventario"];
+const staffApiRoutes = ["/api/productos", "/api/inventario"];
 
 function getDashboardHomeByRole(role?: string) {
   if (role === "ADMIN") return "/dashboard/admin";
@@ -72,7 +72,8 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/auth/signup") ||
-    pathname.startsWith("/api/health") ||
+    pathname.startsWith("/api/estado") ||
+    pathname.startsWith("/api/verificar/pago") ||
     isPublicProductosRoute
   ) {
     return NextResponse.next();
@@ -167,14 +168,10 @@ export async function middleware(request: NextRequest) {
     staffApiRoutes.some((route) => pathname.startsWith(route)) &&
     !["ADMIN", "VENDEDOR"].includes(role || "")
   ) {
-    if (pathname.startsWith("/api/ventas") && role === "CLIENTE" && method === "POST") {
-      // Permitir que CLIENTE registre ventas WEB en /api/ventas
-    } else {
-      return NextResponse.json(
-        { message: "Acceso no autorizado" },
-        { status: 403 }
-      );
-    }
+    return NextResponse.json(
+      { message: "Acceso no autorizado" },
+      { status: 403 }
+    );
   }
 
   if (pathname.startsWith("/api/mis-pedidos") && role !== "CLIENTE") {
@@ -184,15 +181,19 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  if (pathname.startsWith("/api/orders")) {
+  if (pathname.startsWith("/api/pedidos")) {
     const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
     const isClientRead = role === "CLIENTE" && method === "GET";
+    const isClientUpdate =
+      role === "CLIENTE" &&
+      method === "PATCH" &&
+      /^\/api\/pedidos\/[^/]+$/.test(pathname);
     const isClientCheckout =
       role === "CLIENTE" &&
       method === "POST" &&
-      pathname.startsWith("/api/orders/checkout");
+      pathname.startsWith("/api/pedidos/checkout");
 
-    if (!isStaff && !isClientRead && !isClientCheckout) {
+    if (!isStaff && !isClientRead && !isClientUpdate && !isClientCheckout) {
       return NextResponse.json(
         { message: "Acceso no autorizado" },
         { status: 403 }
@@ -200,7 +201,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/api/fulfillment")) {
+  if (pathname.startsWith("/api/entregas")) {
     const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
     const isClientRead = role === "CLIENTE" && method === "GET";
 
@@ -223,14 +224,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/api/cart") && role !== "CLIENTE") {
+  if (pathname.startsWith("/api/carrito") && role !== "CLIENTE") {
     return NextResponse.json(
       { message: "Acceso no autorizado" },
       { status: 403 }
     );
   }
 
-  if (pathname.startsWith("/api/payments")) {
+  if (pathname.startsWith("/api/clientes") && role !== "CLIENTE") {
+    return NextResponse.json(
+      { message: "Acceso no autorizado" },
+      { status: 403 }
+    );
+  }
+
+  if (pathname.startsWith("/api/pagos")) {
     const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
     const isClient = role === "CLIENTE";
 

@@ -17,7 +17,7 @@ type PaymentReviewData = {
     urlComprobante: string | null;
     createdAt: string;
   };
-  order: {
+  pedido: {
     _id: string;
     numeroPedido: string;
     canal: string;
@@ -84,7 +84,7 @@ export default function VerificarPagoPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`/api/verify/payment/${token}`)
+    fetch(`/api/verificar/pago/${token}`)
       .then(async (res) => {
         if (res.status === 410) {
           setState("used");
@@ -107,7 +107,7 @@ export default function VerificarPagoPage() {
   const handleConfirm = async () => {
     setState("confirming");
     try {
-      const res = await fetch(`/api/verify/payment/${token}/confirm`, {
+      const res = await fetch(`/api/verificar/pago/${token}/confirm`, {
         method: "POST",
       });
       if (!res.ok) {
@@ -124,7 +124,7 @@ export default function VerificarPagoPage() {
   const handleReject = async () => {
     setState("rejecting");
     try {
-      const res = await fetch(`/api/verify/payment/${token}/reject`, {
+      const res = await fetch(`/api/verificar/pago/${token}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: rejectReason || undefined }),
@@ -195,7 +195,7 @@ export default function VerificarPagoPage() {
             <span className="text-5xl text-emerald-400">✓</span>
           </div>
           <h1 className="text-3xl font-bold text-emerald-400 mb-3">¡Confirmado!</h1>
-          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.order.numeroPedido}</span> ha sido aprobado.</p>
+          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.pedido.numeroPedido}</span> ha sido aprobado.</p>
           <p className="text-slate-500 text-sm">El cliente recibirá su confirmación en breve.</p>
         </div>
       </div>
@@ -210,7 +210,7 @@ export default function VerificarPagoPage() {
             <span className="text-5xl text-red-500">✕</span>
           </div>
           <h1 className="text-3xl font-bold text-red-400 mb-3">Pago Rechazado</h1>
-          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.order.numeroPedido}</span> fue cancelado.</p>
+          <p className="text-slate-300 mb-1">El pedido <span className="text-white font-bold">{data?.pedido.numeroPedido}</span> fue cancelado.</p>
           <p className="text-slate-500 text-sm">El stock ha sido liberado automáticamente.</p>
         </div>
       </div>
@@ -219,12 +219,12 @@ export default function VerificarPagoPage() {
 
   if (!data) return null;
 
-  const { payment, order } = data;
+  const { payment, pedido } = data;
   const isProcessing = state === "confirming" || state === "rejecting";
-  const deliveryLabel = DELIVERY_METHOD_LABELS[order.snapshotEntrega?.metodo ?? ""] || order.snapshotEntrega?.metodo || "—";
+  const deliveryLabel = DELIVERY_METHOD_LABELS[pedido.snapshotEntrega?.metodo ?? ""] || pedido.snapshotEntrega?.metodo || "—";
   const createdAtFormatted = new Intl.DateTimeFormat('es-BO', { 
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
-  }).format(new Date(order.createdAt));
+  }).format(new Date(pedido.createdAt));
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-indigo-500/30">
@@ -240,7 +240,7 @@ export default function VerificarPagoPage() {
               <span className="text-slate-500 text-xs font-medium">{createdAtFormatted}</span>
             </div>
             <h1 className="text-3xl font-black text-white tracking-tight">
-              Pedido <span className="text-indigo-400">{order.numeroPedido}</span>
+              Pedido <span className="text-indigo-400">{pedido.numeroPedido}</span>
             </h1>
             <p className="text-slate-400 text-sm font-medium mt-1">Transacción QR: <span className="text-slate-300">{payment.numeroPago}</span></p>
           </div>
@@ -249,7 +249,7 @@ export default function VerificarPagoPage() {
               <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
               <span className="text-sm font-semibold text-amber-400 uppercase tracking-wide">Esperando Resolución</span>
             </div>
-            <p className="text-xs text-slate-500">Monto a conciliar: <span className="text-indigo-300 font-bold">Bs {order.total.toFixed(2)}</span></p>
+            <p className="text-xs text-slate-500">Monto a conciliar: <span className="text-indigo-300 font-bold">Bs {pedido.total.toFixed(2)}</span></p>
           </div>
         </div>
 
@@ -290,7 +290,7 @@ export default function VerificarPagoPage() {
                 <h3 className="text-xs font-extrabold uppercase tracking-[0.2em] text-slate-400">Detalle del Carrito</h3>
               </div>
               <div className="divide-y divide-white/5">
-                {order.items.map((item, i) => (
+                {pedido.items.map((item, i) => (
                   <div key={i} className="p-5 flex gap-4 hover:bg-white/[0.02] transition-colors">
                     {item.productoSnapshot.imagen && (
                       <div className="relative w-16 h-16 rounded-xl overflow-hidden ring-1 ring-white/10 bg-slate-900 shrink-0">
@@ -325,17 +325,17 @@ export default function VerificarPagoPage() {
               <div className="bg-slate-950/50 p-6 space-y-3">
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>Subtotal acumulado</span>
-                  <span className="font-mono">Bs {order.subtotal.toFixed(2)}</span>
+                  <span className="font-mono">Bs {pedido.subtotal.toFixed(2)}</span>
                 </div>
-                {order.descuento > 0 && (
+                {pedido.descuento > 0 && (
                   <div className="flex justify-between text-xs text-amber-500 font-medium">
                     <span>Bonificación / Descuento</span>
-                    <span className="font-mono">−Bs {order.descuento.toFixed(2)}</span>
+                    <span className="font-mono">−Bs {pedido.descuento.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-baseline pt-2 border-t border-white/5">
                   <span className="text-sm font-bold text-white uppercase tracking-wider">Monto Total</span>
-                  <span className="text-2xl font-black text-indigo-400 font-mono tracking-tighter">Bs {order.total.toFixed(2)}</span>
+                  <span className="text-2xl font-black text-indigo-400 font-mono tracking-tighter">Bs {pedido.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -345,7 +345,7 @@ export default function VerificarPagoPage() {
           <div className="space-y-8">
             
             {/* Customer Details Card */}
-            {order.snapshotCliente && (
+            {pedido.snapshotCliente && (
               <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                   <span className="text-5xl">👤</span>
@@ -358,18 +358,18 @@ export default function VerificarPagoPage() {
                 </h3>
                 <div className="space-y-5">
                   <div>
-                    <p className="text-white text-xl font-bold mb-0.5">{order.snapshotCliente.nombreCompleto || "Cliente sin nombre"}</p>
-                    <p className="text-slate-500 text-sm">{order.snapshotCliente.email}</p>
+                    <p className="text-white text-xl font-bold mb-0.5">{pedido.snapshotCliente.nombreCompleto || "Cliente sin nombre"}</p>
+                    <p className="text-slate-500 text-sm">{pedido.snapshotCliente.email}</p>
                   </div>
                   <div className="flex flex-wrap gap-4 pt-2">
                     <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-white/5">
                       <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Teléfono</p>
-                      <p className="text-slate-200 text-sm font-bold leading-none">{order.snapshotCliente.telefono || "—"}</p>
+                      <p className="text-slate-200 text-sm font-bold leading-none">{pedido.snapshotCliente.telefono || "—"}</p>
                     </div>
-                    {order.snapshotCliente.numeroDocumento && (
+                    {pedido.snapshotCliente.numeroDocumento && (
                       <div className="bg-slate-800/80 px-4 py-2 rounded-2xl border border-white/5">
-                        <p className="text-[10px] text-slate-500 uppercase font-black mb-1">{order.snapshotCliente.tipoDocumento || "ID"}</p>
-                        <p className="text-slate-200 text-sm font-bold leading-none">{order.snapshotCliente.numeroDocumento}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-black mb-1">{pedido.snapshotCliente.tipoDocumento || "ID"}</p>
+                        <p className="text-slate-200 text-sm font-bold leading-none">{pedido.snapshotCliente.numeroDocumento}</p>
                       </div>
                     )}
                   </div>
@@ -400,42 +400,42 @@ export default function VerificarPagoPage() {
                     <div>
                       <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Ubicación / Punto</p>
                       <p className="text-slate-200 text-sm font-bold leading-tight">
-                        {order.snapshotEntrega?.direccion || order.snapshotEntrega?.puntoRecojo || "No especificado"}
+                        {pedido.snapshotEntrega?.direccion || pedido.snapshotEntrega?.puntoRecojo || "No especificado"}
                       </p>
                     </div>
-                    {order.snapshotEntrega?.programadoPara && (
+                    {pedido.snapshotEntrega?.programadoPara && (
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Programado para</p>
-                        <p className="text-indigo-300 text-sm font-bold">{order.snapshotEntrega.programadoPara}</p>
+                        <p className="text-indigo-300 text-sm font-bold">{pedido.snapshotEntrega.programadoPara}</p>
                       </div>
                     )}
                   </div>
                   <div className="space-y-4">
-                    {order.snapshotEntrega?.departamento && (
+                    {pedido.snapshotEntrega?.departamento && (
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Origen / Destino</p>
-                        <p className="text-slate-200 text-sm font-bold">{order.snapshotEntrega.departamento} {order.snapshotEntrega.ciudad ? `• ${order.snapshotEntrega.ciudad}` : ""}</p>
+                        <p className="text-slate-200 text-sm font-bold">{pedido.snapshotEntrega.departamento} {pedido.snapshotEntrega.ciudad ? `• ${pedido.snapshotEntrega.ciudad}` : ""}</p>
                       </div>
                     )}
-                    {order.snapshotEntrega?.empresaEnvio && (
+                    {pedido.snapshotEntrega?.empresaEnvio && (
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Transportadora</p>
-                        <p className="text-slate-200 text-sm font-bold">{order.snapshotEntrega.empresaEnvio}</p>
+                        <p className="text-slate-200 text-sm font-bold">{pedido.snapshotEntrega.empresaEnvio}</p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {order.snapshotEntrega?.nombreDestinatario && (
+                {pedido.snapshotEntrega?.nombreDestinatario && (
                   <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/20">
                     <p className="text-[10px] text-indigo-400 uppercase font-black mb-2">Datos de Recepción</p>
-                    <p className="text-slate-300 text-sm underline decoration-indigo-500/50 underline-offset-4">{order.snapshotEntrega.nombreDestinatario}</p>
+                    <p className="text-slate-300 text-sm underline decoration-indigo-500/50 underline-offset-4">{pedido.snapshotEntrega.nombreDestinatario}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                       {order.snapshotEntrega.ciRemitente && (
-                         <p className="text-slate-500 text-xs">🪪 CI: <span className="text-slate-300 font-medium">{order.snapshotEntrega.ciRemitente}</span></p>
+                       {pedido.snapshotEntrega.ciRemitente && (
+                         <p className="text-slate-500 text-xs">🪪 CI: <span className="text-slate-300 font-medium">{pedido.snapshotEntrega.ciRemitente}</span></p>
                        )}
-                       {order.snapshotEntrega.telefonoRemitente && (
-                         <p className="text-slate-500 text-xs">📞 Tel: <span className="text-slate-300 font-medium">{order.snapshotEntrega.telefonoRemitente}</span></p>
+                       {pedido.snapshotEntrega.telefonoRemitente && (
+                         <p className="text-slate-500 text-xs">📞 Tel: <span className="text-slate-300 font-medium">{pedido.snapshotEntrega.telefonoRemitente}</span></p>
                        )}
                     </div>
                   </div>
@@ -444,13 +444,13 @@ export default function VerificarPagoPage() {
             </div>
 
             {/* Notes Section */}
-            {order.notas && (
+            {pedido.notas && (
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-3xl p-6 relative">
                  <div className="absolute -top-3 left-6 px-3 bg-slate-900 border border-amber-500/30 rounded-full">
                   <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Notas del Cliente</span>
                  </div>
                  <p className="text-amber-200/80 text-sm italic py-2">
-                   &quot;{order.notas}&quot;
+                   &quot;{pedido.notas}&quot;
                  </p>
               </div>
             )}
@@ -459,9 +459,9 @@ export default function VerificarPagoPage() {
             <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
               <h3 className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-600 mb-4 italic">Metadatos de Auditoría</h3>
               <div className="grid grid-cols-2 gap-4 text-[10px] font-mono text-slate-500">
-                <p>ORDER_ID: <span className="text-slate-400">{order._id}</span></p>
+                <p>ORDER_ID: <span className="text-slate-400">{pedido._id}</span></p>
                 <p>PAYMENT_ID: <span className="text-slate-400">{payment._id}</span></p>
-                <p>CHANNEL: <span className="text-slate-400">{order.canal}</span></p>
+                <p>CHANNEL: <span className="text-slate-400">{pedido.canal}</span></p>
                 <p>METHOD: <span className="text-slate-400">{payment.metodoPago}</span></p>
               </div>
             </div>

@@ -335,8 +335,8 @@ export async function updateFulfillmentStatusById(
     );
 
     return {
-      fulfillment: updatedFulfillment,
-      order: pedido,
+      entrega: updatedFulfillment,
+      pedido,
     };
   });
 }

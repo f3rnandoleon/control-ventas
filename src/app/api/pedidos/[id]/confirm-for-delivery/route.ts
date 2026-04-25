@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/orders/:id/confirm-for-delivery
+ * POST /api/pedidos/:id/confirm-for-delivery
  * Solo ADMIN o VENDEDOR. 
  * Mueve un pedido de PENDING_PAYMENT a CONFIRMED (Por Entregar)
  * Extiende la reserva indefinidamente.
@@ -23,20 +23,20 @@ export async function POST(request: Request, context: Context) {
       );
     }
 
-    const { id: orderId } = await context.params;
-    const order = await confirmPedidoForDelivery(orderId, {
+    const { id: pedidoId } = await context.params;
+    const pedido = await confirmPedidoForDelivery(pedidoId, {
       id: userAuth.id,
       rol: userAuth.rol,
     });
 
     return NextResponse.json({
       message: "Pedido confirmado para entrega exitosamente.",
-      order,
+      pedido,
     });
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al confirmar pedido para entrega",
-      logLabel: "POST orders/confirm-for-delivery error:",
+      logLabel: "POST pedidos/confirm-for-delivery error:",
     });
   }
 }

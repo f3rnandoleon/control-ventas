@@ -12,13 +12,8 @@ const rejectSchema = z.object({
 });
 
 /**
- * POST /api/verify/payment/:token/reject
- * Ruta PÚBLICA — autorización por token.
- * El admin rechaza el pago. El sistema:
- * - Marca el pago como FAILED
- * - Cancela el pedido
- * - Libera el stock reservado
- * - Invalida el token
+ * POST /api/verificar/pago/:token/reject
+ * Ruta pública: autorización por token.
  */
 export async function POST(request: Request, context: Context) {
   try {
@@ -37,17 +32,17 @@ export async function POST(request: Request, context: Context) {
 
     return NextResponse.json({
       message: "Pago rechazado. El pedido fue cancelado y el stock liberado.",
-      order: {
-        _id: result.order._id,
-        orderNumber: result.order.orderNumber,
-        orderStatus: result.order.orderStatus,
-        paymentStatus: result.order.paymentStatus,
+      pedido: {
+        _id: result.pedido._id,
+        numeroPedido: result.pedido.numeroPedido,
+        estadoPedido: result.pedido.estadoPedido,
+        estadoPago: result.pedido.estadoPago,
       },
     });
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al rechazar el pago",
-      logLabel: "POST verify/payment/reject error:",
+      logLabel: "POST verificar/pago/reject error:",
     });
   }
 }

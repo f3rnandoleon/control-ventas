@@ -105,7 +105,7 @@ export async function getOpsOverview() {
       {
         $match: {
           $expr: {
-            $gt: ["$variantes.reservedStock", "$variantes.stock"],
+            $gt: ["$variantes.stockReservado", "$variantes.stock"],
           },
         },
       },
@@ -165,7 +165,7 @@ export async function getOpsOverview() {
       buildAlert(
         "critical",
         "INVALID_RESERVED_STOCK",
-        "Hay variantes con reservedStock mayor al stock fisico.",
+        "Hay variantes con stockReservado mayor al stock fisico.",
         { productsWithInvalidReservedStock }
       )
     );

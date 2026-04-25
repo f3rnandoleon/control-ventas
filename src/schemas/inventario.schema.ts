@@ -27,7 +27,7 @@ const optionalObjectIdSchema = z.preprocess(
 export const ajusteStockSchema = z.object({
     productoId: objectIdSchema,
 
-    variantId: optionalObjectIdSchema,
+    varianteId: optionalObjectIdSchema,
 
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),

@@ -24,13 +24,12 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const { venta, order } = await createPosSale(userAuth, validation.data);
+    const pedido = await createPosSale(userAuth, validation.data);
 
     return NextResponse.json(
       {
         message: "Venta POS registrada correctamente",
-        venta,
-        order,
+        pedido,
       },
       { status: 201 }
     );

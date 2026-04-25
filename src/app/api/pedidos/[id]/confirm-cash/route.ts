@@ -8,10 +8,10 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/orders/:id/confirm-cash
+ * POST /api/pedidos/:id/confirm-cash
  * Solo ADMIN o VENDEDOR. Confirma un pedido con pago en EFECTIVO.
  * - Consume stock reservado
- * - Crea la Venta
+ * - Crea el pago
  * - Finaliza el pedido
  */
 export async function POST(request: Request, context: Context) {
@@ -24,25 +24,25 @@ export async function POST(request: Request, context: Context) {
       );
     }
 
-    const { id: orderId } = await context.params;
-    const result = await confirmCashOrder(orderId, {
+    const { id: pedidoId } = await context.params;
+    const result = await confirmCashOrder(pedidoId, {
       id: userAuth.id,
       rol: userAuth.rol,
     });
 
     return NextResponse.json({
-      message: "Pedido en efectivo confirmado y venta creada exitosamente.",
-      order: {
-        _id: result.order._id,
-        numeroPedido: result.order.numeroPedido,
-        estadoPedido: result.order.estadoPedido,
-        estadoPago: result.order.estadoPago,
+      message: "Pedido en efectivo confirmado correctamente.",
+      pedido: {
+        _id: result.pedido._id,
+        numeroPedido: result.pedido.numeroPedido,
+        estadoPedido: result.pedido.estadoPedido,
+        estadoPago: result.pedido.estadoPago,
       },
     });
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al confirmar pedido en efectivo",
-      logLabel: "POST orders/confirm-cash error:",
+      logLabel: "POST pedidos/confirm-cash error:",
     });
   }
 }

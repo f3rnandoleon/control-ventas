@@ -17,7 +17,7 @@ export async function GET() {
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al obtener el estado del sistema",
-      logLabel: "HEALTH CHECK ERROR:",
+      logLabel: "ESTADO DEL SISTEMA ERROR:",
     });
   }
 }

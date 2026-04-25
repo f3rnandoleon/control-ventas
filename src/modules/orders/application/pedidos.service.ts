@@ -138,50 +138,50 @@ export async function crearPedidoDesdeCarrito(
     ensureProfile: true,
   });
 
-  const method = payload.entrega?.metodo ?? null;
+  const metodoEntrega = payload.entrega?.metodo ?? null;
   let snapshotEntrega: Record<string, unknown> | null = null;
 
-  if (method === "WHATSAPP") {
-    snapshotEntrega = { method: "WHATSAPP" };
-  } else if (method === "PICKUP_POINT") {
+  if (metodoEntrega === "WHATSAPP") {
+    snapshotEntrega = { metodo: "WHATSAPP" };
+  } else if (metodoEntrega === "PICKUP_POINT") {
     snapshotEntrega = {
-      method: "PICKUP_POINT",
-      pickupPoint: payload.entrega?.direccion ?? null,
-      phone: payload.entrega?.telefono ?? null,
-      recipientName: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
-      scheduledAt: payload.entrega?.programadoPara ?? null,
+      metodo: "PICKUP_POINT",
+      puntoRecojo: payload.entrega?.direccion ?? null,
+      telefono: payload.entrega?.telefono ?? null,
+      nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
+      programadoPara: payload.entrega?.programadoPara ?? null,
     };
-  } else if (method === "SHIPPING_NATIONAL") {
+  } else if (metodoEntrega === "SHIPPING_NATIONAL") {
     snapshotEntrega = {
-      method: "SHIPPING_NATIONAL",
-      department: payload.entrega?.departamento ?? null,
-      city: payload.entrega?.ciudad ?? null,
-      shippingCompany: payload.entrega?.empresaEnvio ?? null,
-      branch: payload.entrega?.sucursal ?? null,
-      senderName: payload.entrega?.nombreRemitente ?? null,
-      senderCI: payload.entrega?.ciRemitente ?? null,
-      senderPhone: payload.entrega?.telefonoRemitente ?? null,
-      recipientName: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
+      metodo: "SHIPPING_NATIONAL",
+      departamento: payload.entrega?.departamento ?? null,
+      ciudad: payload.entrega?.ciudad ?? null,
+      empresaEnvio: payload.entrega?.empresaEnvio ?? null,
+      sucursal: payload.entrega?.sucursal ?? null,
+      nombreRemitente: payload.entrega?.nombreRemitente ?? null,
+      ciRemitente: payload.entrega?.ciRemitente ?? null,
+      telefonoRemitente: payload.entrega?.telefonoRemitente ?? null,
+      nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
     };
   } else if (payload.direccionId) {
     const address = await obtenerDireccionClientePorUsuario(customerId, payload.direccionId);
     snapshotEntrega = {
-      method: "PICKUP_POINT",
-      pickupPoint: payload.entrega?.direccion || address.direccion,
-      phone: payload.entrega?.telefono || address.telefono,
-      recipientName: payload.entrega?.nombreDestinatario || address.nombreDestinatario,
+      metodo: "PICKUP_POINT",
+      puntoRecojo: payload.entrega?.direccion || address.direccion,
+      telefono: payload.entrega?.telefono || address.telefono,
+      nombreDestinatario: payload.entrega?.nombreDestinatario || address.nombreDestinatario,
     };
   } else if (customer.defaultAddress) {
     snapshotEntrega = {
-      method: "PICKUP_POINT",
-      pickupPoint: customer.defaultAddress.direccion,
-      phone: customer.defaultAddress.telefono,
-      recipientName: customer.defaultAddress.nombreDestinatario,
+      metodo: "PICKUP_POINT",
+      puntoRecojo: customer.defaultAddress.direccion,
+      telefono: customer.defaultAddress.telefono,
+      nombreDestinatario: customer.defaultAddress.nombreDestinatario,
     };
   }
 
   const reservationMinutes =
-    (method === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
+    (metodoEntrega === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
 
   return runInTransaction(async (session) => {
     const { validatedItems } = await getValidatedCartForCheckout(
@@ -208,7 +208,7 @@ export async function crearPedidoDesdeCarrito(
       );
     }
 
-    const estadoEntrega = method === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
+    const estadoEntrega = metodoEntrega === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
 
     const itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
       const ganancia = (precioUnitario - producto.precioCosto) * cartItem.cantidad;
@@ -254,7 +254,7 @@ export async function crearPedidoDesdeCarrito(
         usuarioId: customer.user._id,
         nombreCompleto: customer.user.nombreCompleto,
         email: customer.user.email,
-        telefono: (snapshotEntrega?.phone as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
+        telefono: (snapshotEntrega?.telefono as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
         tipoDocumento: customer.profile?.tipoDocumento || null,
         numeroDocumento: customer.profile?.numeroDocumento || null,
       },
@@ -282,7 +282,7 @@ export async function crearPedidoDesdeCarrito(
         estado: "SUCCESS",
         metadata: {
           canal: pedido.canal,
-          deliveryMethod: method,
+          metodoEntrega,
           total: pedido.total,
           items: pedido.items.length,
         },

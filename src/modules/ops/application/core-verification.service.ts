@@ -90,7 +90,7 @@ async function createTempProduct(sellerId: string, stamp: string) {
         color: "Negro",
         talla: "M",
         stock: 12,
-        reservedStock: 0,
+        stockReservado: 0,
         descripcion: "Variante web",
         imagenes: [],
         codigoBarra: buildVariantCode("barcode", stamp, "web"),
@@ -101,7 +101,7 @@ async function createTempProduct(sellerId: string, stamp: string) {
         color: "Blanco",
         talla: "L",
         stock: 8,
-        reservedStock: 0,
+        stockReservado: 0,
         descripcion: "Variante POS",
         imagenes: [],
         codigoBarra: buildVariantCode("barcode", stamp, "pos"),
@@ -137,7 +137,7 @@ async function cleanupVerificationData(context: VerificationContext) {
       ? Inventario.deleteMany({ productoId: context.productId })
       : Promise.resolve(),
     context.customerId
-      ? CustomerAddress.deleteMany({ customerProfileId: context.profileId || null })
+      ? CustomerAddress.deleteMany({ perfilClienteId: context.profileId || null })
       : Promise.resolve(),
     context.profileId
       ? CustomerProfile.deleteMany({ _id: context.profileId })
@@ -196,7 +196,7 @@ export async function runCoreEndToEndVerification(
       esPredeterminada: true,
     });
     context.direccionId = address._id.toString();
-    context.profileId = address.customerProfileId.toString();
+    context.profileId = address.perfilClienteId.toString();
     const direccionId = requireId(context.direccionId, "No se pudo crear la direccion temporal");
 
     const product = await createTempProduct(sellerId, context.stamp);

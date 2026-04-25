@@ -28,22 +28,22 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const fulfillment = await createOrSyncFulfillmentForOrder(
+    const entrega = await createOrSyncFulfillmentForOrder(
       validation.data.pedidoId,
       validation.data
     );
 
     return NextResponse.json(
       {
-        message: "Fulfillment sincronizado correctamente",
-        fulfillment,
+        message: "Entrega sincronizada correctamente",
+        entrega,
       },
       { status: 201 }
     );
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Error al crear fulfillment",
-      logLabel: "POST fulfillment error:",
+      fallbackMessage: "Error al crear la entrega",
+      logLabel: "POST entregas error:",
     });
   }
 }

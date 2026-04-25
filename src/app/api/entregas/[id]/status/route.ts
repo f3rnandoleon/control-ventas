@@ -39,13 +39,13 @@ export async function PATCH(request: Request, context: Context) {
     const result = await updateFulfillmentStatusById(id, validation.data);
 
     return NextResponse.json({
-      message: "Fulfillment actualizado correctamente",
+      message: "Entrega actualizada correctamente",
       ...result,
     });
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Error al actualizar fulfillment",
-      logLabel: "PATCH fulfillment status error:",
+      fallbackMessage: "Error al actualizar la entrega",
+      logLabel: "PATCH entregas/[id]/status error:",
     });
   }
 }

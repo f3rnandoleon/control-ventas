@@ -10,12 +10,8 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/payments/:id/upload-comprobante
- * El cliente (CLIENTE) sube la imagen del comprobante QR.
- * - Acepta multipart/form-data con campo "file" (imagen, max 5 MB).
- * - Sube la imagen a Cloudinary en la carpeta "control-ventas/comprobantes".
- * - Genera un reviewToken único (UUID) y lo guarda en el PaymentTransaction.
- * - Envía una notificación automática al admin vía Telegram con el link de verificación.
+ * POST /api/pagos/:id/upload-comprobante
+ * El cliente sube la imagen del comprobante QR y se genera un token de revisión.
  */
 export async function POST(request: Request, context: Context) {
   try {
@@ -61,7 +57,7 @@ export async function POST(request: Request, context: Context) {
       "control-ventas/comprobantes"
     );
 
-    const { payment, reviewToken } = await uploadComprobanteAndGenerateToken(
+    const { payment, tokenRevision } = await uploadComprobanteAndGenerateToken(
       paymentId,
       comprobanteUrl,
       userAuth.id
@@ -70,9 +66,8 @@ export async function POST(request: Request, context: Context) {
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       "https://control-ventas-azure.vercel.app";
-    const verifyLink = `${appUrl}/verificar/pago/${reviewToken}`;
+    const verifyLink = `${appUrl}/verificar/pago/${tokenRevision}`;
 
-    // 🤖 Notificación automática al admin vía Telegram
     const montoEscapado = escapeTelegramMd(`Bs ${payment.monto?.toFixed(2) ?? "0.00"}`);
     const pagoEscapado = escapeTelegramMd(payment.numeroPago ?? paymentId);
     const linkEscapado = escapeTelegramMd(verifyLink);
@@ -96,7 +91,7 @@ export async function POST(request: Request, context: Context) {
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al subir el comprobante",
-      logLabel: "POST payments/upload-comprobante error:",
+      logLabel: "POST pagos/upload-comprobante error:",
     });
   }
 }

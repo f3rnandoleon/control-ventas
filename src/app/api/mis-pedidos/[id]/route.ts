@@ -16,8 +16,8 @@ export async function GET(request: Request, context: Context) {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 
-    const order = await getPedidoForActor("CLIENTE", userAuth.id, id);
-    return NextResponse.json(order);
+    const pedido = await getPedidoForActor("CLIENTE", userAuth.id, id);
+    return NextResponse.json(pedido);
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al obtener pedido",

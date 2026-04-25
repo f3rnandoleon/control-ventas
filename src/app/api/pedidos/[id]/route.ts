@@ -28,13 +28,13 @@ export async function GET(request: Request, context: Context) {
     }
 
     const { id } = await context.params;
-    const order = await getPedidoForActor(userAuth.rol, userAuth.id, id);
+    const pedido = await getPedidoForActor(userAuth.rol, userAuth.id, id);
 
-    return NextResponse.json(order);
+    return NextResponse.json(pedido);
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al obtener pedido",
-      logLabel: "GET orders/[id] error:",
+      logLabel: "GET pedidos/[id] error:",
     });
   }
 }
@@ -49,22 +49,20 @@ export async function PATCH(request: Request, context: Context) {
 
     const { id } = await context.params;
 
-    let order;
+    let pedido;
     if (["ADMIN", "VENDEDOR"].includes(userAuth.rol)) {
       const validation = await validateRequest(updateEstadoPedidoSchema, request);
       if (!validation.success) {
         return validationErrorResponse(validation.errors);
       }
-      order = await updateEstadoPedidoForStaff(id, validation.data);
+      pedido = await updateEstadoPedidoForStaff(id, validation.data);
     } else {
-      // Flujo para CLIENTE
       const body = await request.json();
 
       if (body.estadoPedido === "CANCELLED") {
-        order = await cancelPedidoForCustomer(id, userAuth.id);
+        pedido = await cancelPedidoForCustomer(id, userAuth.id);
       } else if (body.entrega) {
-        // En este caso asumimos que si manda 'entrega' es para editar datos de envío
-        order = await updatePedidoEntregaForCustomer(id, userAuth.id, body.entrega);
+        pedido = await updatePedidoEntregaForCustomer(id, userAuth.id, body.entrega);
       } else {
         return NextResponse.json(
           { message: "Acción no permitida para clientes" },
@@ -75,12 +73,12 @@ export async function PATCH(request: Request, context: Context) {
 
     return NextResponse.json({
       message: "Pedido actualizado correctamente",
-      order,
+      pedido,
     });
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al actualizar pedido",
-      logLabel: "PATCH orders/[id] error:",
+      logLabel: "PATCH pedidos/[id] error:",
     });
   }
 }

@@ -42,16 +42,16 @@ function createDirectSalePaymentIdempotencyKey(pedidoId: string) {
 
 export async function createImmediatePaidPaymentForOrder(
   input: {
-    orderId: string;
-    customerId?: string | null;
+    pedidoId: string;
+    clienteId?: string | null;
     metodoPago: "EFECTIVO" | "QR";
-    amount: number;
-    externalReference?: string | null;
+    monto: number;
+    referenciaExterna?: string | null;
   },
   session?: mongoose.ClientSession
 ) {
   const existingPayment = await paymentsRepository.findLatestPaidByOrder(
-    input.orderId,
+    input.pedidoId,
     session
   );
 
@@ -62,13 +62,13 @@ export async function createImmediatePaidPaymentForOrder(
   return paymentsRepository.create(
     {
       numeroPago: createPaymentNumber(),
-      pedidoId: input.orderId,
-      cliente: input.customerId || null,
+      pedidoId: input.pedidoId,
+      cliente: input.clienteId || null,
       metodoPago: input.metodoPago,
-      monto: input.amount,
+      monto: input.monto,
       estado: "PAID",
-      idempotencyKey: createDirectSalePaymentIdempotencyKey(input.orderId),
-      referenciaExterna: input.externalReference || null,
+      idempotencyKey: createDirectSalePaymentIdempotencyKey(input.pedidoId),
+      referenciaExterna: input.referenciaExterna || null,
       confirmadoEn: new Date(),
       falladoEn: null,
       reembolsadoEn: null,
@@ -213,7 +213,7 @@ export async function createPaymentTransaction(
         rolActor: actor.rol,
         estado: "SUCCESS",
         metadata: {
-          orderId: pedido._id.toString(),
+          pedidoId: pedido._id.toString(),
           monto: payment.monto,
           metodoPago: payment.metodoPago,
         },
@@ -286,13 +286,13 @@ export async function confirmPaymentTransaction(
         rolActor: actor.rol,
         estado: "SUCCESS",
         metadata: {
-          orderId: pedido._id.toString(),
+          pedidoId: pedido._id.toString(),
         },
       },
       session
     );
 
-    return { payment, order: pedido };
+    return { payment, pedido };
   });
 }
 
@@ -370,14 +370,14 @@ export async function failPaymentTransaction(
         rolActor: actor.rol,
         estado: "SUCCESS",
         metadata: {
-          orderId: pedido._id.toString(),
+          pedidoId: pedido._id.toString(),
           reason: input.motivo || null,
         },
       },
       session
     );
 
-    return { payment, order: pedido };
+    return { payment, pedido };
   });
 }
 
@@ -463,14 +463,14 @@ export async function refundPaymentTransaction(
         rolActor: actor.rol,
         estado: "SUCCESS",
         metadata: {
-          orderId: pedido._id.toString(),
+          pedidoId: pedido._id.toString(),
           motivo: input.motivo || null,
         },
       },
       session
     );
 
-    return { payment, order: pedido };
+    return { payment, pedido };
   });
 }
 
@@ -491,9 +491,9 @@ export async function uploadComprobanteAndGenerateToken(
   if (payment.cliente?.toString() !== idActor) throw new AppError("No autorizado", 403);
   if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
 
-  const reviewToken = crypto.randomUUID();
+  const tokenRevision = crypto.randomUUID();
   payment.urlComprobante = comprobanteUrl;
-  payment.tokenRevision = reviewToken;
+  payment.tokenRevision = tokenRevision;
   payment.tokenRevisionUsado = false;
   await payment.save();
 
@@ -505,7 +505,7 @@ export async function uploadComprobanteAndGenerateToken(
     await pedido.save();
   }
 
-  return { payment, reviewToken };
+  return { payment, tokenRevision };
 }
 
 export async function getPaymentByReviewToken(token: string) {
@@ -517,7 +517,7 @@ export async function getPaymentByReviewToken(token: string) {
     .populate("cliente", "nombreCompleto email")
     .lean();
   if (!pedido) throw new AppError("Pedido no encontrado", 404);
-  return { payment, order: pedido };
+  return { payment, pedido };
 }
 
 export async function confirmPaymentByToken(token: string) {
@@ -539,8 +539,8 @@ export async function confirmPaymentByToken(token: string) {
     if (pedido.estadoEntrega !== "DELIVERED") pedido.estadoEntrega = "PENDING";
     await pedido.save({ session });
     await syncFulfillmentForOrder(pedido, session);
-    await recordAuditEventSafe({ accion: "PAYMENT_CONFIRMED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { orderId: pedido._id.toString(), via: "review_token" } }, session);
-    return { payment, order: pedido };
+    await recordAuditEventSafe({ accion: "PAYMENT_CONFIRMED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision" } }, session);
+    return { payment, pedido };
   });
 }
 
@@ -569,17 +569,17 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
     pedido.motivoCancelacion = reason || "Comprobante rechazado";
     await pedido.save({ session });
     await syncFulfillmentForOrder(pedido, session);
-    await recordAuditEventSafe({ accion: "PAYMENT_FAILED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { orderId: pedido._id.toString(), via: "review_token", reason } }, session);
-    return { payment, order: pedido };
+    await recordAuditEventSafe({ accion: "PAYMENT_FAILED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision", reason } }, session);
+    return { payment, pedido };
   });
 }
 
-export async function confirmCashOrder(orderId: string, actor: AuthActor) {
-  assertObjectId(orderId, "Pedido invalido");
+export async function confirmCashOrder(pedidoId: string, actor: AuthActor) {
+  assertObjectId(pedidoId, "Pedido invalido");
   await connectDB();
 
   return runInTransaction(async (session) => {
-    const pedido = await getPedidoForPayment(orderId, session);
+    const pedido = await getPedidoForPayment(pedidoId, session);
 
     if (pedido.metodoPago !== "EFECTIVO") {
       throw new AppError("El pedido no es en efectivo", 400);
@@ -601,11 +601,11 @@ export async function confirmCashOrder(orderId: string, actor: AuthActor) {
 
     const payment = await createImmediatePaidPaymentForOrder(
       {
-        orderId,
-        customerId: pedido.cliente?.toString(),
+        pedidoId,
+        clienteId: pedido.cliente?.toString(),
         metodoPago: "EFECTIVO",
-        amount: pedido.total,
-        externalReference: "CASH_PANEL_CONFIRM_BY_ADMIN",
+        monto: pedido.total,
+        referenciaExterna: "CASH_PANEL_CONFIRM_BY_ADMIN",
       },
       session
     );
@@ -632,6 +632,6 @@ export async function confirmCashOrder(orderId: string, actor: AuthActor) {
       session
     );
 
-    return { order: pedido, payment };
+    return { pedido, payment };
   });
 }

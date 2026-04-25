@@ -1,23 +1,26 @@
-export type PaymentTransactionStatus =
+export type EstadoTransaccionPago =
   | "PENDING"
   | "PAID"
   | "FAILED"
   | "REFUNDED";
 
-export interface PaymentTransaction {
+export interface TransaccionPago {
   _id: string;
-  paymentNumber: string;
-  orderId: string;
-  customer?: string | null;
+  numeroPago: string;
+  pedidoId: string;
+  cliente?: string | null;
   metodoPago: "EFECTIVO" | "QR";
-  amount: number;
-  estado: PaymentTransactionStatus;
+  monto: number;
+  estado: EstadoTransaccionPago;
   idempotencyKey?: string | null;
-  externalReference?: string | null;
-  failureReason?: string | null;
-  confirmedAt?: string | null;
-  failedAt?: string | null;
-  refundedAt?: string | null;
+  referenciaExterna?: string | null;
+  motivoFallo?: string | null;
+  confirmadoEn?: string | null;
+  falladoEn?: string | null;
+  reembolsadoEn?: string | null;
+  urlComprobante?: string | null;
+  tokenRevision?: string | null;
+  tokenRevisionUsado?: boolean;
   createdAt: string;
   updatedAt: string;
 }
