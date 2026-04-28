@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
-import { getCustomerOrderWithLegacyFallback } from "@/modules/orders/application/orders.service";
+import { getPedidoForActor } from "@/modules/orders/application/pedidos.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
 type Context = {
@@ -12,12 +12,12 @@ export async function GET(request: Request, context: Context) {
     const userAuth = await resolveApiAuth(request);
     const { id } = await context.params;
 
-    if (!userAuth || userAuth.role !== "CLIENTE") {
+    if (!userAuth || userAuth.rol !== "CLIENTE") {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 
-    const order = await getCustomerOrderWithLegacyFallback(userAuth.id, id);
-    return NextResponse.json(order);
+    const pedido = await getPedidoForActor("CLIENTE", userAuth.id, id);
+    return NextResponse.json(pedido);
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al obtener pedido",

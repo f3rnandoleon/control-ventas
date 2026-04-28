@@ -7,11 +7,11 @@ import SignOutButton from "@/components/SignOutButton";
 export default async function Home() {
   const session = await getServerSession(authOptions);
 
-  if (session?.user?.role === "ADMIN") {
+  if (session?.user?.rol === "ADMIN") {
     redirect("/dashboard/admin");
   }
 
-  if (session?.user?.role === "VENDEDOR") {
+  if (session?.user?.rol === "VENDEDOR") {
     redirect("/dashboard/vendedor");
   }
 

@@ -3,7 +3,7 @@ import { Schema, model, models } from "mongoose";
 export const authProviderValues = ["credentials", "google"] as const;
 export type AuthProvider = (typeof authProviderValues)[number];
 
-const userSchema = new Schema(
+const usuarioSchema = new Schema(
   {
     email: {
       type: String,
@@ -18,13 +18,13 @@ const userSchema = new Schema(
 
     password: {
       type: String,
-      required(this: { authProviders?: AuthProvider[] }) {
-        return !(this.authProviders || []).includes("google");
+      required(this: { proveedoresAuth?: AuthProvider[] }) {
+        return !(this.proveedoresAuth || []).includes("google");
       },
       select: false, // No se devuelve por defecto
     },
 
-    fullname: {
+    nombreCompleto: {
       type: String,
       required: true,
       minlength: [3, "El nombre debe tener al menos 3 caracteres"],
@@ -32,18 +32,18 @@ const userSchema = new Schema(
       trim: true,
     },
 
-    role: {
+    rol: {
       type: String,
       enum: ["ADMIN", "VENDEDOR", "CLIENTE"],
       default: "CLIENTE",
     },
 
-    isActive: {
+    estaActivo: {
       type: Boolean,
       default: true,
     },
 
-    authProviders: {
+    proveedoresAuth: {
       type: [
         {
           type: String,
@@ -60,18 +60,18 @@ const userSchema = new Schema(
       trim: true,
     },
 
-    avatarUrl: {
+    urlAvatar: {
       type: String,
       default: null,
       trim: true,
     },
 
-    emailVerified: {
+    emailVerificado: {
       type: Boolean,
       default: false,
     },
 
-    lastLogin: {
+    ultimoAcceso: {
       type: Date,
     },
   },
@@ -80,5 +80,5 @@ const userSchema = new Schema(
   }
 );
 
-const User = models.User || model("User", userSchema);
+const User = models.User || model("User", usuarioSchema);
 export default User;

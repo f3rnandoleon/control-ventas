@@ -1,30 +1,30 @@
 import type { ClientSession } from "mongoose";
-import Fulfillment from "@/models/fulfillment";
+import Entrega from "@/models/entrega";
 
 export const fulfillmentRepository = {
   findById(id: string, session?: ClientSession) {
-    return Fulfillment.findById(id)
+    return Entrega.findById(id)
       .session(session ?? null)
-      .populate("customer", "fullname email")
-      .populate("seller", "fullname email")
-      .populate("assignedTo", "fullname email");
+      .populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email")
+      .populate("asignadoA", "nombreCompleto email");
   },
 
-  findByOrderId(orderId: string, session?: ClientSession) {
-    return Fulfillment.findOne({ orderId })
+  findByOrderId(pedidoId: string, session?: ClientSession) {
+    return Entrega.findOne({ pedidoId })
       .session(session ?? null)
-      .populate("customer", "fullname email")
-      .populate("seller", "fullname email")
-      .populate("assignedTo", "fullname email");
+      .populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email")
+      .populate("asignadoA", "nombreCompleto email");
   },
 
   upsertByOrderId(
-    orderId: string,
+    pedidoId: string,
     payload: Record<string, unknown>,
     session?: ClientSession
   ) {
-    return Fulfillment.findOneAndUpdate(
-      { orderId },
+    return Entrega.findOneAndUpdate(
+      { pedidoId },
       { $set: payload },
       {
         new: true,
@@ -33,15 +33,15 @@ export const fulfillmentRepository = {
         session,
       }
     )
-      .populate("customer", "fullname email")
-      .populate("seller", "fullname email")
-      .populate("assignedTo", "fullname email");
+      .populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email")
+      .populate("asignadoA", "nombreCompleto email");
   },
 
   updateById(id: string, payload: Record<string, unknown>, session?: ClientSession) {
-    return Fulfillment.findByIdAndUpdate(id, { $set: payload }, { new: true, session })
-      .populate("customer", "fullname email")
-      .populate("seller", "fullname email")
-      .populate("assignedTo", "fullname email");
+    return Entrega.findByIdAndUpdate(id, { $set: payload }, { new: true, session })
+      .populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email")
+      .populate("asignadoA", "nombreCompleto email");
   },
 };

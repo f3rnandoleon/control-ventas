@@ -1,4 +1,4 @@
-import Producto from "@/models/product";
+import Producto from "@/models/producto";
 
 export const catalogRepository = {
   listAll() {

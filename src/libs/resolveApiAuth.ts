@@ -5,8 +5,8 @@ import { connectDB } from "@/libs/mongodb";
 export type AuthUser = {
   id: string;
   email?: string;
-  fullname?: string;
-  role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+  nombreCompleto?: string;
+  rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
 };
 
 /**
@@ -37,14 +37,14 @@ export async function resolveApiAuth(
         // En Node.js (el runtime de App Router API Routes) `jsonwebtoken` funciona perfectamente.
         const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
         await connectDB();
-        const dbUser = await User.findById(decoded.id).select("isActive").lean();
-        if (!dbUser || !dbUser.isActive) return null;
-        if (decoded && decoded.id && decoded.role) {
+        const dbUser = await User.findById(decoded.id).select("estaActivo");
+        if (!dbUser || !dbUser.estaActivo) return null;
+        if (decoded && decoded.id && decoded.rol) {
           return {
             id: decoded.id,
             email: decoded.email,
-            fullname: decoded.fullname,
-            role: decoded.role as AuthUser["role"],
+            nombreCompleto: decoded.nombreCompleto,
+            rol: decoded.rol as AuthUser["rol"],
           };
         }
       } catch (err) {
@@ -61,7 +61,7 @@ export async function resolveApiAuth(
   if (userId && role) {
     return {
       id: userId,
-      role: role as AuthUser["role"],
+      rol: role as AuthUser["rol"],
     };
   }
 

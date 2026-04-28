@@ -3,10 +3,10 @@ import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
-import type { Usuario } from "@/types/usuario";
+
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { updateUsuarioSchema } from "@/schemas/usuario.schema";
-import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
+import { asegurarPerfilClienteParaUsuario } from "@/modules/clientes/application/clientes.service";
 
 export async function PUT(
   request: Request,
@@ -36,12 +36,11 @@ export async function PUT(
 
     await connectDB();
 
-    const updateData: Partial<Usuario & { password: string }> = {
-      fullname: data.fullname,
-      email: data.email,
-      role: data.role,
-      isActive: data.isActive,
-    };
+    const updateData: Record<string, unknown> = {};
+    if (data.nombreCompleto) updateData.nombreCompleto = data.nombreCompleto;
+    if (data.email) updateData.email = data.email;
+    if (data.rol) updateData.rol = data.rol;
+    if (data.estaActivo !== undefined) updateData.estaActivo = data.estaActivo;
 
     // 🔐 SOLO actualizar password si viene y no está vacío
     if (data.password && data.password.trim() !== "") {
@@ -61,8 +60,8 @@ export async function PUT(
       );
     }
 
-    if (user.role === "CLIENTE") {
-      await ensureCustomerProfileForUser(user._id.toString());
+    if (user.rol === "CLIENTE") {
+      await asegurarPerfilClienteParaUsuario(user._id.toString());
     }
 
     return NextResponse.json(user);

@@ -1,19 +1,19 @@
 import type { ClientSession } from "mongoose";
-import Cart from "@/models/cart";
+import Carrito from "@/models/carrito";
 
 export const cartRepository = {
-  findByCustomer(customerId: string, session?: ClientSession) {
-    return Cart.findOne({ customer: customerId }).session(session ?? null);
+  findByCustomer(clienteId: string, session?: ClientSession) {
+    return Carrito.findOne({ cliente: clienteId }).session(session ?? null);
   },
 
-  upsertEmptyCart(customerId: string, session?: ClientSession) {
-    return Cart.findOneAndUpdate(
-      { customer: customerId },
+  upsertEmptyCart(clienteId: string, session?: ClientSession) {
+    return Carrito.findOneAndUpdate(
+      { cliente: clienteId },
       {
         $setOnInsert: {
-          customer: customerId,
+          cliente: clienteId,
           items: [],
-          totalItems: 0,
+          totalArticulos: 0,
           subtotal: 0,
         },
       },

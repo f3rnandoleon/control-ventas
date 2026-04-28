@@ -1,13 +1,13 @@
 "use client";
 
-import { Venta } from "@/types/venta";
+import { Pedido } from "@/types/pedido";
 
 export default function VentaTable({
   ventas,
   onVerDetalle,
 }: {
-  ventas: Venta[];
-  onVerDetalle: (venta: Venta) => void;
+  ventas: Pedido[];
+  onVerDetalle: (Pedido: Pedido) => void;
 }) {
   return (
     <div
@@ -18,7 +18,7 @@ export default function VentaTable({
         <thead className="text-gray-400 border-b border-white/10">
           <tr>
             <th className="px-6 py-4">Fecha</th>
-            <th>N° Venta</th>
+            <th>N° Pedido</th>
             <th>Vendedor</th>
             <th>Total</th>
             <th>Método</th>
@@ -35,8 +35,8 @@ export default function VentaTable({
               <td className="px-6 py-4">
                 {new Date(v.createdAt).toLocaleString()}
               </td>
-              <td>{v.numeroVenta}</td>
-              <td>{v.vendedor?.fullname}</td>
+              <td>{v.numeroPedido}</td>
+              <td>{v.vendedor?.nombreCompleto}</td>
               <td className="text-cyan-400 font-semibold">
                 Bs {v.total}
               </td>

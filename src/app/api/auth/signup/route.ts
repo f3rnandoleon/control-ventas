@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import User from "@/models/user";
 import { connectDB } from "@/libs/mongodb";
-import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
+import { asegurarPerfilClienteParaUsuario } from "@/modules/clientes/application/clientes.service";
 
 export async function POST(request: Request) {
   try {
-    const { email, password, fullname, role } = await request.json();
+    const { email, password, nombreCompleto, rol } = await request.json();
 
     // 🔎 Validaciones básicas
-    if (!email || !password || !fullname) {
+    if (!email || !password || !nombreCompleto) {
       return NextResponse.json(
         { message: "Todos los campos son obligatorios" },
         { status: 400 }
@@ -40,20 +40,20 @@ export async function POST(request: Request) {
 
     // 🧑‍💼 Control de roles
     const allowedRoles = ["CLIENTE"];
-    const userRole = allowedRoles.includes(role) ? role : "CLIENTE";
+    const userRole = allowedRoles.includes(rol) ? rol : "CLIENTE";
 
     const user = new User({
       email: emailLower,
-      fullname,
+      nombreCompleto,
       password: hashedPassword,
-      role: userRole,
-      isActive: true,
+      rol: userRole,
+      estaActivo: true,
       authProviders: ["credentials"],
       emailVerified: false,
     });
 
     await user.save();
-    await ensureCustomerProfileForUser(user._id.toString());
+    await asegurarPerfilClienteParaUsuario(user._id.toString());
 
     // 🧹 Respuesta limpia (sin token - debe hacer login después)
     return NextResponse.json(
@@ -62,8 +62,8 @@ export async function POST(request: Request) {
         user: {
           id: user._id,
           email: user.email,
-          fullname: user.fullname,
-          role: user.role,
+          nombreCompleto: user.nombreCompleto,
+          rol: user.rol,
         },
       },
       { status: 201 }

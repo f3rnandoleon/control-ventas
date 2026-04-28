@@ -87,23 +87,33 @@
       "departments": [
         {
           "name": "Cochabamba",
-          "branches": ["Av Melchor"]
+          "branches": [
+            "Av Melchor"
+          ]
         },
         {
           "name": "Santa Cruz",
-          "branches": ["Av. 3 Pasos al Frente"]
+          "branches": [
+            "Av. 3 Pasos al Frente"
+          ]
         },
         {
           "name": "Trinidad",
-          "branches": ["Bodega Terminal"]
+          "branches": [
+            "Bodega Terminal"
+          ]
         },
         {
           "name": "Sucre",
-          "branches": ["Bodega Terminal"]
+          "branches": [
+            "Bodega Terminal"
+          ]
         },
         {
           "name": "Potosi",
-          "branches": ["Bodega Terminal"]
+          "branches": [
+            "Bodega Terminal"
+          ]
         }
       ]
     },
@@ -123,11 +133,15 @@
         },
         {
           "name": "Quillacollo",
-          "branches": ["Av Rosendi Zona Central"]
+          "branches": [
+            "Av Rosendi Zona Central"
+          ]
         },
         {
           "name": "Sacaba",
-          "branches": ["Av Villazon Km.2 Frente al Servicio de Caminos"]
+          "branches": [
+            "Av Villazon Km.2 Frente al Servicio de Caminos"
+          ]
         }
       ]
     }

@@ -2,12 +2,12 @@ import type { Variante } from "@/types/producto";
 
 type VariantStockShape = {
   stock?: number | null;
-  reservedStock?: number | null;
+  stockReservado?: number | null;
 };
 
 export const matchesVariant = (current: Variante, target: Variante) => {
-  if (current.variantId && target.variantId) {
-    return current.variantId === target.variantId;
+  if (current.varianteId && target.varianteId) {
+    return current.varianteId === target.varianteId;
   }
 
   return (
@@ -18,12 +18,12 @@ export const matchesVariant = (current: Variante, target: Variante) => {
 };
 
 export const getVariantReservedStock = (
-  variant: { reservedStock?: number | null }
+  variant: { stockReservado?: number | null }
 ) =>
-  Math.max(0, variant.reservedStock || 0);
+  Math.max(0, variant.stockReservado || 0);
 
 export const getVariantAvailableStock = (
-  variant: { stock?: number | null; reservedStock?: number | null }
+  variant: { stock?: number | null; stockReservado?: number | null }
 ) => Math.max(0, (variant.stock || 0) - getVariantReservedStock(variant));
 
 export const withVariantAvailability = <
@@ -37,7 +37,7 @@ export const withVariantAvailability = <
   ...producto,
   variantes: (producto.variantes ?? []).map((variante) => ({
     ...variante,
-    reservedStock: getVariantReservedStock(variante),
+    stockReservado: getVariantReservedStock(variante),
     stockDisponible: getVariantAvailableStock(variante),
   })),
 });

@@ -37,7 +37,7 @@ export default function DashboardPerfilPage() {
   } = useForm<UpdatePerfilInput>({
     resolver: zodResolver(updatePerfilSchema),
     defaultValues: {
-      fullname: "",
+      nombreCompleto: "",
       email: "",
       password: "",
     },
@@ -49,7 +49,7 @@ export default function DashboardPerfilPage() {
         const data = await getPerfil();
         setPerfil(data);
         reset({
-          fullname: data.fullname,
+          nombreCompleto: data.nombreCompleto,
           email: data.email,
           password: "",
         });
@@ -69,11 +69,11 @@ export default function DashboardPerfilPage() {
     () => [
       {
         label: "Rol",
-        value: perfil?.role || "-",
+        value: perfil?.rol || "-",
       },
       {
         label: "Estado",
-        value: perfil?.isActive ? "Activo" : "Inactivo",
+        value: perfil?.estaActivo ? "Activo" : "Inactivo",
       },
       {
         label: "Creado",
@@ -81,7 +81,7 @@ export default function DashboardPerfilPage() {
       },
       {
         label: "Ultimo acceso",
-        value: formatDate(perfil?.lastLogin),
+        value: formatDate(perfil?.ultimoAcceso),
       },
     ],
     [perfil]
@@ -92,20 +92,20 @@ export default function DashboardPerfilPage() {
       setSaving(true);
 
       const updatedPerfil = await updatePerfil({
-        fullname: data.fullname,
+        nombreCompleto: data.nombreCompleto,
         email: data.email,
         password: data.password,
       });
 
       setPerfil(updatedPerfil);
       reset({
-        fullname: updatedPerfil.fullname,
+        nombreCompleto: updatedPerfil.nombreCompleto,
         email: updatedPerfil.email,
         password: "",
       });
 
       await update({
-        fullname: updatedPerfil.fullname,
+        nombreCompleto: updatedPerfil.nombreCompleto,
         email: updatedPerfil.email,
       });
 
@@ -145,13 +145,13 @@ export default function DashboardPerfilPage() {
         <section className="surface-card-strong rounded-3xl p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-600 to-cyan-500 text-3xl font-bold text-white">
-              {perfil?.fullname?.charAt(0).toUpperCase() || "U"}
+              {perfil?.nombreCompleto?.charAt(0).toUpperCase() || "U"}
             </div>
             <div className="space-y-1">
               <p className="text-sm uppercase tracking-[0.3em] text-sky-700">
                 Cuenta
               </p>
-              <h2 className="text-2xl font-semibold">{perfil?.fullname}</h2>
+              <h2 className="text-2xl font-semibold">{perfil?.nombreCompleto}</h2>
               <p className="text-sm text-slate-600">{perfil?.email}</p>
             </div>
           </div>
@@ -187,13 +187,13 @@ export default function DashboardPerfilPage() {
             <div>
               <label className="label">Nombre completo</label>
               <input
-                {...register("fullname")}
+                {...register("nombreCompleto")}
                 className="input"
                 placeholder="Nombre completo"
               />
-              {errors.fullname && (
+              {errors.nombreCompleto && (
                 <p className="mt-1 text-xs text-red-500">
-                  {errors.fullname.message}
+                  {errors.nombreCompleto.message}
                 </p>
               )}
             </div>
@@ -244,7 +244,7 @@ export default function DashboardPerfilPage() {
                 className="btn-secondary"
                 onClick={() =>
                   reset({
-                    fullname: perfil?.fullname || "",
+                    nombreCompleto: perfil?.nombreCompleto || "",
                     email: perfil?.email || "",
                     password: "",
                   })

@@ -53,6 +53,7 @@ export async function POST(request: Request) {
     const { movimiento } = await adjustInventoryStock({
       ...validation.data,
       userIdRaw,
+      rolActor: role,
     });
 
     return NextResponse.json(

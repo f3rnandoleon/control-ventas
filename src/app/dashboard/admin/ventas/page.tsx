@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getVentas } from "@/services/venta.service";
+import { getVentas } from "@/services/pedidos.service";
 import { getProductos } from "@/services/producto.service";
-import { Venta } from "@/types/venta";
+import { Pedido } from "@/types/pedido";
 import VentaPOS from "@/components/ventas/VentaPOS";
 import { useAuth } from "@/context/AuthContext";
 import VentaTable from "@/components/ventas/VentaTable";
@@ -13,10 +13,10 @@ import { Producto } from "@/types/producto";
 export default function AdminVentasPage() {
   const { loading: authLoading } = useAuth();
 
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [ventas, setVentas] = useState<Pedido[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(null);
+  const [ventaSeleccionada, setVentaSeleccionada] = useState<Pedido | null>(null);
   const load = async () => {
     try {
       setLoading(true);
@@ -47,12 +47,12 @@ export default function AdminVentasPage() {
       {/* Historial */}
       <VentaTable
         ventas={ventas}
-        onVerDetalle={(venta) => setVentaSeleccionada(venta)}
+        onVerDetalle={(Pedido) => setVentaSeleccionada(Pedido)}
       />
 
       {/* Modal detalle */}
       <VentaDetalleModal
-        venta={ventaSeleccionada}
+        Pedido={ventaSeleccionada}
         onClose={() => setVentaSeleccionada(null)}
       />
       

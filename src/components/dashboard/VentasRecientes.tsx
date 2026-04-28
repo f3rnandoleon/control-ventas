@@ -1,11 +1,11 @@
 "use client";
 
-import { Venta } from "@/types/venta";
+import { Pedido } from "@/types/pedido";
 
 export default function VentasRecientes({
   ventas,
 }: {
-  ventas: Venta[];
+  ventas: Pedido[];
 }) {
   return (
     <div
@@ -22,7 +22,7 @@ export default function VentasRecientes({
             key={v._id}
             className="flex justify-between border-b border-white/5 pb-2"
           >
-            <span>{v.numeroVenta}</span>
+            <span>{v.numeroPedido}</span>
             <span className="text-cyan-400 font-semibold">
               Bs {v.total}
             </span>

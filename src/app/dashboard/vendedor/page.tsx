@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getVentas } from "@/services/venta.service";
-import { Venta } from "@/types/venta";
+import { getVentas } from "@/services/pedidos.service";
+import { Pedido } from "@/types/pedido";
 import VendedorStats from "@/components/vendedor/VendedorStats";
 import VentasPropiasRecientes from "@/components/vendedor/VentasPropiasRecientes";
 import Link from "next/link";
 
 export default function VendedorDashboardPage() {
   const { user } = useAuth();
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [ventas, setVentas] = useState<Pedido[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -34,7 +34,7 @@ export default function VendedorDashboardPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">
-        Bienvenido, {user?.fullname}
+        Bienvenido, {user?.nombreCompleto}
       </h1>
 
       <VendedorStats
@@ -47,7 +47,7 @@ export default function VendedorDashboardPage() {
           href="/dashboard/vendedor/ventas"
           className="btn-primary"
         >
-          Registrar venta
+          Registrar Pedido
         </Link>
         <Link
           href="/dashboard/vendedor/productos"

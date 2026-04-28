@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 interface User {
   id: string;
   email: string;
-  fullname: string;
-  role: "ADMIN" | "VENDEDOR" | "CLIENTE";
+  nombreCompleto: string;
+  rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
 }
 
 interface AuthContextType {
@@ -34,8 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ? {
         id: session.user.id,
         email: session.user.email,
-        fullname: session.user.fullname,
-        role: session.user.role,
+        nombreCompleto: session.user.nombreCompleto,
+        rol: session.user.rol,
       }
     : null;
 
@@ -60,9 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch("/api/auth/session");
       const sessionData = await response.json();
 
-      if (sessionData?.user?.role === "ADMIN") {
+      if (sessionData?.user?.rol === "ADMIN") {
         router.push(callbackUrl || "/dashboard/admin");
-      } else if (sessionData?.user?.role === "VENDEDOR") {
+      } else if (sessionData?.user?.rol === "VENDEDOR") {
         router.push(callbackUrl || "/dashboard/vendedor");
       } else {
         router.push("/");

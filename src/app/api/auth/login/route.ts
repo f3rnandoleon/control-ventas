@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!user.isActive) {
+    if (!user.estaActivo) {
       return NextResponse.json(
         { message: "Usuario deshabilitado" },
         { status: 401 }
@@ -59,17 +59,17 @@ export async function POST(request: Request) {
     }
 
     try {
-      user.lastLogin = new Date();
+      user.ultimoAcceso = new Date();
       await user.save();
     } catch (error) {
-      console.error("Error actualizando lastLogin en /api/auth/login:", error);
+      console.error("Error actualizando ultimoAcceso en /api/auth/login:", error);
     }
 
     const authUser = buildAuthTokenUser({
       _id: user._id,
       email: user.email,
-      fullname: user.fullname,
-      role: user.role,
+      nombreCompleto: user.nombreCompleto,
+      rol: user.rol,
     });
     const { accessToken, refreshToken } = issueAuthTokens(authUser);
 

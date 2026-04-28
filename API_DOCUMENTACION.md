@@ -1,268 +1,947 @@
 # Documentacion API - Control Ventas
 
-Base URL en desarrollo: `http://localhost:3000/api`
-Base URL en producción: `https://control-ventas-azure.vercel.app/api`
+## Proposito
 
-## Acceso desde Web vs Móvil
+Este documento describe la API actual del proyecto `control-ventas` tal como esta implementada hoy en el repositorio.
 
-- **Web (Panel Interno/Admin)**: Utiliza `NextAuth` con cookies `httpOnly`. No es necesario enviar headers manuales si se navega desde el mismo dominio.
-- **Móvil / Aplicaciones Externas**: Utiliza `JWT` tradicional. Es **obligatorio** enviar el token en el header:
-  `Authorization: Bearer <TU_TOKEN_AQUÍ>`
+Esta guia esta pensada para tres consumidores:
+
+- Web publica de clientes
+- Dashboard web interno (`ADMIN` y `VENDEDOR`)
+- App movil o cliente externo que consuma la API via JWT Bearer
+
+Objetivos del documento:
+
+- dar un mapa confiable de endpoints y permisos
+- documentar payloads y respuestas principales
+- alinear integraciones web y movil con el backend real
+- dejar claro que contratos son publicos y cuales son internos
+
+## Arquitectura general
+
+La API esta construida sobre Next.js App Router, con endpoints en `src/app/api/**`, y organizada por dominios:
+
+- `auth`
+- `catalog`
+- `cart`
+- `clientes`
+- `orders/pedidos`
+- `payments/pagos`
+- `fulfillment/entregas`
+- `inventory/inventario`
+- `pos`
+- `reports`
+- `ops`
+- `audit`
+
+Modelo central de negocio actual:
+
+- `Pedido` es la entidad unificada para venta y order legacy
+- `TransaccionPago` representa el estado financiero
+- `Entrega` representa el estado logistico
+
+## Base URL
+
+Entornos tipicos:
+
+- Desarrollo: `http://localhost:3000/api`
+- Produccion: `https://control-ventas-azure.vercel.app/api`
+
+La API actualmente es **unversionada**.
+
+Recomendacion de evolucion:
+
+1. Mantener esta guia como fuente de verdad operativa.
+2. Introducir `v1` antes de abrir la API a integradores externos de largo plazo.
+3. Publicar luego una especificacion OpenAPI formal.
+
+## Acceso desde web vs movil
+
+### Web interna
+
+El dashboard interno usa `NextAuth` con sesion web.
+
+Caracteristicas:
+
+- cookies `httpOnly`
+- proteccion de rutas en `middleware`
+- no hace falta mandar manualmente `Authorization` desde el mismo dominio
+- el middleware inyecta `x-user-id` y `x-user-role` de forma segura para las APIs
+
+### Web cliente o app movil
+
+La app movil y cualquier cliente desacoplado deben usar JWT Bearer.
+
+Header requerido:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+El helper `resolveApiAuth()` sigue esta estrategia:
+
+1. Intenta Bearer token
+2. Si no existe, cae al contexto seguro de NextAuth agregado por middleware
+
+Conclusiones practicas:
+
+- Dashboard interno: usar sesion NextAuth
+- App movil: usar Bearer token
+- Evitar mezclar ambos modos en un mismo cliente salvo necesidad muy clara
 
 ## Autenticacion y autorizacion
 
-- La API usa un modelo **híbrido**:
-  - NextAuth (JWT en cookie httpOnly) para el panel interno.
-  - Token JWT tradicional (`Authorization: Bearer <token>`) emitido por `/api/auth/login` para acceso desde clientes externos o aplicaciones móviles.
-  - Login cliente con Google mediante `POST /api/auth/google`, que tambien devuelve JWT tradicional para la web cliente y aplicaciones móviles.
-- Middleware protege rutas, rechaza spoofing de headers y agrega info interna confiable:
-  - `x-user-id`
-  - `x-user-role`
-- El mismo middleware controla tambien rutas web:
-  - `/dashboard/**` requiere sesion valida y redirige segun rol.
-  - `/dashboard` redirige a `/dashboard/admin` o `/dashboard/vendedor`.
-  - `/login` y `/register` siguen siendo publicas; solo redirigen al dashboard correspondiente si ya existe sesion.
-- Rutas publicas:
-  - `POST /api/auth/signup`
-  - `POST /api/auth/google`
-  - `POST /api/auth/login`
-  - `GET|POST /api/auth/[...nextauth]`
-  - `GET /api/productos/publicos`
-  - `GET /api/productos/publicos/:id`
-  - `GET /api/verify/payment/:token` *(link de revision de comprobante enviado por Telegram)*
-  - `POST /api/verify/payment/:token/confirm` *(autorizado por token UUID de un solo uso)*
-  - `POST /api/verify/payment/:token/reject` *(autorizado por token UUID de un solo uso)*
-  - `GET /api/delivery-options` *(público para web y móvil)*
-  - `GET /api/health`
+## Roles
 
-## Constantes y Etiquetas (UI)
+Roles soportados:
 
-Para mantener la consistencia entre la Web y la App Móvil, se recomienda utilizar las siguientes etiquetas para los estados:
+- `ADMIN`
+- `VENDEDOR`
+- `CLIENTE`
 
-### Estados de Pedido (`orderStatus`)
-| Código | Etiqueta |
-|---|---|
-| `PENDING_PAYMENT` | Pendiente de Pago |
-| `CONFIRMED` | Confirmado |
-| `PREPARING` | En Preparación |
-| `READY` | Listo para Entrega |
-| `IN_TRANSIT` | En Camino |
-| `DELIVERED` | Entregado |
-| `CANCELLED` | Cancelado |
+## Rutas de autenticacion
 
-### Estados de Pago (`paymentStatus`)
-| Código | Etiqueta |
-|---|---|
-| `PENDING` | Pendiente |
-| `PAID` | Pagado |
-| `FAILED` | Fallido |
-| `REFUNDED` | Reembolsado |
+| Metodo | Ruta | Uso |
+|---|---|---|
+| `POST` | `/api/auth/login` | Login JWT por email/password |
+| `POST` | `/api/auth/signup` | Registro de clientes |
+| `POST` | `/api/auth/google` | Login/registro con Google y JWT |
+| `GET/POST` | `/api/auth/[...nextauth]` | Flujo de sesion NextAuth para web |
 
-### Estados de Logística (`fulfillmentStatus`)
-| Código | Etiqueta |
-|---|---|
-| `PENDING` | Pendiente |
-| `READY` | Listo |
-| `IN_TRANSIT` | Enviado |
-| `DELIVERED` | Entregado |
-| `NOT_APPLICABLE` | No Aplica |
-| `CANCELLED` | Cancelado |
+## Tokens
 
-### Métodos de Entrega (`deliveryMethod`)
-| Código | Etiqueta |
-|---|---|
-| `WHATSAPP` | 📱 WhatsApp |
-| `PICKUP_POINT` | 🏠 Punto de Encuentro |
-| `SHIPPING_NATIONAL` | 📦 Envío Nacional |
+`/api/auth/login` y `/api/auth/google` devuelven:
 
-- Rutas protegidas:
-  - Solo `ADMIN`: `/api/admin/**`, `/api/reportes/**`, `/api/usuarios/**`, `/api/uploads/**`, `/api/admin/delivery-options`
-  - `ADMIN` o `VENDEDOR`: `/api/productos/**`, `/api/ventas/**`, `/api/inventario/**`, `/api/pos/**`
-  - `ADMIN` o `VENDEDOR`: `/api/orders/**` (excluyendo acciones de cliente), `POST /api/fulfillment`, `PATCH /api/fulfillment/**`
-  - `CLIENTE`: `/api/cart/**`, `/api/mis-pedidos/**`, `/api/customers/me/**`
-  - `CLIENTE`: `POST /api/orders/checkout`, `GET /api/orders/:id` (propios), `PATCH /api/orders/:id` (cancelación/edición limitada)
-  - `CLIENTE`, `ADMIN` o `VENDEDOR`: `/api/payments/**`
+- `accessToken`
+- `refreshToken`
+- `user`
 
-## Formato de error de validacion (Zod)
+Importante:
+
+- hoy **no existe endpoint de refresh**
+- el `refreshToken` no tiene flujo publico de renovacion todavia
+- para la app movil, la estrategia actual debe considerar re-login o futura ampliacion del backend
+
+## Matriz de acceso por dominio
+
+| Dominio | CLIENTE | VENDEDOR | ADMIN |
+|---|---|---|---|
+| Catalogo publico | Si | Si | Si |
+| Catalogo interno | No | Si | Si |
+| Carrito | Si | No | No |
+| Checkout y pedidos propios | Si | No | No |
+| Pedidos operativos | No | Si | Si |
+| Pagos propios | Si | Si, si le pertenece o lo opera | Si |
+| Refund | No | Si | Si |
+| Entregas propias (lectura) | Si | Si | Si |
+| Entregas operativas | No | Si | Si |
+| POS | No | Si | Si |
+| Inventario | No | Si | Si |
+| Reportes | No | No | Si |
+| Usuarios | No | No | Si |
+| Ops y auditoria | No | No | Si |
+
+## Rate limiting
+
+El middleware aplica rate limiting en memoria:
+
+| Segmento | Limite |
+|---|---:|
+| Login / signup / paginas auth | 5 req/min por IP |
+| `/api/productos/publicos` | 100 req/min por IP |
+| APIs protegidas GET | 60 req/min por usuario |
+| APIs protegidas de escritura | 30 req/min por usuario |
+
+Si se supera el limite:
+
+- status `429`
+- body: `{ "message": "Demasiadas solicitudes. Intentalo mas tarde." }`
+- header: `Retry-After: 60`
+
+## Convenciones transversales
+
+### Formato de datos
+
+- `application/json` para la mayoria de endpoints
+- `multipart/form-data` para imagenes y comprobantes
+- fechas en ISO 8601
+- IDs MongoDB en formato ObjectId cuando aplica
+
+### Error general
+
+```json
+{
+  "message": "Error al crear pedido desde el carrito"
+}
+```
+
+Si el error viene de dominio (`AppError`), puede incluir `code`:
+
+```json
+{
+  "message": "Pedido no encontrado",
+  "code": "ALGO_OPCIONAL"
+}
+```
+
+### Error de validacion (Zod)
 
 Status: `400`
 
 ```json
 {
-  "message": "Datos inválidos",
+  "message": "Datos invalidos",
   "errors": [
-    { "field": "campo", "message": "detalle" }
+    { "field": "email", "message": "Email invalido" },
+    { "field": "items.0.cantidad", "message": "La cantidad no puede exceder 1000" }
   ]
+}
+```
+
+### Request ID
+
+Los endpoints administrativos de ops y auditoria pueden devolver `x-request-id` y/o `requestId`.
+
+Recomendacion:
+
+- si el cliente movil tiene capa propia de networking, mandar `x-request-id` en requests criticas
+- usarlo para correlacion con logs
+
+## Variables de entorno relevantes
+
+| Variable | Uso |
+|---|---|
+| `MONGODB_URL` | Conexion a MongoDB |
+| `JWT_SECRET` | Firma de JWT Bearer |
+| `JWT_EXPIRES_IN` | Duracion del access token |
+| `NEXTAUTH_SECRET` | Sesiones NextAuth |
+| `NEXTAUTH_URL` | URL base web |
+| `GOOGLE_CLIENT_ID` | Google OAuth |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth |
+| `NEXT_PUBLIC_APP_URL` | Base publica para links de verificacion |
+| `CLOUDINARY_CLOUD_NAME` | Uploads Cloudinary |
+| `CLOUDINARY_API_KEY` | Uploads Cloudinary |
+| `CLOUDINARY_API_SECRET` | Uploads Cloudinary |
+| `TELEGRAM_BOT_TOKEN` | Notificaciones admin |
+| `TELEGRAM_CHAT_ID` | Destino Telegram |
+| `CRON_SECRET` | Proteccion del cron de reservas |
+| `BACKUP_ENABLED` | Estado de backup en ops |
+| `BACKUP_PROVIDER` | Fuente de backup |
+| `BACKUP_TARGET` | Destino del backup |
+| `BACKUP_RETENTION_DAYS` | Retencion |
+| `BACKUP_MAX_AGE_HOURS` | Umbral de alerta |
+| `LAST_BACKUP_AT` | Ultimo backup reportado |
+
+## Modelos principales visibles desde API
+
+## Usuario autenticado
+
+```json
+{
+  "id": "665f...",
+  "email": "cliente@correo.com",
+  "nombreCompleto": "Cliente Demo",
+  "rol": "CLIENTE"
+}
+```
+
+## Producto
+
+```json
+{
+  "_id": "665f...",
+  "nombre": "Chompa Alpaca",
+  "modelo": "Invierno 2026",
+  "sku": "CH-001",
+  "precioVenta": 120,
+  "precioCosto": 70,
+  "categoria": "Chompas",
+  "variantes": [
+    {
+      "varianteId": "665f...",
+      "color": "Azul",
+      "talla": "M",
+      "stock": 10,
+      "stockReservado": 2,
+      "codigoBarra": "123456",
+      "qrCode": "QR-123456"
+    }
+  ]
+}
+```
+
+## Carrito
+
+```json
+{
+  "_id": "665f...",
+  "cliente": "665f...",
+  "items": [
+    {
+      "_id": "665f...",
+      "productoId": "665f...",
+      "variante": {
+        "varianteId": "665f...",
+        "color": "Azul",
+        "talla": "M"
+      },
+      "productoSnapshot": {
+        "nombre": "Chompa Alpaca",
+        "sku": "CH-001"
+      },
+      "precioUnitario": 120,
+      "cantidad": 2,
+      "subtotal": 240
+    }
+  ],
+  "totalArticulos": 2,
+  "subtotal": 240
+}
+```
+
+## Pedido
+
+```json
+{
+  "_id": "665f...",
+  "numeroPedido": "P-20260424-0001",
+  "canal": "WEB",
+  "estadoPedido": "PENDING_PAYMENT",
+  "estadoPago": "PENDING",
+  "estadoEntrega": "PENDING",
+  "estadoReservaStock": "RESERVED",
+  "metodoPago": "QR",
+  "subtotal": 240,
+  "descuento": 0,
+  "total": 240,
+  "gananciaTotal": 100,
+  "snapshotCliente": {
+    "usuarioId": "665f...",
+    "nombreCompleto": "Cliente Demo",
+    "email": "cliente@correo.com"
+  },
+  "snapshotEntrega": {
+    "metodo": "PICKUP_POINT",
+    "puntoRecojo": "Plaza del Estudiante",
+    "telefono": "76543210"
+  },
+  "items": []
+}
+```
+
+Notas:
+
+- Para `CLIENTE`, la API sanea algunos pedidos y oculta costos/ganancias internas.
+- Para `ADMIN` y `VENDEDOR`, puede devolver informacion financiera completa.
+
+## TransaccionPago
+
+```json
+{
+  "_id": "665f...",
+  "numeroPago": "P-1713960000000",
+  "pedidoId": "665f...",
+  "metodoPago": "QR",
+  "monto": 240,
+  "estado": "PENDING",
+  "referenciaExterna": null,
+  "urlComprobante": null,
+  "tokenRevision": null
+}
+```
+
+## Entrega
+
+```json
+{
+  "_id": "665f...",
+  "pedidoId": "665f...",
+  "numeroPedido": "P-20260424-0001",
+  "canal": "WEB",
+  "metodo": "PICKUP_POINT",
+  "estado": "PENDING",
+  "puntoRecojo": "Plaza del Estudiante",
+  "telefono": "76543210",
+  "codigoSeguimiento": null,
+  "nombreTransportista": null
 }
 ```
 
 ## Endpoints
 
-## Variables de entorno requeridas
+## 1. Publicos y de salud
 
-| Variable | Descripcion | Ejemplo |
-|---|---|---|
-| `MONGODB_URL` | URI de conexion a MongoDB Atlas | `mongodb+srv://...` |
-| `JWT_SECRET` | Secreto para firmar tokens JWT | string largo aleatorio |
-| `JWT_EXPIRES_IN` | Duracion del access token | `1d` |
-| `NEXTAUTH_SECRET` | Secreto de NextAuth | string aleatorio |
-| `NEXTAUTH_URL` | URL base del servidor | `http://localhost:3000` |
-| `CLOUDINARY_CLOUD_NAME` | Nombre del cloud en Cloudinary | `mi-cloud` |
-| `CLOUDINARY_API_KEY` | API Key de Cloudinary | `767714819689957` |
-| `CLOUDINARY_API_SECRET` | API Secret de Cloudinary | `...` |
-| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloud name publico (frontend) | `mi-cloud` |
-| `GOOGLE_CLIENT_ID` | Client ID de Google OAuth | `...apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | Client Secret de Google OAuth | `GOCSPX-...` |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Client ID publico para Google Sign-In web | `...apps.googleusercontent.com` |
-| `NEXT_PUBLIC_APP_URL` | URL publica del frontend (para construir links de verificacion) | `https://control-ventas-azure.vercel.app` |
-| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram (BotFather) para notificaciones al admin | `123456:AAEMwor...` |
-| `TELEGRAM_CHAT_ID` | ID del chat/usuario Telegram del admin | `1226712516` |
-| `BACKUP_ENABLED` | Habilita el reporte de backup en `/api/admin/ops/overview` | `true` |
-| `BACKUP_PROVIDER` | Proveedor de backup | `atlas` / `manual-local` |
-| `BACKUP_TARGET` | Destino del backup | `s3://bucket` |
-| `BACKUP_RETENTION_DAYS` | Dias de retencion | `7` |
-| `BACKUP_MAX_AGE_HOURS` | Horas maximas antes de alertar backup stale | `24` |
-| `LAST_BACKUP_AT` | Timestamp del ultimo backup (ISO 8601) | `2026-04-04T09:30:00.000Z` |
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/estado` | Publica | Estado del sistema y de MongoDB |
+| `GET` | `/api/productos/publicos` | Publica | Catalogo publico |
+| `GET` | `/api/productos/publicos/:id` | Publica | Detalle de producto publico |
+| `GET` | `/api/delivery-options` | Publica | Puntos, horarios y empresas de entrega |
+| `GET` | `/api/verificar/pago/:token` | Token de un solo uso | Vista de verificacion de comprobante |
+| `POST` | `/api/verificar/pago/:token/confirm` | Token de un solo uso | Confirma pago QR |
+| `POST` | `/api/verificar/pago/:token/reject` | Token de un solo uso | Rechaza pago QR |
 
----
-
-## Garantias de consistencia
-
-- Los flujos criticos ahora corren dentro de transacciones MongoDB:
-  - `POST /api/inventario`
-  - `POST /api/ventas`
-  - `POST /api/orders/checkout`
-  - `POST /api/payments`
-  - `POST /api/payments/:id/confirm`
-  - `POST /api/payments/:id/fail`
-  - `POST /api/payments/:id/refund`
-  - `POST /api/verify/payment/:token/confirm`
-  - `POST /api/verify/payment/:token/reject`
-- Si una operacion critica falla a mitad del proceso, el backend revierte los cambios del bloque transaccional para evitar:
-  - stock descontado sin venta
-  - pedido creado sin reserva
-  - pago confirmado sin venta/pedido actualizados
-  - devoluciones con stock o movimientos incompletos
-- Requisito de infraestructura:
-  - para que estas transacciones funcionen en produccion, MongoDB debe correr como `replica set` o `cluster sharded`
-  - si el backend detecta una base `standalone`, los flujos criticos transaccionales responderan `503`
-
-### Uploads (solo ADMIN)
-
-### Migraciones Legacy (solo ADMIN)
-
-#### `GET /api/admin/migrations/legacy`
-Obtiene el estado del backfill legacy para saber cuanto falta migrar al core nuevo.
-
-Respuesta `200`:
+### Ejemplo `GET /api/estado`
 
 ```json
 {
-  "totals": {
-    "sales": 120,
-    "orders": 145,
-    "payments": 118,
-    "fulfillments": 140
-  },
-  "pendingBackfill": {
-    "salesWithoutOrder": 5,
-    "saleBackedOrdersWithoutPayment": 12,
-    "ordersWithoutFulfillment": 3
-  },
-  "samples": {
-    "salesWithoutOrder": ["ventaId1"],
-    "saleBackedOrdersWithoutPayment": ["orderId1"],
-    "ordersWithoutFulfillment": ["orderId2"]
-  },
-  "compatibility": {
-    "legacyFallbackStillRequired": true,
-    "readyToDisableLegacyFallback": false
+  "estado": "ok",
+  "timestamp": "2026-04-24T20:00:00.000Z",
+  "services": {
+    "mongodb": {
+      "connected": true,
+      "transactionsSupported": true,
+      "topology": "REPLICA_SET",
+      "dbName": "test",
+      "serverStatus": "connected"
+    }
   }
 }
 ```
 
-Notas:
-- `salesWithoutOrder`: ventas historicas todavia no migradas a `Order`.
-- `saleBackedOrdersWithoutPayment`: pedidos ligados a una venta pero aun sin `PaymentTransaction`.
-- `ordersWithoutFulfillment`: pedidos sin documento logistico sincronizado.
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `500`
-
-#### `GET /api/admin/ops/overview`
-Obtiene el estado operativo del sistema central.
-
-Incluye:
-
-- runtime de MongoDB
-- soporte de transacciones
-- estado declarado de backups
-- alertas operativas
-- estado del backfill legacy
-- eventos recientes de auditoria
-
-Respuesta `200`:
+### Ejemplo `GET /api/delivery-options`
 
 ```json
 {
-  "requestId": "0d5c3d74-3f72-4d7f-9d7c-1f7cf4d0a111",
-  "timestamp": "2026-04-04T19:00:00.000Z",
-  "runtime": {
-    "connected": true,
-    "transactionsSupported": true,
-    "topology": "REPLICA_SET",
-    "dbName": "control_ventas",
-    "serverStatus": "connected"
-  },
-  "backup": {
-    "enabled": true,
-    "provider": "atlas",
-    "target": "s3://bucket/backups",
-    "retentionDays": 7,
-    "lastBackupAt": "2026-04-04T18:00:00.000Z",
-    "maxAgeHours": 24,
-    "stale": false
-  },
-  "alerts": [],
-  "legacy": {},
-  "metrics": {},
-  "recentAuditEvents": []
+  "pickupPoints": [
+    { "id": "plaza-del-estudiante", "name": "Plaza Del Estudiante" }
+  ],
+  "pickupSchedules": [
+    {
+      "id": "lunes-1200-1800",
+      "day": "Lunes",
+      "start": "12:00",
+      "end": "18:00",
+      "label": "Lunes: 12:00-18:00"
+    }
+  ],
+  "shippingCompanies": [
+    {
+      "id": "bolivar-cargo",
+      "name": "BolivarCargo",
+      "departments": [
+        {
+          "name": "Cochabamba",
+          "branches": ["Av Melchor"]
+        }
+      ]
+    }
+  ]
 }
 ```
 
-Respuestas:
-- `200`
-- `401`
-- `403`
-- `500`
+## 2. Autenticacion
 
-#### `GET /api/admin/audit-events?limit=50`
-Lista eventos recientes de auditoria.
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Publica | Login con email/password |
+| `POST` | `/api/auth/signup` | Publica | Registro de cliente |
+| `POST` | `/api/auth/google` | Publica | Login/registro con Google |
+| `GET/POST` | `/api/auth/[...nextauth]` | Web | Sesion NextAuth |
 
-Notas:
-- `limit`: `1..200`
-- Registra acciones criticas como:
-  - checkout
-  - pagos
-  - ventas
-  - fulfillment
-  - ajustes manuales de inventario
-  - migraciones
-  - verificaciones E2E
+### `POST /api/auth/login`
 
-Respuestas:
-- `200`
-- `401`
-- `403`
-- `500`
+Request:
 
-#### `POST /api/admin/ops/verify-core`
-Ejecuta una verificacion end-to-end real del core usando datos temporales.
+```json
+{
+  "email": "cliente@correo.com",
+  "password": "secret123"
+}
+```
+
+Response:
+
+```json
+{
+  "message": "Login exitoso",
+  "accessToken": "<jwt>",
+  "refreshToken": "<jwt>",
+  "user": {
+    "id": "665f...",
+    "email": "cliente@correo.com",
+    "nombreCompleto": "Cliente Demo",
+    "rol": "CLIENTE"
+  }
+}
+```
+
+### `POST /api/auth/signup`
+
+Request:
+
+```json
+{
+  "email": "cliente@correo.com",
+  "password": "secret123",
+  "nombreCompleto": "Cliente Demo"
+}
+```
+
+Response:
+
+```json
+{
+  "message": "Usuario creado correctamente. Por favor inicia sesion.",
+  "user": {
+    "id": "665f...",
+    "email": "cliente@correo.com",
+    "nombreCompleto": "Cliente Demo",
+    "rol": "CLIENTE"
+  }
+}
+```
+
+### `POST /api/auth/google`
+
+Request:
+
+```json
+{
+  "idToken": "<google-id-token>"
+}
+```
+
+Response:
+
+```json
+{
+  "message": "Autenticado correctamente",
+  "accessToken": "<jwt>",
+  "refreshToken": "<jwt>",
+  "user": {},
+  "created": false,
+  "linkedExistingAccount": false
+}
+```
+
+## 3. Perfil y cliente autenticado
+
+### Perfil general
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/perfil` | Cualquier autenticado | Perfil unificado del usuario |
+| `PUT` | `/api/perfil` | Cualquier autenticado | Actualiza nombre, email y password |
+
+Body `PUT /api/perfil`:
+
+```json
+{
+  "nombreCompleto": "Nuevo Nombre",
+  "email": "nuevo@correo.com",
+  "password": "opcional"
+}
+```
+
+### Cliente
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/clientes/me` | `CLIENTE` | Contexto de cliente, perfil y direccion por defecto |
+| `PUT` | `/api/clientes/me` | `CLIENTE` | Actualiza perfil de cliente |
+| `GET` | `/api/clientes/me/direcciones` | `CLIENTE` | Lista direcciones |
+| `POST` | `/api/clientes/me/direcciones` | `CLIENTE` | Crea direccion |
+| `PUT` | `/api/clientes/me/direcciones/:direccionId` | `CLIENTE` | Actualiza direccion |
+| `DELETE` | `/api/clientes/me/direcciones/:direccionId` | `CLIENTE` | Elimina direccion |
+
+Body ejemplo `PUT /api/clientes/me`:
+
+```json
+{
+  "telefono": "76543210",
+  "tipoDocumento": "CI",
+  "numeroDocumento": "1234567",
+  "metodoEntregaPredeterminado": "PICKUP_POINT",
+  "notas": "Entregar por la tarde"
+}
+```
+
+Body ejemplo `POST /api/clientes/me/direcciones`:
+
+```json
+{
+  "etiqueta": "Casa",
+  "nombreDestinatario": "Cliente Demo",
+  "telefono": "76543210",
+  "departamento": "La Paz",
+  "ciudad": "La Paz",
+  "direccion": "Zona Centro, calle ejemplo 123",
+  "pais": "Bolivia",
+  "esPredeterminada": true
+}
+```
+
+## 4. Catalogo e inventario
+
+### Catalogo publico
+
+Ya documentado en el bloque de endpoints publicos.
+
+### Catalogo interno
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/productos` | `ADMIN`, `VENDEDOR` | Lista catalogo interno |
+| `POST` | `/api/productos` | `ADMIN` | Crea producto |
+| `GET` | `/api/productos/:id` | `ADMIN`, `VENDEDOR` | Obtiene producto interno |
+| `PUT` | `/api/productos/:id` | `ADMIN` | Actualiza producto |
+| `DELETE` | `/api/productos/:id` | `ADMIN` | Elimina producto |
+| `GET` | `/api/productos/by-code/:code` | `ADMIN`, `VENDEDOR` | Busca por QR o codigo de barras |
+
+Query params:
+
+- `GET /api/productos?withStock=true`
+
+Body ejemplo `POST /api/productos`:
+
+```json
+{
+  "nombre": "Chompa Alpaca",
+  "modelo": "Invierno 2026",
+  "precioVenta": 120,
+  "precioCosto": 70,
+  "categoria": "Chompas",
+  "variantes": [
+    {
+      "color": "Azul",
+      "talla": "M",
+      "stock": 10,
+      "stockReservado": 0,
+      "codigoBarra": "123456",
+      "qrCode": "QR-123456"
+    }
+  ]
+}
+```
+
+### Inventario
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/inventario` | `ADMIN`, `VENDEDOR` | Lista movimientos de inventario |
+| `POST` | `/api/inventario` | `ADMIN` | Ajuste de stock |
+| `GET` | `/api/inventario/:productoId` | `ADMIN`, `VENDEDOR` | Kardex por producto |
+
+Body ejemplo `POST /api/inventario`:
+
+```json
+{
+  "productoId": "665f...",
+  "varianteId": "665f...",
+  "color": "Azul",
+  "talla": "M",
+  "tipo": "ENTRADA",
+  "cantidad": 5,
+  "motivo": "Reposicion",
+  "referencia": "COMPRA-2026-001"
+}
+```
+
+## 5. Uploads
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `POST` | `/api/uploads/variantes` | `ADMIN` | Sube imagen de variante a Cloudinary |
+
+Request:
+
+- `multipart/form-data`
+- campo requerido: `file`
+- solo imagenes
+- maximo `5 MB`
+
+Response:
+
+```json
+{
+  "url": "https://res.cloudinary.com/..."
+}
+```
+
+## 6. Carrito y checkout
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/carrito` | `CLIENTE` | Obtiene carrito actual |
+| `DELETE` | `/api/carrito` | `CLIENTE` | Vacia carrito |
+| `POST` | `/api/carrito/items` | `CLIENTE` | Agrega item |
+| `PUT` | `/api/carrito/items/:itemId` | `CLIENTE` | Actualiza cantidad |
+| `DELETE` | `/api/carrito/items/:itemId` | `CLIENTE` | Elimina item |
+| `POST` | `/api/pedidos/checkout` | `CLIENTE` | Convierte carrito en pedido |
+
+Body ejemplo `POST /api/carrito/items`:
+
+```json
+{
+  "productoId": "665f...",
+  "varianteId": "665f...",
+  "color": "Azul",
+  "talla": "M",
+  "cantidad": 2
+}
+```
+
+Body ejemplo `POST /api/pedidos/checkout`:
+
+```json
+{
+  "metodoPago": "QR",
+  "notas": "Entregar con anticipacion",
+  "entrega": {
+    "metodo": "PICKUP_POINT",
+    "direccion": "Plaza Del Estudiante",
+    "telefono": "76543210",
+    "nombreDestinatario": "Cliente Demo",
+    "programadoPara": "Viernes 17:00-19:00"
+  }
+}
+```
+
+Reglas de negocio importantes:
+
+- `SHIPPING_NATIONAL` exige `metodoPago = QR`
+- el checkout reserva stock
+- pedidos QR quedan tipicamente en `PENDING_PAYMENT`
+- pedidos efectivo quedan pendientes de confirmacion operativa
+
+## 7. Pedidos
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/pedidos` | `ADMIN`, `VENDEDOR`, `CLIENTE` | Lista pedidos visibles para el actor |
+| `GET` | `/api/pedidos/:id` | `ADMIN`, `VENDEDOR`, `CLIENTE` | Detalle de pedido |
+| `PATCH` | `/api/pedidos/:id` | `ADMIN`, `VENDEDOR`, `CLIENTE` | Actualiza estado o entrega segun rol |
+| `POST` | `/api/pedidos/:id/confirm-for-delivery` | `ADMIN`, `VENDEDOR` | Confirma pedido pendiente para entrega |
+| `POST` | `/api/pedidos/:id/confirm-cash` | `ADMIN`, `VENDEDOR` | Confirma pedido en efectivo |
+| `GET` | `/api/mis-pedidos` | `CLIENTE` | Alias orientado a cliente |
+| `GET` | `/api/mis-pedidos/:id` | `CLIENTE` | Alias orientado a cliente |
+
+### `PATCH /api/pedidos/:id` para staff
 
 Body:
+
+```json
+{
+  "estadoPedido": "READY",
+  "estadoPago": "PAID",
+  "estadoEntrega": "READY"
+}
+```
+
+### `PATCH /api/pedidos/:id` para cliente
+
+Cancelar:
+
+```json
+{
+  "estadoPedido": "CANCELLED"
+}
+```
+
+Editar entrega:
+
+```json
+{
+  "entrega": {
+    "telefono": "76543210",
+    "nombreDestinatario": "Nuevo nombre"
+  }
+}
+```
+
+Reglas:
+
+- el cliente solo puede operar sobre pedidos propios
+- la cancelacion aplica sobre `PENDING_PAYMENT`
+- la edicion de entrega es limitada y con ventana corta
+
+## 8. Pagos
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `POST` | `/api/pagos` | Autenticado | Crea transaccion de pago |
+| `POST` | `/api/pagos/:id/confirm` | Dueño o staff | Confirma pago |
+| `POST` | `/api/pagos/:id/fail` | Dueño o staff | Marca pago fallido y libera stock |
+| `POST` | `/api/pagos/:id/refund` | `ADMIN`, `VENDEDOR` | Reembolsa pago y repone stock |
+| `POST` | `/api/pagos/:id/upload-comprobante` | `CLIENTE` | Sube comprobante QR |
+
+### `POST /api/pagos`
+
+Body:
+
+```json
+{
+  "pedidoId": "665f...",
+  "metodoPago": "QR",
+  "idempotencyKey": "app-ios-order-665f-v1",
+  "referenciaExterna": "checkout-mobile-001"
+}
+```
+
+Recomendacion:
+
+- para movil usar siempre `idempotencyKey`
+
+### `POST /api/pagos/:id/upload-comprobante`
+
+Request:
+
+- `multipart/form-data`
+- campo requerido: `file`
+- solo imagenes
+- maximo `5 MB`
+
+Response:
+
+```json
+{
+  "message": "Comprobante subido correctamente. El administrador fue notificado.",
+  "urlComprobante": "https://res.cloudinary.com/...",
+  "verifyLink": "https://control-ventas-azure.vercel.app/verificar/pago/<token>"
+}
+```
+
+### Flujo recomendado QR
+
+1. crear pedido
+2. crear pago
+3. subir comprobante
+4. revisar con link tokenizado
+5. confirmar o rechazar por token
+
+## 9. Entregas
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `POST` | `/api/entregas` | `ADMIN`, `VENDEDOR` | Crea o sincroniza entrega de un pedido |
+| `GET` | `/api/entregas/:id` | Staff o cliente dueño | Obtiene entrega por pedido |
+| `PATCH` | `/api/entregas/:id/status` | `ADMIN`, `VENDEDOR` | Actualiza estado y metadata logistico |
+
+Body ejemplo `POST /api/entregas`:
+
+```json
+{
+  "pedidoId": "665f...",
+  "codigoSeguimiento": "TRK-001",
+  "nombreTransportista": "Trans Copacabana",
+  "asignadoA": "665f...",
+  "notas": "Recojo en terminal"
+}
+```
+
+Body ejemplo `PATCH /api/entregas/:id/status`:
+
+```json
+{
+  "estado": "IN_TRANSIT",
+  "codigoSeguimiento": "TRK-001",
+  "nombreTransportista": "Trans Copacabana",
+  "notas": "Despachado a las 18:30"
+}
+```
+
+## 10. POS
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `POST` | `/api/pos/sales` | `ADMIN`, `VENDEDOR` | Registra venta POS como `Pedido` en canal `APP_QR` |
+| `GET` | `/api/pos/my-sales` | `ADMIN`, `VENDEDOR` | Lista ventas POS del actor |
+| `GET` | `/api/pos/summary` | `ADMIN`, `VENDEDOR` | Resumen agregado del actor |
+| `GET` | `/api/pos/scan/:code` | `ADMIN`, `VENDEDOR` | Busca producto por QR o codigo de barras |
+
+Body ejemplo `POST /api/pos/sales`:
+
+```json
+{
+  "items": [
+    {
+      "productoId": "665f...",
+      "varianteId": "665f...",
+      "color": "Azul",
+      "talla": "M",
+      "cantidad": 1
+    }
+  ],
+  "metodoPago": "EFECTIVO",
+  "descuento": 0
+}
+```
+
+Ejemplo de `GET /api/pos/summary`:
+
+```json
+{
+  "totalVentas": 0,
+  "totalIngresos": 0,
+  "totalGanancia": 0,
+  "totalDescuentos": 0,
+  "efectivoVentas": 0,
+  "qrVentas": 0
+}
+```
+
+## 11. Reportes
+
+Todos los endpoints de reportes requieren `ADMIN`.
+
+Filtros comunes:
+
+- `from=YYYY-MM-DD`
+- `to=YYYY-MM-DD`
+- `limit=1..100` para rankings
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| `GET` | `/api/reportes` | Resumen general |
+| `GET` | `/api/reportes/ventas-diarias` | Serie diaria |
+| `GET` | `/api/reportes/ventas-mensuales` | Serie mensual |
+| `GET` | `/api/reportes/productos-top` | Top productos |
+| `GET` | `/api/reportes/variantes-top` | Top variantes |
+| `GET` | `/api/reportes/canales` | Ventas por canal |
+| `GET` | `/api/reportes/vendedores` | Ventas por vendedor |
+| `GET` | `/api/reportes/cancelaciones` | Cancelaciones, failed y refunded |
+| `GET` | `/api/reportes/inventario-rotacion` | Rotacion de inventario |
+
+Ejemplo:
+
+```http
+GET /api/reportes/productos-top?from=2026-04-01&to=2026-04-30&limit=20
+```
+
+## 12. Usuarios administrativos
+
+Todos requieren `ADMIN`.
+
+| Metodo | Ruta | Descripcion |
+|---|---|---|
+| `GET` | `/api/usuarios` | Lista usuarios |
+| `POST` | `/api/usuarios` | Crea usuario |
+| `PUT` | `/api/usuarios/:id` | Actualiza usuario |
+
+Body ejemplo `POST /api/usuarios`:
+
+```json
+{
+  "nombreCompleto": "Vendedor Demo",
+  "email": "vendedor@correo.com",
+  "password": "secret123",
+  "rol": "VENDEDOR",
+  "estaActivo": true
+}
+```
+
+## 13. Ops, auditoria y mantenimiento
+
+| Metodo | Ruta | Auth | Descripcion |
+|---|---|---|---|
+| `GET` | `/api/admin/audit-events?limit=50` | `ADMIN` | Lista eventos de auditoria |
+| `PATCH` | `/api/admin/delivery-options` | `ADMIN` | Actualiza `data/delivery-options.json` |
+| `GET` | `/api/admin/ops/overview` | `ADMIN` | Overview operativo |
+| `POST` | `/api/admin/ops/verify-core` | `ADMIN` | Verificacion E2E del core |
+| `POST` | `/api/admin/cron/reservas-expiradas` | `x-cron-secret` | Libera reservas expiradas |
+
+Body `POST /api/admin/ops/verify-core`:
 
 ```json
 {
@@ -272,2130 +951,113 @@ Body:
 }
 ```
 
-Flujos verificados:
-
-- checkout desde carrito
-- pago confirmado
-- entrega (`READY -> IN_TRANSIT -> DELIVERED`)
-- pago fallido
-- reembolso
-- venta POS con escaneo
-
-Notas:
-- Si `cleanup = true`, elimina al final los datos temporales creados.
-- Si `runLegacyMigration = true`, primero ejecuta backfill legacy antes de validar el core.
-- La respuesta incluye `legacyFallbackStillRequired` para saber si aun hace falta mantener compatibilidad legacy.
-
-Respuestas:
-- `201`
-- `400`
-- `401`
-- `403`
-- `500`
-
-#### `POST /api/admin/migrations/legacy`
-Ejecuta el backfill incremental hacia el core nuevo.
-
-Body:
+Body `PATCH /api/admin/delivery-options`:
 
 ```json
 {
-  "limit": 100,
-  "dryRun": false,
-  "steps": ["ORDERS", "PAYMENTS", "FULFILLMENTS"]
+  "pickupPoints": [],
+  "pickupSchedules": [],
+  "shippingCompanies": []
 }
 ```
 
-Reglas:
-- `limit`: `1..500`, controla cuantos registros procesa por paso.
-- `dryRun: true`: no escribe nada; solo devuelve el estado y lo pendiente.
-- `steps` permite ejecutar solo una parte del backfill:
-  - `ORDERS`
-  - `PAYMENTS`
-  - `FULFILLMENTS`
-- Cada registro se procesa en su propia transaccion Mongo para evitar migraciones parciales.
-- El endpoint es idempotente: si un registro ya fue migrado, lo marca como `skipped`.
+Header del cron:
 
-Respuesta `201`:
-
-```json
-{
-  "dryRun": false,
-  "limit": 100,
-  "steps": ["ORDERS", "PAYMENTS", "FULFILLMENTS"],
-  "processed": {
-    "ordersCreated": 5,
-    "paymentsCreated": 12,
-    "fulfillmentsCreated": 3
-  },
-  "skipped": {
-    "orders": 0,
-    "payments": 2,
-    "fulfillments": 0
-  },
-  "errors": [],
-  "before": {},
-  "after": {}
-}
+```http
+x-cron-secret: <CRON_SECRET>
 ```
 
-Respuestas:
-- `200`: cuando `dryRun = true`
-- `201`: migracion ejecutada
-- `400`: validacion
-- `401`: no autenticado
-- `403`: no autorizado
-- `500`
+## Garantias de consistencia
 
-### Health
+Hoy los flujos criticos relevantes trabajan con transacciones o secuencias controladas sobre:
 
-#### `GET /api/health`
-Estado basico del sistema y de MongoDB.
+- checkout de pedidos
+- confirmacion/fallo/reembolso de pagos
+- confirmacion por token
+- ajustes de inventario
+- sincronizacion de entregas
 
-Respuesta `200`:
+Ademas:
 
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-04-04T18:30:00.000Z",
-  "services": {
-    "mongodb": {
-      "connected": true,
-      "transactionsSupported": true,
-      "topology": "REPLICA_SET",
-      "dbName": "control_ventas",
-      "serverStatus": "connected"
-    }
-  }
-}
-```
+- las reservas expiradas se liberan por cron
+- ops overview detecta estados anomalos
+- auditoria registra eventos de dominio cuando corresponde
 
-Notas:
-- `status = ok`: Mongo conectado y con soporte de transacciones.
-- `status = degraded`: Mongo conectado pero sin soporte transaccional o con estado degradado.
-- Este endpoint es publico para que web/app o infraestructura puedan verificar readiness.
+## Flujos recomendados
 
-Respuestas:
-- `200`
-- `500`
+### Flujo cliente QR
 
-#### `POST /api/uploads/variantes`
-Sube una imagen de variante a Cloudinary y devuelve la URL segura.
+1. `POST /api/auth/login`
+2. `GET /api/productos/publicos`
+3. `POST /api/carrito/items`
+4. `POST /api/pedidos/checkout`
+5. `POST /api/pagos`
+6. `POST /api/pagos/:id/upload-comprobante`
+7. Operacion revisa `/api/verificar/pago/:token`
 
-Content-Type:
-- `multipart/form-data`
+### Flujo cliente efectivo
 
-Body:
-- `file`: archivo de imagen obligatorio
+1. `POST /api/pedidos/checkout` con `metodoPago=EFECTIVO`
+2. Staff confirma con `POST /api/pedidos/:id/confirm-cash`
 
-Validaciones:
-- Solo acepta archivos `image/*`
-- Tamano maximo: `5 MB`
+### Flujo POS
 
-Respuesta `201`:
+1. `GET /api/pos/scan/:code`
+2. `POST /api/pos/sales`
+3. `GET /api/pos/summary`
 
-```json
-{
-  "url": "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/archivo.jpg"
-}
-```
+## Guia para desarrolladores moviles
 
-Respuestas:
-- `201`
-- `400`: archivo faltante, tipo invalido o tamano excedido
-- `403`: no autorizado
-- `500`: error al subir a Cloudinary
+### Recomendaciones de integracion
 
-Notas:
-- El endpoint recibe un solo archivo por request.
-- Para variantes con varias imagenes, el frontend realiza multiples uploads y luego guarda las URLs resultantes en `variantes[].imagenes[]`.
+1. Crear un `ApiClient` central que agregue `Authorization`, `x-request-id` y manejo uniforme de errores.
+2. Separar modulos de consumo:
+   - `AuthApi`
+   - `CatalogApi`
+   - `CartApi`
+   - `OrdersApi`
+   - `PaymentsApi`
+   - `ProfileApi`
+3. Usar `idempotencyKey` en la creacion de pagos QR.
+4. Tratar pagos QR como flujo asincrono.
+5. Cachear `delivery-options` y catalogo publico cuando tenga sentido.
 
----
+### Lo que la app no debe asumir
 
-### Auth
+- que existe endpoint de refresh token
+- que todos los endpoints devuelven exactamente el mismo envelope
+- que los endpoints administrativos son publicos para la app
 
-#### `POST /api/auth/signup`
-Registro de usuario cliente.
+### Contratos mas estables hoy para movil
 
-Body:
+- `/api/auth/login`
+- `/api/auth/google`
+- `/api/productos/publicos`
+- `/api/clientes/me`
+- `/api/clientes/me/direcciones`
+- `/api/carrito`
+- `/api/pedidos/checkout`
+- `/api/pedidos`
+- `/api/pagos`
+- `/api/pagos/:id/upload-comprobante`
+- `/api/entregas/:id`
 
-```json
-{
-  "email": "cliente@correo.com",
-  "password": "123456",
-  "fullname": "Nombre Completo",
-  "role": "CLIENTE"
-}
-```
+## Resumen ejecutivo
 
-Notas:
-- `email`, `password`, `fullname` son obligatorios.
-- `password` minimo 6 caracteres.
-- Solo se acepta rol `CLIENTE`; cualquier otro valor se guarda como `CLIENTE`.
-- Al registrar un cliente, el backend crea tambien su `CustomerProfile` base para poder guardar direcciones y preferencias de entrega.
-- Las cuentas creadas por este flujo quedan con proveedor `credentials`.
+La API actual ya soporta correctamente:
 
-Respuestas:
-- `201`: usuario creado.
-- `400`: campos invalidos.
-- `409`: email ya registrado.
-- `500`: error interno.
+- web publica
+- dashboard interno
+- app movil autenticada por JWT
 
-#### `GET|POST /api/auth/[...nextauth]`
-Ruta interna de NextAuth para login/sesion (`credentials`: email + password).
+Los contratos publicos mas importantes hoy son:
 
-#### `POST /api/auth/login`
-Endpoint explícito para sistemas de terceros. Devuelve tokens fijos y datos del usuario.
+- autenticacion
+- catalogo publico
+- clientes
+- carrito
+- pedidos
+- pagos
+- entregas
 
-Body:
-
-```json
-{
-  "email": "usuario@correo.com",
-  "password": "mi-password"
-}
-```
-
-Respuestas:
-- `200`: Login exitoso. Retorna:
-
-```json
-{
-  "message": "Login exitoso",
-  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsIn...",
-  "user": {
-    "id": "64abcdef1234567890abcdef",
-    "email": "usuario@correo.com",
-    "fullname": "Nombre Completo",
-    "role": "CLIENTE"
-  }
-}
-```
-- `400`: faltan credenciales.
-- `401`: credenciales incorrectas, usuario inactivo o cuenta registrada solo con Google.
-- `500`: error interno.
-
-Notas:
-- Si la cuenta fue creada solo con Google y no tiene password local, este endpoint responde:
-
-```json
-{
-  "message": "Esta cuenta fue registrada con Google. Ingresa con Google desde la web de clientes."
-}
-```
-
-#### `POST /api/auth/google`
-Login o registro automatico para clientes usando Google Sign-In.
-
-Body:
-
-```json
-{
-  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ik..."
-}
-```
-
-Notas:
-- Disponible solo para cuentas `CLIENTE`.
-- El backend valida el `idToken` directamente con Google.
-- Si no existe usuario local con ese correo, crea la cuenta automaticamente.
-- Si ya existe una cuenta con el mismo correo y rol `CLIENTE`, la vincula automaticamente con Google.
-- Si la cuenta existe pero esta deshabilitada, rechaza el acceso.
-- Al crear o vincular un cliente, el backend garantiza tambien la existencia de su `CustomerProfile`.
-
-Respuestas:
-- `200`: autenticacion exitosa. Retorna:
-
-```json
-{
-  "message": "Se detecto un correo igual y se lo vinculo exitosamente con Google.",
-  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsIn...",
-  "user": {
-    "id": "64abcdef1234567890abcdef",
-    "email": "cliente@correo.com",
-    "fullname": "Cliente Demo",
-    "role": "CLIENTE"
-  },
-  "created": false,
-  "linkedExistingAccount": true
-}
-```
-- `400`: `idToken` faltante o invalido por schema.
-- `401`: token Google invalido o correo Google no verificado.
-- `403`: cuenta deshabilitada o acceso no permitido para roles no cliente.
-- `409`: conflicto de vinculacion con otra cuenta Google.
-- `503`: Google auth no configurado (`GOOGLE_CLIENT_ID` faltante).
-
-Variables de entorno requeridas para habilitarlo:
-- `GOOGLE_CLIENT_ID`
-- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` en la web cliente que inicia Google Sign-In
-
----
-
-### Usuarios (solo ADMIN)
-
-#### `GET /api/usuarios`
-Lista usuarios (sin password), ordenados por fecha descendente.
-
-Respuestas:
-- `200`
-- `403`: no autorizado.
-
-#### `POST /api/usuarios`
-Crea usuario.
-
-Body:
-
-```json
-{
-  "fullname": "Administrador",
-  "email": "admin@correo.com",
-  "password": "123456",
-  "role": "ADMIN",
-  "isActive": true
-}
-```
-
-Validaciones:
-- `fullname`: 3..100
-- `email`: formato valido
-- `password`: 6..100
-- `role`: `ADMIN | VENDEDOR | CLIENTE`
-- `isActive`: boolean
-
-Respuestas:
-- `201`
-- `400`: validacion.
-- `403`: no autorizado.
-- `409`: email existente.
-
-#### `PUT /api/usuarios/:id`
-Actualiza usuario por ID.
-
-Body (todos opcionales):
-
-```json
-{
-  "fullname": "Nuevo Nombre",
-  "email": "nuevo@correo.com",
-  "password": "nueva-clave",
-  "role": "VENDEDOR",
-  "isActive": true
-}
-```
-
-Notas:
-- Si `password` llega vacio, no se actualiza.
-- Si `password` llega con contenido, se vuelve a hashear.
-
-Respuestas:
-- `200`
-- `400`: validacion.
-- `403`: no autorizado.
-- `404`: usuario no encontrado.
-- `500`
-
----
-
-### Perfil
-
-#### `GET /api/perfil`
-Obtiene los datos del usuario autenticado (excluyendo password).
-
-Notas:
-- Para usuarios `CLIENTE`, la respuesta ahora puede incluir tambien:
-  - `customerProfile`
-  - `defaultAddress`
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `404`: usuario no encontrado.
-- `500`
-
-#### `PUT /api/perfil`
-Actualiza el perfil del usuario autenticado.
-
-Body (todos opcionales):
-
-```json
-{
-  "fullname": "Nuevo Nombre",
-  "email": "nuevo@correo.com",
-  "password": "nueva-clave"
-}
-```
-
-Notas:
-- Si el `email` ya existe en otro usuario, devuelve error.
-- Si `password` no se envia o llega vacio, no se actualiza.
-
-Respuestas:
-- `200`
-- `400`: validacion de campos.
-- `401`: no autenticado.
-- `404`: usuario no encontrado.
-- `409`: email ya en uso.
-- `500`
-
----
-
-### Cart
-
-#### `GET /api/cart`
-Obtiene el carrito persistente del cliente autenticado.
-
-Notas:
-- Si el cliente aun no tiene carrito, el backend crea uno vacio automaticamente.
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `403`: solo clientes.
-- `500`
-
-#### `DELETE /api/cart`
-Vacia completamente el carrito del cliente autenticado.
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `403`: solo clientes.
-- `500`
-
-#### `POST /api/cart/items`
-Agrega un producto al carrito.
-
-Body:
-
-```json
-{
-  "productoId": "507f1f77bcf86cd799439011",
-  "variantId": "67ee00000000000000000001",
-  "color": "Negro",
-  "colorSecundario": "Blanco",
-  "talla": "M",
-  "cantidad": 2
-}
-```
-
-Reglas:
-- Si el item ya existe en el carrito, el backend suma la cantidad.
-- Si la cantidad total supera el `stockDisponible`, responde `400`.
-
-Respuestas:
-- `201`
-- `400`: validacion o stock insuficiente.
-- `401`: no autenticado.
-- `403`: solo clientes.
-- `404`: producto o variante no encontrada.
-- `500`
-
-#### `PUT /api/cart/items/:itemId`
-Actualiza la cantidad de un item del carrito.
-
-Body:
-
-```json
-{
-  "cantidad": 3
-}
-```
-
-Respuestas:
-- `200`
-- `400`: validacion, `itemId` invalido o stock insuficiente.
-- `401`: no autenticado.
-- `403`: solo clientes.
-- `404`: item, producto o variante no encontrada.
-- `500`
-
-#### `DELETE /api/cart/items/:itemId`
-Elimina un item del carrito.
-
-Respuestas:
-- `200`
-- `400`: `itemId` invalido.
-- `401`: no autenticado.
-- `403`: solo clientes.
-- `404`: item no encontrado.
-- `500`
-
----
-
-### Customers
-
-#### `GET /api/customers/me`
-Obtiene el contexto completo del cliente autenticado.
-
-Respuesta `200`:
-
-```json
-{
-  "user": {
-    "_id": "507f1f77bcf86cd799439011",
-    "fullname": "Cliente Demo",
-    "email": "cliente@correo.com",
-    "role": "CLIENTE",
-    "isActive": true,
-    "createdAt": "2026-04-04T10:00:00.000Z",
-    "updatedAt": "2026-04-04T10:00:00.000Z"
-  },
-  "profile": {
-    "_id": "507f1f77bcf86cd799439012",
-    "userId": "507f1f77bcf86cd799439011",
-    "phone": "76543210",
-    "documentType": "CI",
-    "documentNumber": "1234567",
-    "defaultDeliveryMethod": "PICKUP_POINT",
-    "notes": null
-  },
-  "defaultAddress": {
-    "_id": "507f1f77bcf86cd799439013",
-    "label": "Casa",
-    "recipientName": "Cliente Demo",
-    "phone": "76543210",
-    "department": "La Paz",
-    "city": "La Paz",
-    "zone": "Zona Sur",
-    "addressLine": "Calle 10 #123",
-    "reference": "Porton azul",
-    "postalCode": null,
-    "country": "Bolivia",
-    "isDefault": true,
-    "isActive": true
-  }
-}
-```
-
-Notas:
-- Si el cliente aun no tiene `CustomerProfile`, el backend lo crea automaticamente al consultar este endpoint.
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `404`: usuario no encontrado.
-- `500`
-
-#### `PUT /api/customers/me`
-Actualiza el perfil comercial del cliente autenticado.
-
-Body:
-
-```json
-{
-  "fullname": "Cliente Demo",
-  "phone": "76543210",
-  "documentType": "CI",
-  "documentNumber": "1234567",
-  "defaultDeliveryMethod": "PICKUP_POINT",
-  "notes": "Entregar por las tardes"
-}
-```
-
-Notas:
-- `fullname` actualiza tambien el nombre del `User`.
-- `email` y `password` siguen gestionandose por `/api/perfil`.
-
-Respuestas:
-- `200`
-- `400`: validacion.
-- `401`: no autenticado.
-- `404`: usuario no encontrado.
-- `500`
-
-#### `GET /api/customers/me/addresses`
-Lista las direcciones activas del cliente autenticado.
-
-Notas:
-- Ordena primero la direccion por defecto y luego por fecha de creacion descendente.
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `404`: usuario no encontrado.
-- `500`
-
-#### `POST /api/customers/me/addresses`
-Crea una nueva direccion para el cliente autenticado.
-
-Body:
-
-```json
-{
-  "label": "Casa",
-  "recipientName": "Cliente Demo",
-  "phone": "76543210",
-  "department": "La Paz",
-  "city": "La Paz",
-  "zone": "Zona Sur",
-  "addressLine": "Calle 10 #123",
-  "reference": "Porton azul",
-  "postalCode": "",
-  "country": "Bolivia",
-  "isDefault": true
-}
-```
-
-Reglas:
-- La primera direccion creada se marca automaticamente como `isDefault: true`.
-- Si se envia `isDefault: true`, el backend desmarca cualquier otra direccion por defecto.
-
-Respuestas:
-- `201`
-- `400`: validacion.
-- `401`: no autenticado.
-- `404`: usuario no encontrado.
-- `500`
-
-#### `PUT /api/customers/me/addresses/:addressId`
-Actualiza una direccion existente del cliente autenticado.
-
-Body:
-- Todos los campos son opcionales.
-
-Reglas:
-- Si se envia `isDefault: true`, esa direccion pasa a ser la direccion por defecto.
-- Si una direccion pierde el estado por defecto y no queda otra activa, el backend promueve automaticamente otra direccion activa.
-
-Respuestas:
-- `200`
-- `400`: validacion o `addressId` invalido.
-- `401`: no autenticado.
-- `404`: direccion no encontrada.
-- `500`
-
-#### `DELETE /api/customers/me/addresses/:addressId`
-Elimina logicamente una direccion del cliente autenticado.
-
-Notas:
-- El backend marca la direccion como inactiva (`isActive: false`).
-- Si era la direccion por defecto, promueve otra direccion activa automaticamente cuando exista.
-
-Respuestas:
-- `200`
-- `400`: `addressId` invalido.
-- `401`: no autenticado.
-- `404`: direccion no encontrada.
-- `500`
-
----
-
-### Productos (ADMIN y VENDEDOR para lectura, solo ADMIN para escritura)
-
-#### `GET /api/productos`
-Lista todos los productos.
-
-Notas:
-- Cada variante puede incluir `imagenes[]`.
-- Por compatibilidad pueden existir registros antiguos con `imagen`, pero el backend migra ese valor a `imagenes[]` al guardar.
-- Cada variante ahora puede incluir `variantId`, que funciona como identificador estable para integraciones web/app.
-- Cada variante tambien puede incluir:
-  - `reservedStock`: stock retenido temporalmente por pedidos pendientes
-  - `stockDisponible`: stock realmente disponible para nuevas ventas
-- Query params opcionales:
-  - `withStock=true`: devuelve productos listos para paneles de inventario, asegurando `stockTotal` y `stockMinimo` en la respuesta.
-
-Respuestas:
-- `200`
-- `500`
-
-#### `POST /api/productos` (solo ADMIN)
-Crea producto y genera SKU.
-
-Notas:
-- Las imagenes de variantes se guardan como URL en `variantes[].imagenes[]`.
-- El flujo recomendado es subir los archivos necesarios a `POST /api/uploads/variantes` y luego enviar las URLs al crear o actualizar el producto.
-- Si por compatibilidad llega una imagen en formato base64 (`data:image/...`) o el campo legado `imagen`, el backend la sube a Cloudinary y la migra a `imagenes[]`.
-
-Body:
-
-```json
-{
-  "nombre": "Polera",
-  "modelo": "Classic",
-  "categoria": "Poleras",
-  "precioVenta": 120,
-  "precioCosto": 80,
-  "variantes": [
-    {
-      "variantId": "67ee00000000000000000001",
-      "color": "Negro",
-      "colorSecundario": "Blanco",
-      "talla": "M",
-      "stock": 10,
-      "descripcion": "Polera negra talla M",
-      "imagenes": [
-        "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m-1.jpg",
-        "https://res.cloudinary.com/.../image/upload/v1234567890/control-ventas/variantes/polera-negra-m-2.jpg"
-      ]
-    }
-  ]
-}
-```
-
-Validaciones:
-- `nombre`: 3..100
-- `modelo`: 2..50
-- `categoria`: string opcional, default "Chompas" (o ingresado por el usuario libremente).
-- `precioVenta`: numero positivo
-- `precioCosto`: numero positivo
-- `precioVenta > precioCosto`
-- `variantes[]` opcional (default `[]`)
-- Variante:
-  - `variantId?`: ObjectId string opcional. Si no se envia, el backend lo genera automaticamente.
-  - `color`: requerido, max 50
-  - `colorSecundario?`: opcional, max 50
-  - `talla`: requerido, max 20
-  - `stock`: entero >= 0
-  - `descripcion?`: string opcional para detalles.
-  - `imagenes?`: arreglo de URLs validas de Cloudinary o valores `data:image/...` validos para migracion/compatibilidad
-  - `imagen?`: campo legado aceptado por compatibilidad; se migra a `imagenes[]`
-  - `codigoBarra?`, `qrCode?`
-
-Respuestas:
-- `201`
-- `400`: validacion.
-- `403`: no autorizado.
-- `409`: SKU duplicado.
-- `500`
-
-#### `GET /api/productos/:id`
-Obtiene un producto por ID.
-
-Respuestas:
-- `200`
-- `404`
-- `500`
-
-#### `GET /api/productos/publicos`
-Catalogo publico para clientes.
-
-Notas:
-- No expone `precioCosto`.
-- No expone `creadoPor`.
-- No expone `variantes.codigoBarra` ni `variantes.qrCode`.
-- Solo retorna productos con `estado != INACTIVO`.
-
-Respuestas:
-- `200`
-- `500`
-
-#### `GET /api/productos/publicos/:id`
-Detalle publico de producto.
-
-Notas:
-- Mismos filtros de datos sensibles que `GET /api/productos/publicos`.
-- Solo retorna producto si `estado != INACTIVO`.
-
-Respuestas:
-- `200`
-- `400`: ID invalido.
-- `404`
-- `500`
-
-#### `PUT /api/productos/:id` (solo ADMIN)
-Actualiza producto por ID.
-
-Comportamiento:
-- Recalcula SKU si cambia `nombre` o `modelo`.
-- Si el SKU nuevo ya existe en otro producto, devuelve `409`.
-- Procesa variantes:
-  - Si una variante no tiene `variantId`, el backend lo genera.
-  - Si una variante ya existia, el backend preserva su `reservedStock`.
-  - Si `imagenes[]` o `imagen` llegan con valores base64, los sube a Cloudinary y guarda solo URLs.
-  - Si variante no tiene `codigoBarra`/`qrCode`, los genera.
-  - Si se agrega variante nueva con stock > 0, registra movimiento de inventario (`ENTRADA`).
-  - Si aumenta stock de variante existente, registra movimiento de inventario (`ENTRADA`).
-  - Si una variante elimina o reemplaza una imagen previa de Cloudinary, intenta borrar el recurso anterior en Cloudinary.
-
-Body:
-- Todos los campos son opcionales.
-- `variantes` puede enviarse completo para reemplazar el arreglo actual.
-- Si no se envia `variantes`, el endpoint no modifica las variantes existentes.
-
-Respuestas:
-- `200`
-- `400`: validacion.
-- `401`: usuario no autenticado (header `x-user-id` invalido).
-- `403`: no autorizado.
-- `404`: producto no encontrado.
-- `409`: SKU duplicado.
-- `500`
-
-#### `DELETE /api/productos/:id` (solo ADMIN)
-Elimina producto.
-
-Notas:
-- Antes de eliminar el producto, intenta eliminar de Cloudinary las imagenes asociadas a las variantes.
-- Si alguna variante tiene `reservedStock > 0`, el backend bloquea la eliminacion con `409`.
-
-Respuestas:
-- `200`
-- `403`
-- `404`
-- `500`
-
-#### `GET /api/productos/by-code/:code`
-Busca producto por codigo de variante (`codigoBarra` o `qrCode`).
-
-Respuestas:
-- `200`:
-
-```json
-{
-  "_id": "productoId",
-  "nombre": "Polera",
-  "modelo": "Classic",
-  "precioVenta": 120,
-  "variante": {
-    "variantId": "67ee00000000000000000001",
-    "color": "Negro",
-    "colorSecundario": "Blanco",
-    "talla": "M",
-    "stock": 5,
-    "reservedStock": 1,
-    "stockDisponible": 4,
-    "imagen": "url-portada-opcional",
-    "imagenes": [
-      "url-1-opcional",
-      "url-2-opcional"
-    ],
-    "codigoBarra": "xxx",
-    "qrCode": "yyy"
-  }
-}
-```
-
-- `400`: codigo no enviado o stock insuficiente.
-- `404`: producto o variante no encontrada.
-- `500`
-
----
-
-### Inventario (ADMIN y VENDEDOR para lectura, solo ADMIN para ajuste manual)
-
-#### `GET /api/inventario`
-Lista movimientos de inventario (populate de producto y usuario).
-
-Respuestas:
-- `200`
-- `500`
-
-#### `POST /api/inventario` (solo ADMIN)
-Ajuste manual de stock.
-
-Body:
-
-```json
-{
-  "productoId": "507f1f77bcf86cd799439011",
-  "variantId": "67ee00000000000000000001",
-  "color": "Negro",
-  "colorSecundario": "Blanco",
-  "talla": "M",
-  "tipo": "ENTRADA",
-  "cantidad": 5,
-  "motivo": "Reposicion"
-}
-```
-
-Validaciones:
-- `productoId`: ObjectId valido
-- `variantId?`: ObjectId string opcional. Si se envia, el backend intenta resolver primero la variante por este campo.
-- `color`: requerido, max 50
-- `colorSecundario?`: opcional, max 50
-- `talla`: requerido, max 20
-- `tipo`: `ENTRADA | SALIDA | AJUSTE | DEVOLUCION`
-- `cantidad`: entero, distinto de 0
-- `motivo?`: max 200
-- `referencia?`: max 100
-
-Reglas:
-- La variante se resuelve por `variantId` si llega; en caso contrario usa compatibilidad por `color + talla`, y si tambien llega `colorSecundario` lo toma en cuenta para distinguir combinaciones bicolor.
-- `ENTRADA`: suma stock.
-- `SALIDA`: resta stock (si no alcanza, `400`).
-- `AJUSTE`: fija stock al valor absoluto de `cantidad`.
-- Todo el ajuste y su movimiento asociado se guardan en una misma transaccion Mongo.
-- Cada movimiento guarda tambien snapshots minimos:
-  - `productoSnapshot.nombre`
-  - `productoSnapshot.modelo`
-  - `productoSnapshot.sku`
-  - `variante.variantId`
-  - `variante.codigoBarra`
-- **Nota sobre Auditoría:** El campo `usuario` en el modelo de inventario es ahora opcional para permitir movimientos registrados automáticamente por el sistema (ej. confirmación de pagos vía token).
-
-Respuestas:
-- `201`
-- `400`: validacion/tipo invalido/stock insuficiente.
-- `401`: usuario no autenticado.
-- `403`: no autorizado.
-- `404`: producto o variante no encontrada.
-- `500`
-
-#### `GET /api/inventario/:productoId`
-Kardex por producto.
-
-Respuestas:
-- `200`
-- `400`: ID invalido.
-- `500`
-
----
-
-### Ventas (ADMIN, VENDEDOR y CLIENTE con restricciones)
-
-#### `POST /api/ventas`
-Registra una venta y descuenta stock.
-
-Body:
-
-```json
-{
-  "items": [
-    {
-      "productoId": "507f1f77bcf86cd799439011",
-      "variantId": "67ee00000000000000000001",
-      "color": "Negro",
-      "colorSecundario": "Blanco",
-      "talla": "M",
-      "cantidad": 2
-    }
-  ],
-  "metodoPago": "EFECTIVO",
-  "tipoVenta": "TIENDA",
-  "descuento": 0,
-  "delivery": {
-    "method": "PICKUP_POINT",
-    "address": "Zona Sur, Calle 10, casa 123",
-    "phone": "76543210"
-  }
-}
-```
-
-Validaciones:
-- `items`: minimo 1
-- item:
-  - `productoId`: ObjectId valido
-  - `variantId?`: ObjectId string opcional. Si se envia, el backend intenta resolver primero la variante por este campo.
-  - `color`: requerido, max 50
-  - `colorSecundario?`: opcional, max 50
-  - `talla`: requerido, max 20
-  - `cantidad`: entero positivo, max 1000
-- `metodoPago`: `EFECTIVO | QR`
-- `tipoVenta`: `WEB | APP_QR | TIENDA`
-- `descuento?`: monto en Bs >= 0. El backend lo resta directamente del subtotal (`total = subtotal - descuento`). Si no se envia, se asume `0` (sin descuento).
-- `delivery?`: objeto opcional
-  - `method`: `WHATSAPP | PICKUP_POINT | SHIPPING_NATIONAL`
-  - `address`: requerido para PICKUP_POINT (nombre del punto de encuentro), max 250 caracteres
-  - `phone`: requerido para PICKUP_POINT
-  - `scheduledAt`: horario, opcional
-
-Comportamiento:
-- Valida existencia de producto y variante.
-- La variante se resuelve por `variantId` si llega; en caso contrario usa compatibilidad por `color + talla`, y si tambien llega `colorSecundario` lo toma en cuenta para distinguir combinaciones bicolor.
-- Valida stock suficiente.
-- Descuenta stock por item.
-- Crea movimiento de inventario (`SALIDA`, referencia `VENTA`).
-- Incrementa `producto.totalVendidos`.
-- Calcula:
-  - `subtotal`
-  - `gananciaTotal`
-  - `total = subtotal - descuento + impuesto`
-  - `impuesto` fijo en `0`
-- Crea venta con:
-  - `numeroVenta`: `V-${Date.now()}`
-  - `estado`: `PAGADA`
-  - `vendedor`: usuario autenticado (si rol `ADMIN`/`VENDEDOR`)
-  - `cliente`: usuario autenticado (si rol `CLIENTE`)
-- Crea tambien un `Order` espejo con:
-  - `orderNumber`: `O-${Date.now()}`
-  - `sourceSaleId`
-  - `sourceSaleNumber`
-  - `orderStatus`
-  - `paymentStatus`
-  - `fulfillmentStatus`
-- Venta, salida de stock, movimientos y pedido espejo se confirman en una sola transaccion Mongo.
-- Cada item guardado en la venta incluye snapshots minimos:
-  - `productoSnapshot.nombre`
-  - `productoSnapshot.modelo`
-  - `productoSnapshot.sku`
-  - `productoSnapshot.imagen`
-  - `variante.variantId`
-  - `variante.codigoBarra`
-  - `variante.qrCode`
-
-Regla de rol `CLIENTE`:
-- Puede usar `POST /api/ventas` solo cuando `tipoVenta` es `WEB`.
-
-Respuestas:
-- `201`: Retorna objeto estable con campos principales (`_id`, `numeroVenta`, `estado`, `totales`, `items`, `delivery` si aplica) y `order`.
-- `400`: validacion/stock insuficiente/ID invalido.
-- `403`: no autorizado.
-- `404`: producto o variante no encontrada.
-- `500`
-
-#### `GET /api/ventas`
-Lista ventas (populate vendedor).
-
-Respuestas:
-- `200`
-- `500`
-
-#### `GET /api/ventas/:id`
-Detalle de venta por ID (populate vendedor).
-
-Respuestas:
-- `200`
-- `404`
-- `500`
-
----
-
-### Orders
-
-#### `GET /api/orders`
-Lista pedidos.
-
-Reglas:
-- `ADMIN` y `VENDEDOR`: obtienen todos los pedidos.
-- `CLIENTE`: obtiene solo sus propios pedidos.
-
-Notas:
-- Los pedidos nuevos se generan a partir de `POST /api/ventas`.
-- Esta coleccion es la nueva base para ecommerce y seguimiento operativo.
-- Los pedidos web manejan ademas:
-  - `stockReservationStatus`
-  - `reservedAt`
-  - `reservationExpiresAt`
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `500`
-
-#### `POST /api/orders/checkout`
-Convierte el carrito del cliente autenticado en un pedido real con la opción de entrega elegida.
-
-Permisos:
-- Solo `CLIENTE`.
-
-**3 métodos de entrega disponibles (`delivery.method`):**
-
-| Método | Descripción | Pago permitido | Reserva stock |
-|--------|-------------|:--------------:|:--------------:|
-| `WHATSAPP` | Coordinación por WhatsApp | EFECTIVO o QR | 24 horas |
-| `PICKUP_POINT` | Punto de Encuentro | EFECTIVO o QR | 30 minutos |
-| `SHIPPING_NATIONAL` | Envío a otro departamento | Solo QR | 30 minutos |
-
----
-
-**Opción 1 — WhatsApp:**
-```json
-{
-  "metodoPago": "EFECTIVO",
-  "delivery": { "method": "WHATSAPP" }
-}
-```
-El backend crea el pedido en `PENDING_PAYMENT` con reserva de 24 horas. El frontend debe abrir `wa.me` con el resumen del pedido para que el cliente lo envíe al número del negocio.
-
----
-
-**Opción 2 — Punto de Encuentro:**
-```json
-{
-  "metodoPago": "QR",
-  "delivery": {
-    "method": "PICKUP_POINT",
-    "address": "Zona Sur, Calle 12 #345",
-    "phone": "76543210",
-    "recipientName": "Juan Pérez",
-    "scheduledAt": "Miércoles por la tarde"
-  }
-}
-```
-- `address` y `phone` son **obligatorios**.
-- `scheduledAt` y `recipientName` son opcionales (texto libre).
-- Si `metodoPago = QR`: el siguiente paso es subir el comprobante con `POST /api/payments/:id/upload-comprobante`.
-- Si `metodoPago = EFECTIVO`: el pedido queda pendiente hasta que un admin lo confirme manualmente.
-
----
-
-**Opción 3 — Envío a otro departamento:**
-```json
-{
-  "metodoPago": "QR",
-  "delivery": {
-    "method": "SHIPPING_NATIONAL",
-    "department": "Santa Cruz",
-    "city": "Santa Cruz de la Sierra",
-    "shippingCompany": "Trans Copacabana",
-    "branch": "Terminal Bimodal",
-    "recipientName": "María López",
-    "senderName": "Juan Pérez",
-    "senderCI": "12345678",
-    "senderPhone": "76543210"
-  }
-}
-```
-- `metodoPago` debe ser **`QR`** (validado por el backend).
-- `department`, `shippingCompany`, `senderName`, `senderCI` y `senderPhone` son **obligatorios**.
-- `city`, `branch` y `recipientName` son opcionales.
-- El siguiente paso es subir el comprobante con `POST /api/payments/:id/upload-comprobante`.
-
----
-
-Campos comunes opcionales:
-- `addressId`: ID de una dirección guardada del cliente (solo aplica si no se usa el nuevo campo `delivery`).
-- `notes`: Observaciones o notas especiales del cliente (max 300 chars). Se persiste en el campo `notes` del pedido.
-
-Reglas generales:
-- El backend valida que el carrito no esté vacío.
-- Valida existencia de producto, variante y stock disponible.
-- Crea un `Order` con:
-  - `channel = WEB`
-  - `orderStatus = PENDING_PAYMENT`
-  - `paymentStatus = PENDING`
-- Reserva stock (`stockReservationStatus = RESERVED`).
-- Vacía el carrito al finalizar.
-- No descuenta stock físico en este paso; se consume al confirmar el pago.
-- Todo corre dentro de una transacción Mongo.
-
-Respuestas:
-- `201`
-- `400`: carrito vacío, validación condicional de campos, stock insuficiente.
-- `401`: no autenticado.
-- `403`: solo clientes.
-- `404`: producto o variante no encontrada.
-- `500`
-
-#### `GET /api/mis-pedidos`
-Lista los pedidos del cliente autenticado, ordenados por fecha descendente.
-
-Reglas:
-- Solo accesible para usuarios con rol `CLIENTE`.
-- Antes de listar, el backend intenta liberar reservas expiradas.
-- Prioriza pedidos de la nueva colección `Order`, con fallback a ventas legacy si existen ventas web sin pedido.
-
-Respuesta `200`: Arreglo de objetos de pedido simplificados para vista de cliente.
-
-#### `GET /api/mis-pedidos/:id`
-Obtiene el detalle de un pedido propio para el cliente.
-
-Reglas:
-- Valida que el pedido pertenezca al cliente autenticado.
-- Fallback automático a ventas legacy si el ID corresponde a una venta antigua.
-- Oculta campos sensibles (costos, utilidad).
-
-Respuesta `200`: Detalle del pedido.
-
-#### `GET /api/orders/:id`
-Obtiene el detalle de un pedido.
-
-Reglas:
-- `ADMIN` y `VENDEDOR`: pueden consultar cualquier pedido. Incluye `notes` y `cancelReason`.
-- `CLIENTE`: solo puede consultar pedidos propios.
-
-Respuestas:
-- `200`
-- `400`: ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `500`
-
-#### `PATCH /api/orders/:id`
-Actualiza estados operativos del pedido o permite autogestión al cliente.
-
-**Permisos y Reglas:**
-
-1. **Staff (ADMIN / VENDEDOR)**:
-   - Puede actualizar `orderStatus`, `paymentStatus` y `fulfillmentStatus` a cualquier valor válido.
-   - Sincroniza automáticamente la logística.
-
-2. **Cliente (CLIENTE)**:
-   - Solo puede cancelar el pedido (`orderStatus = CANCELLED`).
-   - Solo puede editar datos de entrega (`deliverySnapshot`).
-   - **Restricción de Tiempo**: Los cambios por parte del cliente solo se permiten dentro de los **primeros 30 minutos** posteriores a la creación del pedido.
-   - **Restricción de Estado**: Solo se permite si el pedido está en `PENDING_PAYMENT`.
-
-Body (ejemplo cliente):
-```json
-{
-  "orderStatus": "CANCELLED"
-}
-```
-
-Body (ejemplo staff):
-```json
-{
-  "orderStatus": "IN_TRANSIT",
-  "fulfillmentStatus": "IN_TRANSIT"
-}
-```
-
-Respuestas:
-- `200`: Pedido actualizado.
-- `400`: Validación o estado no permitido.
-- `403`: Plazo de edición expirado o acción no permitida para el rol.
-- `404`: Pedido no encontrado.
-
-#### `POST /api/orders/:id/confirm-for-delivery`
-Prepara el pedido para su entrega física (solo Staff). Se utiliza principalmente para pedidos de Efectivo/Punto de Encuentro/WhatsApp.
-
-Reglas:
-- Solo para pedidos en `PENDING_PAYMENT`.
-- Cambia `orderStatus` a `CONFIRMED`.
-- **Reserva de Stock**: Elimina la expiración de la reserva (`reservationExpiresAt = null`). El producto queda asegurado indefinidamente hasta la entrega o cancelación manual.
-
-#### `POST /api/orders/:id/confirm-cash`
-Finaliza un pedido con cobro en efectivo en el momento de la entrega física (solo Staff).
-
-Reglas:
-- Transforma el pedido en una **Venta** oficial (PAGADA).
-- Consume el stock reservado definitivamente (`RESERVED` -> `CONSUMED`).
-- Registra movimiento de inventario.
-- Actualiza:
-  - `orderStatus = DELIVERED`
-  - `fulfillmentStatus = DELIVERED`
-  - `paymentStatus = PAID`
-  - `stockReservationStatus = CONSUMED`
-
-Respuestas:
-- `200`: Venta registrada y pedido finalizado.
-- `409`: Conflicto si el pedido ya fue pagado o cancelado.
-
----
-
----
-
-### Payments
-
-#### `POST /api/payments`
-Crea una transaccion de pago para un pedido.
-
-Body:
-
-```json
-{
-  "orderId": "507f1f77bcf86cd799439021",
-  "metodoPago": "QR",
-  "idempotencyKey": "checkout-123",
-  "externalReference": "qr-session-001"
-}
-```
-
-Reglas:
-- Un pedido no puede tener mas de un pago confirmado.
-- Si se envia un `idempotencyKey` ya usado, el backend devuelve la transaccion existente.
-- Si el pedido ya perdio su reserva activa (`stockReservationStatus = RELEASED`) y no esta pagado, el backend responde `409`.
-- La verificacion del pedido y la creacion de la transaccion de pago se ejecutan dentro de una misma transaccion Mongo.
-
-Respuestas:
-- `201`
-- `400`: validacion o ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `409`: el pedido ya tiene un pago confirmado.
-- `500`
-
-#### `POST /api/payments/:id/confirm`
-Confirma una transaccion de pago.
-
-Body:
-
-```json
-{
-  "externalReference": "qr-paid-001"
-}
-```
-
-Reglas:
-- Si el pedido aun no tiene `Venta` asociada, el backend:
-  - consume stock reservado
-  - registra movimientos de inventario
-  - crea la `Venta`
-  - enlaza `Order.sourceSaleId`
-- Luego marca el pago como pagado.
-
-#### `POST /api/payments/:id/fail`
-Falla una transacción de pago y libera las reservas.
-
-#### `POST /api/payments/:id/refund`
-Reembolsa un pago.
-
----
-
-### Confirmacion Manual de Pagos en Efectivo
-
-#### `POST /api/orders/:id/confirm-cash`
-Confirma de manera directa un pedido en estado `PENDING_PAYMENT` y método de pago `EFECTIVO`.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Reglas:
-- Genera un `PaymentTransaction` con estado `PAID` inmediatamente, referenciando pago externo manual.
-- No utiliza flujo de QR ni tokens ni Telegram.
-- Crea la `Venta`, consume el stock reservado y actualiza el pedido a `CONFIRMED`.
-
-Respuestas:
-- `200`: `message` y datos básicos de la `order`.
-- `400`: el pedido no es en efectivo o ya fue pagado.
-- `401`/`403`: no autorizado.
-- `404`: pedido no encontrado.
-- `409`: reserva de stock expirada o sin stock disponible.
-
----
-
-### Comprobantes QR y Verificación Manual Web
-
-Estos endpoints pertenecen al flujo de pago QR del checkout web. El cliente sube la imagen del comprobante, el sistema notifica **automáticamente** al admin vía **Telegram Bot**, y el admin confirma o rechaza desde el link de revisión.
-
-**Variables de entorno requeridas:**
-- `TELEGRAM_BOT_TOKEN` — token del bot otorgado por BotFather.
-- `TELEGRAM_CHAT_ID` — ID del chat/usuario al que se enviarán las alertas (usualmente el del admin).
-
-Si estas variables no están configuradas, el sistema omite la notificación silenciosamente (falla controlada, no interrumpe el flujo de pago).
-
-#### `POST /api/payments/:id/upload-comprobante`
-Sube imagen de comprobante QR, genera link de verificación y **notifica automáticamente al admin vía Telegram**.
-
-Permisos:
-- Solo `CLIENTE` (dueño del pago).
-
-Content-Type:
-- `multipart/form-data`
-
-Body:
-- `file`: imagen del comprobante (obligatorio, max 5 MB, solo `image/*`).
-
-Flujo interno:
-1. Valida autenticación y rol `CLIENTE`.
-2. Sube la imagen a Cloudinary en `/control-ventas/comprobantes`.
-3. Genera un `reviewToken` UUID único y lo asocia al `PaymentTransaction`.
-4. Construye el `verifyLink`: `{NEXT_PUBLIC_APP_URL}/verificar/pago/{reviewToken}`.
-5. **Pausa la expiración de reserva del pedido**, dándole al Admin 48 horas extra para revisar antes de cancelar automáticamente el stock.
-6. Envía el mensaje con MarkdownV2 escapado a Telegram (evitando errores por caracteres como `.`, `-`, etc.).
-
-Mensaje Telegram enviado al admin:
-```
-🔔 NUEVO COMPROBANTE POR VERIFICAR
-
-💳 Pago: P-1713369600000
-💰 Monto: Bs 250.00
-
-📋 Ver comprobante y procesar → https://tu-web.com/verificar/pago/{token}
-
-Este link es de un solo uso.
-```
-
-Respuesta `201`:
-```json
-{
-  "message": "Comprobante subido correctamente. El administrador fue notificado.",
-  "comprobanteUrl": "https://res.cloudinary.com/.../comprobante.jpg",
-  "verifyLink": "https://tu-web.com/verificar/pago/uuid-token"
-}
-```
-
-Respuestas:
-- `201`: Comprobante subido y admin notificado por Telegram.
-- `400`: archivo faltante, tipo inválido o mayor a 5 MB.
-- `401`: no autenticado.
-- `403`: solo clientes pueden subir comprobantes.
-- `409`: el pago ya fue procesado.
-- `500`.
-
-#### `GET /api/verify/payment/:token`
-Ruta **PÚBLICA** (no requiere autenticación). El admin accede al link recibido vía Telegram para revisar el comprobante.
-Busca la transacción de pago mediante el `reviewToken` UUID único.
-
-Respuesta `200`:
-```json
-{
-  "payment": {
-    "_id": "...",
-    "paymentNumber": "P-1713369600000",
-    "metodoPago": "QR",
-    "amount": 250.00,
-    "status": "PENDING",
-    "comprobanteUrl": "https://res.cloudinary.com/.../comprobante.jpg",
-    "createdAt": "2026-04-17T06:00:00.000Z"
-  },
-  "order": {
-    "_id": "...",
-    "orderNumber": "O-1713369600000",
-    "channel": "WEB",
-    "metodoPago": "QR",
-    "subtotal": 250.00,
-    "descuento": 0,
-    "total": 250.00,
-    "orderStatus": "PENDING_PAYMENT",
-    "paymentStatus": "PENDING",
-    "customerSnapshot": {
-      "fullname": "Juan Pérez",
-      "email": "juan@correo.com",
-      "phone": "76543210"
-    },
-    "deliverySnapshot": {
-      "method": "PICKUP_POINT",
-      "address": "Zona Sur, Calle 12",
-      "phone": "76543210"
-    },
-    "notes": "Dejar en portería",
-    "cancelReason": null,
-    "items": [
-      {
-        "productoSnapshot": { "nombre": "Polera Classic", "imagen": "url" },
-        "variante": { "color": "Negro", "talla": "M" },
-        "cantidad": 2,
-        "precioUnitario": 125.00
-      }
-    ]
-  }
-}
-```
-
-Respuestas:
-- `200`: datos del pago, comprobante y pedido completo.
-- `404`: link inválido o token no encontrado.
-- `410`: link ya fue utilizado (token ya procesado).
-
-#### `POST /api/verify/payment/:token/confirm`
-Ruta **PÚBLICA** (autorizada por UUID token). El admin confirma el pago desde la página de revisión.
-
-Flujo interno:
-- El token sustituye la autenticación normal (Actor interno: `TOKEN_REVIEW`, rol `ADMIN`).
-- Si el pedido aún no tiene `Venta`: consume stock reservado, registra movimientos de inventario y crea la `Venta`.
-- Marca el pago como `PAID` y `confirmedAt = now()`.
-- Actualiza el pedido: `orderStatus = CONFIRMED`, `paymentStatus = PAID`, `stockReservationStatus = CONSUMED`.
-- Marca el `reviewToken` como usado (`reviewTokenUsed = true`). El link deja de funcionar.
-- Todo corre en una transacción Mongo.
-
-Respuesta `200`:
-```json
-{
-  "message": "Pago confirmado correctamente. Venta registrada.",
-  "order": {
-    "_id": "507f1f77bcf86cd799439021",
-    "orderNumber": "O-1713369600000",
-    "orderStatus": "CONFIRMED",
-    "paymentStatus": "PAID"
-  }
-}
-```
-
-Respuestas:
-- `200`: pago confirmado, venta creada, stock consumido.
-- `404`: link inválido.
-- `409`: pedido ya cancelado.
-- `410`: link ya fue utilizado.
-
-#### `POST /api/verify/payment/:token/reject`
-Ruta **PÚBLICA** (autorizada por UUID token). El admin rechaza el comprobante desde la página de revisión.
-
-Flujo interno:
-- Marca el pago como `FAILED`.
-- Libera todas las reservas de stock (`stockReservationStatus = RELEASED`).
-- Cancela el pedido (`orderStatus = CANCELLED`, `paymentStatus = FAILED`).
-- Si se proporciona un `reason`, se guarda en `order.cancelReason` y `paymentTransaction.failureReason`.
-- Marca el `reviewToken` como usado. El link deja de funcionar.
-- Todo corre en una transacción Mongo.
-
-Body opcional:
-```json
-{
-  "reason": "Comprobante falso o borroso"
-}
-```
-
-Body opcional:
-```json
-{
-  "reason": "Comprobante falso o borroso"
-}
-```
-Validaciones:
-- `reason`: string, max 250 caracteres, opcional.
-
-Respuesta `200`:
-```json
-{
-  "message": "Pago rechazado. El pedido fue cancelado y el stock liberado.",
-  "order": {
-    "_id": "507f1f77bcf86cd799439021",
-    "orderNumber": "O-1713369600000",
-    "orderStatus": "CANCELLED",
-    "paymentStatus": "FAILED"
-  }
-}
-```
-
-Respuestas:
-- `200`: pago rechazado, stock liberado, pedido cancelado.
-- `404`: link inválido.
-- `410`: link ya fue utilizado.
-
----
-
-### Fulfillment
-
-#### `GET /api/fulfillment/:orderId`
-Obtiene el estado logistico del pedido.
-
-Permisos:
-- `ADMIN` y `VENDEDOR`: pueden consultar cualquier pedido.
-- `CLIENTE`: solo puede consultar fulfillment de pedidos propios.
-
-Notas:
-- Si el pedido aun no tiene documento de fulfillment, el backend lo sincroniza automaticamente desde `Order`.
-- Pedidos sin entrega logistica real devuelven `status = NOT_APPLICABLE`.
-
-Respuesta `200`:
-
-```json
-{
-  "_id": "507f1f77bcf86cd799439030",
-  "orderId": "507f1f77bcf86cd799439021",
-  "orderNumber": "O-1712265600000",
-  "channel": "WEB",
-  "method": "PICKUP_POINT",
-  "status": "PENDING",
-  "address": "Zona Sur, Calle 10 #123",
-  "phone": "76543210",
-  "recipientName": "Cliente Demo",
-  "trackingCode": null,
-  "courierName": null,
-  "assignedTo": null,
-  "notes": null,
-  "preparedAt": null,
-  "inTransitAt": null,
-  "deliveredAt": null,
-  "cancelledAt": null
-}
-```
-
-Respuestas:
-- `200`
-- `400`: ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `500`
-
-#### `POST /api/fulfillment`
-Crea o sincroniza manualmente el fulfillment de un pedido.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Body:
-
-```json
-{
-  "orderId": "507f1f77bcf86cd799439021",
-  "trackingCode": "TRK-001",
-  "courierName": "Repartidor Interno",
-  "assignedTo": "507f1f77bcf86cd799439099",
-  "notes": "Entregar por recepcion"
-}
-```
-
-Notas:
-- Si el fulfillment ya existe, el backend lo reutiliza y actualiza solo los campos manuales enviados.
-- Si no existe, lo crea a partir del `Order` actual.
-
-Respuestas:
-- `201`
-- `400`: validacion o IDs invalidos.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `500`
-
-#### `PATCH /api/fulfillment/:id/status`
-Actualiza el estado del fulfillment y sincroniza `Order.fulfillmentStatus`.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Body:
-
-```json
-{
-  "status": "IN_TRANSIT",
-  "trackingCode": "TRK-001",
-  "courierName": "Moto 12",
-  "notes": "Cliente contacto por WhatsApp"
-}
-```
-
-Reglas:
-- `READY`, `IN_TRANSIT` y `DELIVERED` requieren `paymentStatus = PAID`.
-- El backend actualiza tambien el pedido:
-  - `READY` -> `order.orderStatus = READY`
-  - `IN_TRANSIT` -> `order.orderStatus = IN_TRANSIT`
-  - `DELIVERED` -> `order.orderStatus = DELIVERED`
-  - `CANCELLED` -> `order.orderStatus = CANCELLED`
-- Se registran fechas automaticamente segun el estado:
-  - `preparedAt`
-  - `inTransitAt`
-  - `deliveredAt`
-  - `cancelledAt`
-
-Respuestas:
-- `200`
-- `400`: validacion o ID invalido.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: fulfillment o pedido no encontrado.
-- `409`: intento de avanzar entrega sin pago confirmado.
-- `500`
-
----
-
-### POS
-
-#### `GET /api/pos/scan/:code`
-Busca una variante por `codigoBarra` o `qrCode` para flujo de escaneo.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Notas:
-- Reutiliza la logica central del catalogo.
-- Responde solo si la variante tiene `stockDisponible > 0`.
-
-Respuesta `200`:
-
-```json
-{
-  "_id": "productoId",
-  "nombre": "Polera",
-  "modelo": "Classic",
-  "precioVenta": 120,
-  "scanSource": "BARCODE",
-  "variante": {
-    "variantId": "67ee00000000000000000001",
-    "color": "Negro",
-    "colorSecundario": "Blanco",
-    "talla": "M",
-    "stock": 5,
-    "reservedStock": 1,
-    "stockDisponible": 4,
-    "codigoBarra": "xxx",
-    "qrCode": "yyy"
-  }
-}
-```
-
-Respuestas:
-- `200`
-- `400`: codigo vacio o stock insuficiente.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: producto o variante no encontrada.
-- `500`
-
-#### `POST /api/pos/sales`
-Registra una venta desde el panel POS (punto de venta en tienda o app).
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Body:
-
-```json
-{
-  "items": [
-    {
-      "productoId": "507f1f77bcf86cd799439011",
-      "variantId": "67ee00000000000000000001",
-      "color": "Negro",
-      "colorSecundario": "Blanco",
-      "talla": "M",
-      "cantidad": 1
-    }
-  ],
-  "metodoPago": "QR",
-  "descuento": 20.00
-}
-```
-
-Validaciones del campo `descuento`:
-- Tipo: `number` (monto en Bs).
-- Minimo: `0` (sin descuento).
-- No tiene limite maximo en el schema del backend; la logica del frontend garantiza que no supere el subtotal.
-- Si no se envia, el backend asume `0`.
-- El campo es opcional.
-
-Calculo del total:
-```
-total = subtotal - descuento
-```
-
-Modos de descuento (gestion en el frontend POS):
-
-El UI del POS permite aplicar el descuento de dos formas. Antes de enviar la request, el frontend convierte el valor a monto fijo en Bs:
-
-| Modo | Ejemplo (subtotal Bs 200) | Valor enviado al backend |
-|------|--------------------------|-------------------------|
-| Monto fijo (Bs) | Descuento: `Bs 30` | `"descuento": 30` |
-| Porcentaje (%) | Descuento: `15%` | `"descuento": 30` |
-
-Reglas:
-- El backend fuerza `tipoVenta = APP_QR`.
-- Reutiliza la misma logica transaccional de `POST /api/ventas`.
-- Crea:
-  - venta con `descuento` y `total` definitivos
-  - movimientos de inventario
-  - pedido espejo (con `descuento` reflejado)
-  - pago inmediato confirmado
-  - evento de auditoria `SALE_CREATED`
-
-Ejemplo de respuesta `201`:
-
-```json
-{
-  "message": "Venta POS registrada correctamente",
-  "venta": {
-    "_id": "...",
-    "numeroVenta": "V-1234567890",
-    "subtotal": 240,
-    "descuento": 20,
-    "total": 220,
-    "gananciaTotal": 80,
-    "metodoPago": "QR",
-    "tipoVenta": "APP_QR",
-    "estado": "PAGADA"
-  },
-  "order": {
-    "_id": "...",
-    "orderNumber": "O-1234567890"
-  }
-}
-```
-
-Respuestas:
-- `201`
-- `400`: validacion o stock insuficiente.
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `404`: producto o variante no encontrada.
-- `500`
-
-#### `GET /api/pos/my-sales`
-Lista las ventas POS del vendedor autenticado.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Notas:
-- Filtra por `tipoVenta = APP_QR`.
-- Filtra por `vendedor = usuario autenticado`.
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `500`
-
-#### `GET /api/pos/summary`
-Resumen rapido de ventas POS del vendedor autenticado.
-
-Permisos:
-- Solo `ADMIN` y `VENDEDOR`.
-
-Respuesta `200`:
-
-```json
-{
-  "totalVentas": 15,
-  "totalIngresos": 2400,
-  "totalGanancia": 780,
-  "totalDescuentos": 40,
-  "efectivoVentas": 9,
-  "qrVentas": 6
-}
-```
-
-Respuestas:
-- `200`
-- `401`: no autenticado.
-- `403`: no autorizado.
-- `500`
-
----
-
-### Mis pedidos (solo CLIENTE)
-
-#### `GET /api/mis-pedidos`
-Lista los pedidos del cliente autenticado, ordenados por fecha descendente.
-
-Notas:
-- Endpoint de compatibilidad. Para desarrollos nuevos de web/app, la fuente principal debe ser `/api/orders`.
-- Ahora prioriza la coleccion `orders`.
-- Si existen ventas antiguas sin `Order` asociado, aplica fallback a `ventas` para no perder historial.
-- Mantiene compatibilidad devolviendo:
-  - `numeroPedido`
-  - `numeroVenta`
-  - `estado`
-  - `estadoPedido`
-  - `estadoPago`
-  - `estadoEntrega`
-- Antes de listar, el backend intenta liberar reservas expiradas.
-- No expone `precioCosto`, `ganancia` ni `gananciaTotal`.
-
-Respuestas:
-- `200`
-- `403`: no autorizado.
-- `500`
-
-#### `GET /api/mis-pedidos/:id`
-Detalle de un pedido propio del cliente autenticado.
-
-Notas:
-- Endpoint de compatibilidad. Para integraciones nuevas, usar `GET /api/orders/:id`.
-- Busca primero en `orders` y luego hace fallback a `ventas` legacy.
-- Si el pedido no pertenece al cliente autenticado, responde `404`.
-- No expone campos de costo/ganancia.
-
-Respuestas:
-- `200`
-- `400`: ID invalido.
-- `403`: no autorizado.
-- `404`: pedido no encontrado.
-- `500`
-
----
-
-### Reportes (solo ADMIN)
-
-#### `GET /api/reportes`
-Resumen global de ventas:
-
-```json
-{
-  "totalVentas": 0,
-  "gananciaTotal": 0,
-  "cantidadVentas": 0,
-  "totalDescuentos": 0,
-  "pedidosCancelados": 0,
-  "pedidosEntregados": 0,
-  "ventasPorCanal": [],
-  "transaccionesPorEstado": []
-}
-```
-
-Si no hay datos, devuelve esos valores en cero.
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/ventas-diarias`
-Agrupa por fecha (`createdAt`) en formato `YYYY-MM-DD`:
-
-```json
-[
-  {
-    "_id": "2026-03-05",
-    "totalVentas": 500,
-    "ganancia": 180,
-    "cantidad": 4
-  }
-]
-```
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/ventas-mensuales`
-Agrupa por anio y mes:
-
-```json
-[
-  {
-    "_id": { "anio": 2026, "mes": 3 },
-    "totalVentas": 12000,
-    "ganancia": 4200,
-    "cantidad": 85
-  }
-]
-```
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/productos-top`
-Top 10 productos mas vendidos desde `items` de ventas:
-
-```json
-[
-  {
-    "_id": "productoId",
-    "cantidadVendida": 50,
-    "totalVendido": 6000,
-    "ganancia": 2100
-  }
-]
-```
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-- `limit=1..100`
-
-#### `GET /api/reportes/variantes-top`
-Top variantes mas vendidas.
-
-Respuesta `200`:
-
-```json
-[
-  {
-    "_id": {
-      "variantId": "67ee00000000000000000001",
-      "color": "Negro",
-      "colorSecundario": "Blanco",
-      "talla": "M",
-      "productoId": "productoId"
-    },
-    "nombre": "Polera",
-    "modelo": "Classic",
-    "sku": "POL-CLA",
-    "cantidadVendida": 50,
-    "totalVendido": 6000,
-    "ganancia": 2100
-  }
-]
-```
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-- `limit=1..100`
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/canales`
-Ventas agregadas por canal (`WEB`, `APP_QR`, `TIENDA`).
-
-Respuesta `200`:
-
-```json
-[
-  {
-    "_id": "APP_QR",
-    "totalVentas": 2400,
-    "gananciaTotal": 780,
-    "cantidadVentas": 15
-  }
-]
-```
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/vendedores`
-Ventas agregadas por vendedor.
-
-Respuesta `200`:
-
-```json
-[
-  {
-    "_id": "sellerId",
-    "totalVentas": 2400,
-    "gananciaTotal": 780,
-    "cantidadVentas": 15,
-    "vendedor": {
-      "_id": "sellerId",
-      "fullname": "Vendedor Demo",
-      "email": "vendedor@correo.com"
-    }
-  }
-]
-```
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/cancelaciones`
-Resumen de cancelaciones, fallos y reembolsos.
-
-Respuesta `200`:
-
-```json
-{
-  "pedidosCancelados": 3,
-  "pedidosRefunded": 1,
-  "pedidosFailed": 2,
-  "transaccionesPorEstado": [
-    {
-      "_id": "REFUNDED",
-      "cantidad": 1,
-      "monto": 120
-    }
-  ],
-  "cancelacionesPorCanal": [
-    {
-      "_id": "WEB",
-      "cantidad": 2
-    }
-  ]
-}
-```
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
-#### `GET /api/reportes/inventario-rotacion`
-Rotacion de inventario por variante, basada en movimientos `SALIDA` y `DEVOLUCION`.
-
-Respuesta `200`:
-
-```json
-[
-  {
-    "_id": {
-      "productoId": "productoId",
-      "variantId": "67ee00000000000000000001",
-      "color": "Negro",
-      "colorSecundario": "Blanco",
-      "talla": "M"
-    },
-    "nombre": "Polera",
-    "modelo": "Classic",
-    "sku": "POL-CLA",
-    "salidas": 20,
-    "devoluciones": 2,
-    "movimientos": 8,
-    "rotacionNeta": 18
-  }
-]
-```
-
-Query params opcionales:
-- `from=YYYY-MM-DD`
-- `to=YYYY-MM-DD`
-- `limit=1..100`
-
-Respuestas:
-- `200`
-- `400`: filtros invalidos.
-- `500`
-
----
-
-### Delivery Options
-
-#### `GET /api/delivery-options`
-Obtiene la configuración actual de puntos de encuentro, horarios y empresas de envío. Es una ruta pública ideal para cargar selectores en el checkout de la web o móvil.
-
-Respuesta `200`:
-```json
-{
-  "pickupPoints": [
-    { "id": "teleferico-morado-faro-murillo", "name": "Teleferico Morado Estacion Faro Murillo" },
-    { "id": "plaza-del-estudiante", "name": "Plaza Del Estudiante" }
-  ],
-  "pickupSchedules": [
-    { "id": "lunes-1200-1800", "day": "Lunes", "start": "12:00", "end": "18:00", "label": "Lunes: 12:00-18:00" }
-  ],
-  "shippingCompanies": [
-    {
-      "id": "bolivar-cargo",
-      "name": "BolivarCargo",
-      "departments": [
-        { "name": "Cochabamba", "branches": ["Av Melchor"] },
-        { "name": "Santa Cruz", "branches": ["Av. 3 Pasos al Frente"] }
-      ]
-    }
-  ]
-}
-```
-
-#### `PATCH /api/admin/delivery-options`
-Actualiza la configuración central de opciones de entrega. Solo accesible por `ADMIN`.
-
-Body:
-```json
-{
-  "pickupPoints": [...],
-  "pickupSchedules": [...],
-  "shippingCompanies": [...]
-}
-```
-
----
-
-## Guía para Desarrolladores Móviles
-
-### 1. Autenticación
-1. Realizar `POST /api/auth/login` o `POST /api/auth/google`.
-2. Guardar el `accessToken` de forma segura (ej. SecureStore en Expo o EncryptedSharedPreferences en Android).
-3. Incluir el token en todos los requests protegidos: `Authorization: Bearer <token>`.
-
-### 2. Flujo de Checkout en Móvil
-1. Obtener catálogo público: `GET /api/productos/publicos`.
-2. Gestionar el carrito localmente o mediante la API `GET /api/cart`.
-3. Consultar opciones de entrega: `GET /api/delivery-options`.
-4. Ejecutar checkout: `POST /api/orders/checkout`.
-5. Si el pago es QR:
-   - El app muestra el QR (generado externamente o estético mientras tanto).
-   - El usuario sube el comprobante desde su galería: `POST /api/payments/:id/upload-comprobante`.
-   - La API notifica al Admin y el app queda en espera de confirmación (pooling o re-consulta de `GET /api/orders/:id`).
-
-### 3. Escaneo en POS Móvil
-Para la aplicación de vendedores:
-1. Usar la cámara para leer el código de barras o QR.
-2. Consultar `GET /api/pos/scan/:code`.
-3. Si el producto existe y tiene stock, agregarlo a la venta.
-4. Finalizar con `POST /api/pos/sales`.
-
-### 4. Manejo de Imágenes
-- Todas las imágenes retornadas son URLs seguras de Cloudinary.
-- Se recomienda usar componentes con cache (ej. `react-native-fast-image`) para mejorar el rendimiento.
-- Las variantes pueden tener múltiples imágenes en el arreglo `imagenes[]`.
-
+Los dominios de `reportes`, `ops`, `auditoria`, `usuarios` y `admin/**` deben tratarse como contratos internos de negocio y operacion.

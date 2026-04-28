@@ -1,8 +1,8 @@
 import mongoose, { type ClientSession } from "mongoose";
 import { connectDB } from "@/libs/mongodb";
-import Producto from "@/models/product";
+import Producto from "@/models/producto";
 import type { Variante } from "@/types/producto";
-import { findVariantByIdentity } from "@/utils/variantIdentity";
+import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import { AppError } from "@/shared/errors/AppError";
 import { inventoryRepository } from "@/modules/inventory/infrastructure/inventory.repository";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
@@ -11,9 +11,10 @@ import {
   getVariantReservedStock,
 } from "@/modules/catalog/domain/variant.utils";
 import { runInTransaction } from "@/shared/db/runTransaction";
+import { assertObjectId } from "@/utils/validacion";
 
 type VariantLookup = {
-  variantId?: string;
+  varianteId?: string;
   color?: string;
   colorSecundario?: string;
   talla?: string;
@@ -29,7 +30,7 @@ type ProductoWithVariants = {
 
 type VariantWithStock = Variante & {
   stock: number;
-  reservedStock?: number;
+  stockReservado?: number;
 };
 
 type RecordInventoryMovementInput = {
@@ -51,6 +52,7 @@ type AdjustInventoryInput = VariantLookup & {
   motivo?: string;
   referencia?: string;
   userIdRaw: string;
+  rolActor: "ADMIN" | "VENDEDOR";
 };
 
 type ConsumeStockForSaleInput = {
@@ -72,11 +74,7 @@ type AdjustInventoryResult = {
   movimiento: InventoryMovementRecord;
 };
 
-function assertObjectId(value: string, message: string) {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    throw new AppError(message, 400);
-  }
-}
+
 
 function resolveVariant(
   variants: Variante[],
@@ -113,8 +111,8 @@ export async function recordInventoryMovement({
   referencia,
   userId,
 }: RecordInventoryMovementInput, session?: ClientSession) {
-  const validUserId = mongoose.Types.ObjectId.isValid(userId.toString()) 
-    ? userId 
+  const validUserId = mongoose.Types.ObjectId.isValid(userId.toString())
+    ? userId
     : undefined;
 
   return inventoryRepository.create({
@@ -125,7 +123,7 @@ export async function recordInventoryMovement({
       sku: producto.sku,
     },
     variante: {
-      variantId: variante.variantId,
+      varianteId: variante.varianteId,
       color: variante.color,
       colorSecundario: variante.colorSecundario,
       talla: variante.talla,
@@ -158,11 +156,11 @@ export async function reserveStockForOrder({
     throw new AppError(`Stock insuficiente (${producto.nombre})`, 400);
   }
 
-  variante.reservedStock = getVariantReservedStock(variante) + cantidad;
+  variante.stockReservado = getVariantReservedStock(variante) + cantidad;
   await producto.save(session ? { session } : undefined);
 
   return {
-    reservedStock: variante.reservedStock,
+    stockReservado: variante.stockReservado,
     availableStock: getAvailableStockForVariant(variante),
   };
 }
@@ -176,14 +174,14 @@ export async function releaseReservedStockForOrder({
   variante: VariantWithStock;
   cantidad: number;
 }, session?: ClientSession) {
-  variante.reservedStock = Math.max(
+  variante.stockReservado = Math.max(
     0,
     getVariantReservedStock(variante) - cantidad
   );
   await producto.save(session ? { session } : undefined);
 
   return {
-    reservedStock: variante.reservedStock,
+    stockReservado: variante.stockReservado,
     availableStock: getAvailableStockForVariant(variante),
   };
 }
@@ -196,9 +194,9 @@ export async function consumeReservedStockForOrder({
   referencia = "ORDER_CONFIRM",
   motivo = "Confirmacion de pedido",
 }: ConsumeStockForSaleInput, session?: ClientSession) {
-  const reservedStock = getVariantReservedStock(variante);
+  const stockReservado = getVariantReservedStock(variante);
 
-  if (reservedStock < cantidad) {
+  if (stockReservado < cantidad) {
     throw new AppError(
       `La reserva de stock ya no es suficiente (${producto.nombre})`,
       409
@@ -213,7 +211,7 @@ export async function consumeReservedStockForOrder({
   const stockActual = stockAnterior - cantidad;
 
   variante.stock = stockActual;
-  variante.reservedStock = reservedStock - cantidad;
+  variante.stockReservado = stockReservado - cantidad;
   producto.totalVendidos += cantidad;
   await producto.save(session ? { session } : undefined);
 
@@ -232,7 +230,7 @@ export async function consumeReservedStockForOrder({
   return {
     stockAnterior,
     stockActual,
-    reservedStock: variante.reservedStock,
+    stockReservado: variante.stockReservado,
     availableStock: getAvailableStockForVariant(variante),
     movimiento,
   };
@@ -240,7 +238,7 @@ export async function consumeReservedStockForOrder({
 
 export async function adjustInventoryStock({
   productoId,
-  variantId,
+  varianteId,
   color,
   colorSecundario,
   talla,
@@ -249,13 +247,14 @@ export async function adjustInventoryStock({
   motivo,
   referencia = "AJUSTE_MANUAL",
   userIdRaw,
+  rolActor,
 }: AdjustInventoryInput, session?: ClientSession): Promise<AdjustInventoryResult> {
   if (!session) {
     return runInTransaction(async (transactionSession) =>
       adjustInventoryStock(
         {
           productoId,
-          variantId,
+          varianteId,
           color,
           colorSecundario,
           talla,
@@ -264,6 +263,7 @@ export async function adjustInventoryStock({
           motivo,
           referencia,
           userIdRaw,
+          rolActor,
         },
         transactionSession
       )
@@ -280,7 +280,7 @@ export async function adjustInventoryStock({
   }
 
   const variante = resolveVariant(producto.variantes as Variante[], {
-    variantId,
+    varianteId,
     color,
     colorSecundario,
     talla,
@@ -289,7 +289,7 @@ export async function adjustInventoryStock({
   const qty = Math.abs(cantidad);
   const stockAnterior = variante.stock;
   let stockActual = stockAnterior;
-  const reservedStock = getVariantReservedStock(variante);
+  const stockReservado = getVariantReservedStock(variante);
 
   if (tipo === "ENTRADA") {
     stockActual += qty;
@@ -299,7 +299,7 @@ export async function adjustInventoryStock({
     }
     stockActual -= qty;
   } else if (tipo === "AJUSTE") {
-    if (qty < reservedStock) {
+    if (qty < stockReservado) {
       throw new AppError(
         "El stock fisico no puede quedar por debajo del stock reservado",
         400
@@ -327,15 +327,15 @@ export async function adjustInventoryStock({
 
   await recordAuditEventSafe(
     {
-      action: "INVENTORY_ADJUSTED",
-      entityType: "INVENTORY_MOVEMENT",
-      entityId: movimiento._id.toString(),
-      actorId: userIdRaw,
-      actorRole: "ADMIN",
-      status: "SUCCESS",
+      accion: "INVENTORY_ADJUSTED",
+      tipoEntidad: "INVENTORY_MOVEMENT",
+      idEntidad: movimiento._id.toString(),
+      idActor: userIdRaw,
+      rolActor,
+      estado: "SUCCESS",
       metadata: {
         productoId,
-        variantId: variante.variantId || null,
+        varianteId: variante.varianteId || null,
         tipo,
         cantidad: qty,
         stockAnterior,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const fulfillmentStatusSchema = z.enum([
+export const estadoEntregaSchema = z.enum([
   "PENDING",
   "READY",
   "IN_TRANSIT",
@@ -25,19 +25,19 @@ const nullableTrimmedString = (max: number) =>
     });
 
 export const createFulfillmentSchema = z.object({
-  orderId: z.string().min(1, "orderId es requerido"),
-  trackingCode: nullableTrimmedString(100),
-  courierName: nullableTrimmedString(120),
-  assignedTo: nullableTrimmedString(100),
-  notes: nullableTrimmedString(500),
+  pedidoId: z.string().min(1, "pedidoId es requerido"),
+  codigoSeguimiento: nullableTrimmedString(100),
+  nombreTransportista: nullableTrimmedString(120),
+  asignadoA: nullableTrimmedString(100),
+  notas: nullableTrimmedString(500),
 });
 
 export const updateFulfillmentStatusSchema = z.object({
-  status: fulfillmentStatusSchema,
-  trackingCode: nullableTrimmedString(100),
-  courierName: nullableTrimmedString(120),
-  assignedTo: nullableTrimmedString(100),
-  notes: nullableTrimmedString(500),
+  estado: estadoEntregaSchema,
+  codigoSeguimiento: nullableTrimmedString(100),
+  nombreTransportista: nullableTrimmedString(120),
+  asignadoA: nullableTrimmedString(100),
+  notas: nullableTrimmedString(500),
 });
 
 export type CreateFulfillmentInput = z.infer<typeof createFulfillmentSchema>;

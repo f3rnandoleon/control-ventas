@@ -2,7 +2,7 @@ export interface CartItem {
   _id: string;
   productoId: string;
   variante: {
-    variantId?: string;
+    varianteId?: string;
     color: string;
     colorSecundario?: string;
     talla: string;
@@ -22,9 +22,9 @@ export interface CartItem {
 
 export interface Cart {
   _id: string;
-  customer: string;
+  cliente: string;
   items: CartItem[];
-  totalItems: number;
+  totalArticulos: number;
   subtotal: number;
   createdAt: string;
   updatedAt: string;

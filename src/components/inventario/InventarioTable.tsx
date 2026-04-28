@@ -206,7 +206,7 @@ export default function InventarioTable({
                   {item.stockAnterior} -&gt;{" "}
                   <span className="text-cyan-400">{item.stockActual}</span>
                 </td>
-                <td>{item.usuario?.fullname || "-"}</td>
+                <td>{item.usuario?.nombreCompleto || "-"}</td>
               </tr>
             ))}
 

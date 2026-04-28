@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getVentas } from "@/services/venta.service";
+import { getVentas } from "@/services/pedidos.service";
 import ReportesResumen from "@/components/reportes/ReportesResumen";
 import VentasPorFechaChart from "@/components/reportes/VentasPorFechaChart";
 import ReportesFiltros from "@/components/reportes/ReportesFiltros";
 import ComparativaMensualChart from "@/components/reportes/ComparativaMensualChart";
-import { Venta } from "@/types/venta";
+import { Pedido } from "@/types/pedido";
 
 export default function AdminReportesPage() {
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [ventas, setVentas] = useState<Pedido[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [metodo, setMetodo] = useState("");

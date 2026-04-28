@@ -43,7 +43,7 @@ const varianteImageValueSchema = z.preprocess(
  * Schema para variante de producto
  */
 export const varianteSchema = z.object({
-    variantId: optionalObjectIdSchema,
+    varianteId: optionalObjectIdSchema,
 
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),
@@ -58,7 +58,7 @@ export const varianteSchema = z.object({
 
     stock: nonNegativeIntegerSchema,
 
-    reservedStock: nonNegativeIntegerSchema.optional(),
+    stockReservado: nonNegativeIntegerSchema.optional(),
 
     imagenes: z.array(varianteImageValueSchema).optional().default([]),
 

@@ -1,7 +1,7 @@
 import mongoose, { type ClientSession } from "mongoose";
 import { connectDB } from "@/libs/mongodb";
-import Order from "@/models/order";
-import { ordersRepository } from "@/modules/orders/infrastructure/orders.repository";
+import Pedido from "@/models/pedido";
+import { pedidosRepository } from "@/modules/orders/infrastructure/pedidos.repository";
 import { fulfillmentRepository } from "@/modules/fulfillment/infrastructure/fulfillment.repository";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
 import { AppError } from "@/shared/errors/AppError";
@@ -12,7 +12,7 @@ import type {
 } from "@/schemas/fulfillment.schema";
 
 type SupportedRole = "ADMIN" | "VENDEDOR" | "CLIENTE";
-type OrderDocument = InstanceType<typeof Order>;
+type PedidoDocument = InstanceType<typeof Pedido>;
 
 function assertObjectId(value: string, message: string) {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -45,40 +45,40 @@ function resolveRefId(value: unknown) {
   return null;
 }
 
-function deriveFulfillmentStatus(order: OrderDocument) {
-  if (order.orderStatus === "CANCELLED") {
+function deriveFulfillmentStatus(pedido: PedidoDocument) {
+  if (pedido.estadoPedido === "CANCELLED") {
     return "CANCELLED" as const;
   }
 
-  if (!order.deliverySnapshot?.method || order.deliverySnapshot.method === "WHATSAPP") {
+  if (!pedido.snapshotEntrega?.metodo || pedido.snapshotEntrega.metodo === "WHATSAPP") {
     return "NOT_APPLICABLE" as const;
   }
 
-  if (order.fulfillmentStatus === "NOT_APPLICABLE") {
+  if (pedido.estadoEntrega === "NOT_APPLICABLE") {
     return "PENDING" as const;
   }
 
-  return order.fulfillmentStatus;
+  return pedido.estadoEntrega;
 }
 
-function buildFulfillmentPayload(order: OrderDocument) {
+function buildFulfillmentPayload(pedido: PedidoDocument) {
   return {
-    orderId: order._id,
-    orderNumber: order.orderNumber,
-    customer: resolveRefId(order.customer),
-    seller: resolveRefId(order.seller),
-    channel: order.channel,
-    method: order.deliverySnapshot?.method || null,
-    status: deriveFulfillmentStatus(order),
-    pickupPoint: order.deliverySnapshot?.pickupPoint || null,
-    address: order.deliverySnapshot?.address || null,
-    phone:
-      order.deliverySnapshot?.phone ||
-      order.customerSnapshot?.phone ||
+    pedidoId: pedido._id,
+    numeroPedido: pedido.numeroPedido,
+    cliente: resolveRefId(pedido.cliente),
+    vendedor: resolveRefId(pedido.vendedor),
+    canal: pedido.canal,
+    metodo: pedido.snapshotEntrega?.metodo || null,
+    estado: deriveFulfillmentStatus(pedido),
+    puntoRecojo: pedido.snapshotEntrega?.puntoRecojo || null,
+    direccion: pedido.snapshotEntrega?.direccion || null,
+    telefono:
+      pedido.snapshotEntrega?.telefono ||
+      pedido.snapshotCliente?.telefono ||
       null,
-    recipientName:
-      order.deliverySnapshot?.recipientName ||
-      order.customerSnapshot?.fullname ||
+    nombreDestinatario:
+      pedido.snapshotEntrega?.nombreDestinatario ||
+      pedido.snapshotCliente?.nombreCompleto ||
       null,
   };
 }
@@ -94,66 +94,66 @@ function applyStatusTimestamps(
 
   const now = new Date();
 
-  if (nextStatus === "READY" && !payload.preparedAt) {
-    payload.preparedAt = now;
+  if (nextStatus === "READY" && !payload.preparadoEn) {
+    payload.preparadoEn = now;
   }
 
-  if (nextStatus === "IN_TRANSIT" && !payload.inTransitAt) {
-    payload.inTransitAt = now;
+  if (nextStatus === "IN_TRANSIT" && !payload.enTransitoEn) {
+    payload.enTransitoEn = now;
   }
 
-  if (nextStatus === "DELIVERED" && !payload.deliveredAt) {
-    payload.deliveredAt = now;
+  if (nextStatus === "DELIVERED" && !payload.entregadoEn) {
+    payload.entregadoEn = now;
   }
 
-  if (nextStatus === "CANCELLED" && !payload.cancelledAt) {
-    payload.cancelledAt = now;
+  if (nextStatus === "CANCELLED" && !payload.canceladoEn) {
+    payload.canceladoEn = now;
   }
 
   return payload;
 }
 
 export async function syncFulfillmentForOrder(
-  orderOrId: string | OrderDocument,
+  orderOrId: string | PedidoDocument,
   session?: ClientSession
 ) {
   await connectDB();
 
-  const order =
+  const pedido =
     typeof orderOrId === "string"
-      ? await Order.findById(orderOrId).session(session ?? null)
+      ? await Pedido.findById(orderOrId).session(session ?? null)
       : orderOrId;
 
-  if (!order) {
+  if (!pedido) {
     throw new AppError("Pedido no encontrado para fulfillment", 404);
   }
 
   const currentFulfillment = await fulfillmentRepository.findByOrderId(
-    order._id.toString(),
+    pedido._id.toString(),
     session
   );
 
-  const payload = buildFulfillmentPayload(order);
+  const payload = buildFulfillmentPayload(pedido);
   const nextPayload: Record<string, unknown> = {
     ...payload,
-    trackingCode: currentFulfillment?.trackingCode || null,
-    courierName: currentFulfillment?.courierName || null,
-    assignedTo: resolveRefId(currentFulfillment?.assignedTo) || null,
-    notes: currentFulfillment?.notes || null,
-    preparedAt: currentFulfillment?.preparedAt || null,
-    inTransitAt: currentFulfillment?.inTransitAt || null,
-    deliveredAt: currentFulfillment?.deliveredAt || null,
-    cancelledAt: currentFulfillment?.cancelledAt || null,
+    codigoSeguimiento: currentFulfillment?.codigoSeguimiento || null,
+    nombreTransportista: currentFulfillment?.nombreTransportista || null,
+    asignadoA: resolveRefId(currentFulfillment?.asignadoA) || null,
+    notas: currentFulfillment?.notas || null,
+    preparadoEn: currentFulfillment?.preparadoEn || null,
+    enTransitoEn: currentFulfillment?.enTransitoEn || null,
+    entregadoEn: currentFulfillment?.entregadoEn || null,
+    canceladoEn: currentFulfillment?.canceladoEn || null,
   };
 
   applyStatusTimestamps(
-    currentFulfillment?.status,
-    payload.status,
+    currentFulfillment?.estado,
+    payload.estado,
     nextPayload
   );
 
   return fulfillmentRepository.upsertByOrderId(
-    order._id.toString(),
+    pedido._id.toString(),
     nextPayload,
     session
   );
@@ -162,57 +162,57 @@ export async function syncFulfillmentForOrder(
 export async function getFulfillmentByOrderForActor(
   role: SupportedRole,
   userId: string,
-  orderId: string
+  pedidoId: string
 ) {
-  assertObjectId(orderId, "ID de pedido invalido");
+  assertObjectId(pedidoId, "ID de pedido invalido");
   await connectDB();
 
-  const order =
+  const pedido =
     role === "CLIENTE"
-      ? await ordersRepository.findByIdForCustomer(orderId, userId)
-      : await ordersRepository.findById(orderId);
+      ? await pedidosRepository.findByIdForCustomer(pedidoId, userId)
+      : await pedidosRepository.findById(pedidoId);
 
-  if (!order) {
+  if (!pedido) {
     throw new AppError("Pedido no encontrado", 404);
   }
 
-  const existing = await fulfillmentRepository.findByOrderId(orderId);
+  const existing = await fulfillmentRepository.findByOrderId(pedidoId);
   if (existing) {
     return existing;
   }
 
-  return syncFulfillmentForOrder(order);
+  return syncFulfillmentForOrder(pedido);
 }
 
 export async function createOrSyncFulfillmentForOrder(
-  orderId: string,
+  pedidoId: string,
   payload: CreateFulfillmentInput
 ) {
-  assertObjectId(orderId, "ID de pedido invalido");
+  assertObjectId(pedidoId, "ID de pedido invalido");
 
-  if (payload.assignedTo) {
-    assertObjectId(payload.assignedTo, "assignedTo invalido");
+  if (payload.asignadoA) {
+    assertObjectId(payload.asignadoA, "asignadoA invalido");
   }
 
   return runInTransaction(async (session) => {
-    const fulfillment = await syncFulfillmentForOrder(orderId, session);
+    const fulfillment = await syncFulfillmentForOrder(pedidoId, session);
 
     const nextPayload: Record<string, unknown> = {};
 
-    if (payload.trackingCode !== undefined) {
-      nextPayload.trackingCode = payload.trackingCode;
+    if (payload.codigoSeguimiento !== undefined) {
+      nextPayload.codigoSeguimiento = payload.codigoSeguimiento;
     }
 
-    if (payload.courierName !== undefined) {
-      nextPayload.courierName = payload.courierName;
+    if (payload.nombreTransportista !== undefined) {
+      nextPayload.nombreTransportista = payload.nombreTransportista;
     }
 
-    if (payload.notes !== undefined) {
-      nextPayload.notes = payload.notes;
+    if (payload.notas !== undefined) {
+      nextPayload.notas = payload.notas;
     }
 
-    if (payload.assignedTo !== undefined) {
-      nextPayload.assignedTo = payload.assignedTo;
+    if (payload.asignadoA !== undefined) {
+      nextPayload.asignadoA = payload.asignadoA;
     }
 
     if (Object.keys(nextPayload).length === 0) {
@@ -239,8 +239,8 @@ export async function updateFulfillmentStatusById(
 ) {
   assertObjectId(id, "ID de fulfillment invalido");
 
-  if (payload.assignedTo) {
-    assertObjectId(payload.assignedTo, "assignedTo invalido");
+  if (payload.asignadoA) {
+    assertObjectId(payload.asignadoA, "asignadoA invalido");
   }
 
   return runInTransaction(async (session) => {
@@ -250,18 +250,18 @@ export async function updateFulfillmentStatusById(
       throw new AppError("Fulfillment no encontrado", 404);
     }
 
-    const order = await ordersRepository.findById(
-      fulfillment.orderId.toString(),
+    const pedido = await pedidosRepository.findById(
+      fulfillment.pedidoId.toString(),
       session
     );
 
-    if (!order) {
+    if (!pedido) {
       throw new AppError("Pedido no encontrado", 404);
     }
 
     if (
-      ["READY", "IN_TRANSIT", "DELIVERED"].includes(payload.status) &&
-      order.paymentStatus !== "PAID"
+      ["READY", "IN_TRANSIT", "DELIVERED"].includes(payload.estado) &&
+      pedido.estadoPago !== "PAID"
     ) {
       throw new AppError(
         "No se puede avanzar el fulfillment de un pedido sin pago confirmado",
@@ -270,26 +270,26 @@ export async function updateFulfillmentStatusById(
     }
 
     const nextPayload: Record<string, unknown> = {
-      status: payload.status,
+      estado: payload.estado,
     };
 
-    if (payload.trackingCode !== undefined) {
-      nextPayload.trackingCode = payload.trackingCode;
+    if (payload.codigoSeguimiento !== undefined) {
+      nextPayload.codigoSeguimiento = payload.codigoSeguimiento;
     }
 
-    if (payload.courierName !== undefined) {
-      nextPayload.courierName = payload.courierName;
+    if (payload.nombreTransportista !== undefined) {
+      nextPayload.nombreTransportista = payload.nombreTransportista;
     }
 
-    if (payload.assignedTo !== undefined) {
-      nextPayload.assignedTo = payload.assignedTo;
+    if (payload.asignadoA !== undefined) {
+      nextPayload.asignadoA = payload.asignadoA;
     }
 
-    if (payload.notes !== undefined) {
-      nextPayload.notes = payload.notes;
+    if (payload.notas !== undefined) {
+      nextPayload.notas = payload.notas;
     }
 
-    applyStatusTimestamps(fulfillment.status, payload.status, nextPayload);
+    applyStatusTimestamps(fulfillment.estado, payload.estado, nextPayload);
 
     const updatedFulfillment = await fulfillmentRepository.updateById(
       id,
@@ -301,42 +301,42 @@ export async function updateFulfillmentStatusById(
       throw new AppError("Fulfillment no encontrado", 404);
     }
 
-    order.fulfillmentStatus = payload.status;
+    pedido.estadoEntrega = payload.estado;
 
-    if (payload.status === "READY") {
-      order.orderStatus = "READY";
-    } else if (payload.status === "IN_TRANSIT") {
-      order.orderStatus = "IN_TRANSIT";
-    } else if (payload.status === "DELIVERED") {
-      order.orderStatus = "DELIVERED";
-    } else if (payload.status === "CANCELLED") {
-      order.orderStatus = "CANCELLED";
-    } else if (payload.status === "PENDING") {
-      if (order.paymentStatus === "PAID" && order.orderStatus !== "PREPARING") {
-        order.orderStatus = "CONFIRMED";
+    if (payload.estado === "READY") {
+      pedido.estadoPedido = "READY";
+    } else if (payload.estado === "IN_TRANSIT") {
+      pedido.estadoPedido = "IN_TRANSIT";
+    } else if (payload.estado === "DELIVERED") {
+      pedido.estadoPedido = "DELIVERED";
+    } else if (payload.estado === "CANCELLED") {
+      pedido.estadoPedido = "CANCELLED";
+    } else if (payload.estado === "PENDING") {
+      if (pedido.estadoPago === "PAID" && pedido.estadoPedido !== "PREPARING") {
+        pedido.estadoPedido = "CONFIRMED";
       }
     }
 
-    await order.save({ session });
+    await pedido.save({ session });
 
     await recordAuditEventSafe(
       {
-        action: "FULFILLMENT_STATUS_UPDATED",
-        entityType: "FULFILLMENT",
-        entityId: updatedFulfillment._id.toString(),
-        status: "SUCCESS",
+        accion: "FULFILLMENT_STATUS_UPDATED",
+        tipoEntidad: "FULFILLMENT",
+        idEntidad: updatedFulfillment._id.toString(),
+        estado: "SUCCESS",
         metadata: {
-          orderId: order._id.toString(),
-          status: payload.status,
-          trackingCode: payload.trackingCode || null,
+          pedidoId: pedido._id.toString(),
+          estado: payload.estado,
+          codigoSeguimiento: payload.codigoSeguimiento || null,
         },
       },
       session
     );
 
     return {
-      fulfillment: updatedFulfillment,
-      order,
+      entrega: updatedFulfillment,
+      pedido,
     };
   });
 }

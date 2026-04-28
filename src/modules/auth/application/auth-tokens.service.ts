@@ -5,16 +5,16 @@ type UserRole = "ADMIN" | "VENDEDOR" | "CLIENTE";
 export type AuthTokenUser = {
   id: string;
   email: string;
-  fullname: string;
-  role: UserRole;
+  nombreCompleto: string;
+  rol: UserRole;
 };
 
 export function buildAuthTokenUser(user: {
   _id?: { toString(): string };
   id?: string;
   email: string;
-  fullname: string;
-  role: UserRole;
+  nombreCompleto: string;
+  rol: UserRole;
 }): AuthTokenUser {
   const id = user.id || user._id?.toString();
 
@@ -25,8 +25,8 @@ export function buildAuthTokenUser(user: {
   return {
     id,
     email: user.email,
-    fullname: user.fullname,
-    role: user.role,
+    nombreCompleto: user.nombreCompleto,
+    rol: user.rol,
   };
 }
 

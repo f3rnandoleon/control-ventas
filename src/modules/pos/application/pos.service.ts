@@ -1,13 +1,18 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
-import Venta from "@/models/venta";
+import Pedido from "@/models/pedido";
 import { findCatalogProductByCode } from "@/modules/catalog/application/catalog.service";
-import { createDirectSale, type SalesActor } from "@/modules/sales/application/sales.service";
+import { crearVentaDirecta } from "@/modules/orders/application/pedidos.service";
 import type { CreatePosSaleInput } from "@/schemas/pos.schema";
 import { AppError } from "@/shared/errors/AppError";
 
+type SalesActor = {
+  id: string;
+  rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
+};
+
 function assertStaff(actor: SalesActor) {
-  if (!["ADMIN", "VENDEDOR"].includes(actor.role)) {
+  if (!["ADMIN", "VENDEDOR"].includes(actor.rol)) {
     throw new AppError("No autorizado", 403);
   }
 }
@@ -32,21 +37,21 @@ export async function createPosSale(
 ) {
   assertStaff(actor);
 
-  return createDirectSale(actor, {
+  return crearVentaDirecta(actor as unknown as { id: string; rol: "ADMIN" | "VENDEDOR" }, {
     ...input,
-    tipoVenta: "APP_QR",
-  });
+    canal: "APP_QR",
+  } as unknown as Parameters<typeof crearVentaDirecta>[1]);
 }
 
 export async function listMyPosSales(actor: SalesActor) {
   assertStaff(actor);
   await connectDB();
 
-  return Venta.find({
+  return Pedido.find({
     vendedor: actor.id,
-    tipoVenta: "APP_QR",
+    canal: "APP_QR",
   })
-    .populate("vendedor", "fullname email")
+    .populate("vendedor", "nombreCompleto email")
     .sort({ createdAt: -1 });
 }
 
@@ -55,11 +60,11 @@ export async function getMyPosSummary(actor: SalesActor) {
   await connectDB();
 
   const sellerId = new mongoose.Types.ObjectId(actor.id);
-  const [summary] = await Venta.aggregate([
+  const [summary] = await Pedido.aggregate([
     {
       $match: {
         vendedor: sellerId,
-        tipoVenta: "APP_QR",
+        canal: "APP_QR",
       },
     },
     {

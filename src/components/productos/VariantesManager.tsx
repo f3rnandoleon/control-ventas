@@ -176,7 +176,7 @@ export default function VariantesManager({
           <tbody >
             {producto.variantes.map((v, index) => (
               <VarianteRow
-                key={v.variantId || `${v.color}-${v.colorSecundario || ""}-${v.talla}`}
+                key={v.varianteId || `${v.color}-${v.colorSecundario || ""}-${v.talla}`}
                 variante={v}
                 onEdit={() => {
                   setEditingIndex(index);

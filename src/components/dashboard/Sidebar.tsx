@@ -31,14 +31,14 @@ export default function Sidebar({ role }: { role: string }) {
           
           <Link href="/dashboard/perfil" className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-600 text-sm font-bold text-white">
-            {user?.fullname?.charAt(0).toUpperCase() || "U"}
+            {user?.nombreCompleto?.charAt(0).toUpperCase() || "U"}
           </div>
           <div className="text-sm">
             <p className="font-semibold text-slate-900">
-              {user?.fullname || "Usuario"}
+              {user?.nombreCompleto || "Usuario"}
             </p>
             <p className="text-xs uppercase tracking-[0.2em] text-sky-700">
-              {user?.role || "..."}
+              {user?.rol || "..."}
             </p>
             <p className="text-xs uppercase tracking-[0.2em] text-sky-800">
               Ver Perfil

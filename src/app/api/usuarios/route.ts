@@ -5,7 +5,7 @@ import User from "@/models/user";
 import bcrypt from "bcryptjs";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { createUsuarioSchema } from "@/schemas/usuario.schema";
-import { ensureCustomerProfileForUser } from "@/modules/customers/application/customers.service";
+import { asegurarPerfilClienteParaUsuario } from "@/modules/clientes/application/clientes.service";
 
 export async function GET() {
   const headersList = await headers();
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return validationErrorResponse(validation.errors);
   }
 
-  const { email, fullname, role: userRole, password, isActive } = validation.data;
+  const { email, nombreCompleto, rol, password, estaActivo } = validation.data;
 
   await connectDB();
 
@@ -63,16 +63,16 @@ export async function POST(request: Request) {
   // Crear usuario
   const user = await User.create({
     email,
-    fullname,
-    role: userRole,
+    nombreCompleto,
+    rol,
     password: hash,
-    isActive,
+    estaActivo,
     authProviders: ["credentials"],
     emailVerified: false,
   });
 
-  if (user.role === "CLIENTE") {
-    await ensureCustomerProfileForUser(user._id.toString());
+  if (user.rol === "CLIENTE") {
+    await asegurarPerfilClienteParaUsuario(user._id.toString());
   }
 
   return NextResponse.json(
@@ -81,9 +81,9 @@ export async function POST(request: Request) {
       user: {
         _id: user._id,
         email: user.email,
-        fullname: user.fullname,
-        role: user.role,
-        isActive: user.isActive,
+        nombreCompleto: user.nombreCompleto,
+        rol: user.rol,
+        estaActivo: user.estaActivo,
       },
     },
     { status: 201 }

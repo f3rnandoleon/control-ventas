@@ -22,7 +22,7 @@ const optionalStr = (max: number) =>
 
 export const addCartItemSchema = z.object({
   productoId: objectIdSchema,
-  variantId: optionalObjectIdSchema,
+  varianteId: optionalObjectIdSchema,
   color: nonEmptyStringSchema.max(50, "El color no puede exceder 50 caracteres"),
   colorSecundario: z
     .string()
@@ -40,53 +40,53 @@ export const updateCartItemSchema = z.object({
 export const checkoutCartSchema = z
   .object({
     metodoPago: z.enum(["EFECTIVO", "QR"]),
-    addressId: optionalObjectIdSchema,
-    notes: nonEmptyStringSchema
+    direccionId: optionalObjectIdSchema,
+    notas: nonEmptyStringSchema
       .max(300, "Las notas no pueden exceder 300 caracteres")
       .optional(),
 
-    delivery: z
+    entrega: z
       .object({
-        method: z.enum(["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL"]),
+        metodo: z.enum(["WHATSAPP", "PICKUP_POINT", "SHIPPING_NATIONAL"]),
 
         // PICKUP_POINT (Puntos de entrega)
-        address: optionalStr(250),
-        phone: optionalStr(20),
-        recipientName: optionalStr(100),
-        scheduledAt: optionalStr(100),
+        direccion: optionalStr(250),
+        telefono: optionalStr(20),
+        nombreDestinatario: optionalStr(100),
+        programadoPara: optionalStr(100),
 
         // SHIPPING_NATIONAL (Otro departamento)
-        department: optionalStr(100),
-        city: optionalStr(100),
-        shippingCompany: optionalStr(150),
-        branch: optionalStr(150),
-        senderName: optionalStr(100),
-        senderCI: optionalStr(20),
-        senderPhone: optionalStr(20),
+        departamento: optionalStr(100),
+        ciudad: optionalStr(100),
+        empresaEnvio: optionalStr(150),
+        sucursal: optionalStr(150),
+        nombreRemitente: optionalStr(100),
+        ciRemitente: optionalStr(20),
+        telefonoRemitente: optionalStr(20),
       })
       .optional(),
   })
   .superRefine((data, ctx) => {
-    const method = data.delivery?.method;
+    const metodo = data.entrega?.metodo;
 
-    if (method === "PICKUP_POINT") {
-      if (!data.delivery?.phone) {
+    if (metodo === "PICKUP_POINT") {
+      if (!data.entrega?.telefono) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El celular de contacto es obligatorio para el punto de encuentro",
-          path: ["delivery", "phone"],
+          path: ["entrega", "telefono"],
         });
       }
-      if (!data.delivery?.address) {
+      if (!data.entrega?.direccion) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El lugar de encuentro es obligatorio",
-          path: ["delivery", "address"],
+          path: ["entrega", "direccion"],
         });
       }
     }
 
-    if (method === "SHIPPING_NATIONAL") {
+    if (metodo === "SHIPPING_NATIONAL") {
       if (data.metodoPago !== "QR") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -94,39 +94,39 @@ export const checkoutCartSchema = z
           path: ["metodoPago"],
         });
       }
-      if (!data.delivery?.department) {
+      if (!data.entrega?.departamento) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El departamento destino es obligatorio",
-          path: ["delivery", "department"],
+          path: ["entrega", "departamento"],
         });
       }
-      if (!data.delivery?.shippingCompany) {
+      if (!data.entrega?.empresaEnvio) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "La empresa de transporte es obligatoria",
-          path: ["delivery", "shippingCompany"],
+          path: ["entrega", "empresaEnvio"],
         });
       }
-      if (!data.delivery?.senderName) {
+      if (!data.entrega?.nombreRemitente) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El nombre del remitente es obligatorio",
-          path: ["delivery", "senderName"],
+          path: ["entrega", "nombreRemitente"],
         });
       }
-      if (!data.delivery?.senderCI) {
+      if (!data.entrega?.ciRemitente) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El carnet del remitente es obligatorio",
-          path: ["delivery", "senderCI"],
+          path: ["entrega", "ciRemitente"],
         });
       }
-      if (!data.delivery?.senderPhone) {
+      if (!data.entrega?.telefonoRemitente) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El celular del remitente es obligatorio",
-          path: ["delivery", "senderPhone"],
+          path: ["entrega", "telefonoRemitente"],
         });
       }
     }

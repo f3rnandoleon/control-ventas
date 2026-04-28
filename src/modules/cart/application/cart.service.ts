@@ -1,13 +1,13 @@
 import mongoose, { type ClientSession } from "mongoose";
 import { connectDB } from "@/libs/mongodb";
-import Producto from "@/models/product";
+import Producto from "@/models/producto";
 import type { Variante } from "@/types/producto";
 import type {
   AddCartItemInput,
   UpdateCartItemInput,
 } from "@/schemas/cart.schema";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
-import { findVariantByIdentity } from "@/utils/variantIdentity";
+import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import { AppError } from "@/shared/errors/AppError";
 import { cartRepository } from "@/modules/cart/infrastructure/cart.repository";
 import { getAvailableStockForVariant } from "@/modules/inventory/application/inventory.service";
@@ -20,10 +20,10 @@ function assertObjectId(value: string, message: string) {
 
 function recalculateCart(cart: {
   items: Array<{ cantidad: number; subtotal: number }>;
-  totalItems: number;
+  totalArticulos: number;
   subtotal: number;
 }) {
-  cart.totalItems = cart.items.reduce((sum, item) => sum + item.cantidad, 0);
+  cart.totalArticulos = cart.items.reduce((sum, item) => sum + item.cantidad, 0);
   cart.subtotal = cart.items.reduce((sum, item) => sum + item.subtotal, 0);
 }
 
@@ -40,7 +40,7 @@ async function getProductAndVariant(
   }
 
   const variante = findVariantByIdentity(producto.variantes as Variante[], {
-    variantId: input.variantId,
+    varianteId: input.varianteId,
     color: input.color,
     colorSecundario: input.colorSecundario,
     talla: input.talla,
@@ -83,7 +83,7 @@ export async function addCartItemByUserId(
       (item.variante.colorSecundario || "") ===
         (variante.colorSecundario || "") &&
       item.variante.talla === variante.talla &&
-      (item.variante.variantId || "") === (variante.variantId || "")
+      (item.variante.varianteId || "") === (variante.varianteId || "")
   );
 
   const nextQuantity = (existingItem?.cantidad || 0) + input.cantidad;
@@ -106,7 +106,7 @@ export async function addCartItemByUserId(
     cart.items.push({
       productoId: producto._id,
       variante: {
-        variantId: variante.variantId,
+        varianteId: variante.varianteId,
         color: variante.color,
         colorSecundario: variante.colorSecundario,
         talla: variante.talla,
@@ -157,7 +157,7 @@ export async function updateCartItemByUserId(
   }
 
   const variante = findVariantByIdentity(producto.variantes as Variante[], {
-    variantId: item.variante.variantId,
+    varianteId: item.variante.varianteId,
     color: item.variante.color,
     colorSecundario: item.variante.colorSecundario,
     talla: item.variante.talla,
@@ -250,7 +250,7 @@ export async function getValidatedCartForCheckout(
     }
 
     const variante = findVariantByIdentity(producto.variantes as Variante[], {
-      variantId: item.variante.variantId,
+      varianteId: item.variante.varianteId,
       color: item.variante.color,
       colorSecundario: item.variante.colorSecundario,
       talla: item.variante.talla,

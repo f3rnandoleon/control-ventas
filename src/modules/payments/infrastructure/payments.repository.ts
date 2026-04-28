@@ -1,32 +1,32 @@
 import type { ClientSession } from "mongoose";
-import PaymentTransaction from "@/models/paymentTransaction";
+import TransaccionPago from "@/models/transaccionPago";
 
 export const paymentsRepository = {
   create(payload: Record<string, unknown>, session?: ClientSession) {
-    return PaymentTransaction.create([payload], session ? { session } : {}).then(
+    return TransaccionPago.create([payload], session ? { session } : {}).then(
       ([payment]) => payment
     );
   },
 
   findById(id: string, session?: ClientSession) {
-    return PaymentTransaction.findById(id).session(session ?? null);
+    return TransaccionPago.findById(id).session(session ?? null);
   },
 
   findByIdempotencyKey(idempotencyKey: string, session?: ClientSession) {
-    return PaymentTransaction.findOne({ idempotencyKey }).session(session ?? null);
+    return TransaccionPago.findOne({ idempotencyKey }).session(session ?? null);
   },
 
-  findLatestPaidByOrder(orderId: string, session?: ClientSession) {
-    return PaymentTransaction.findOne({
-      orderId,
-      status: "PAID",
+  findLatestPaidByOrder(pedidoId: string, session?: ClientSession) {
+    return TransaccionPago.findOne({
+      pedidoId,
+      estado: "PAID",
     })
       .session(session ?? null)
       .sort({ createdAt: -1 });
   },
 
   updateById(id: string, payload: Record<string, unknown>, session?: ClientSession) {
-    return PaymentTransaction.findByIdAndUpdate(
+    return TransaccionPago.findByIdAndUpdate(
       id,
       { $set: payload },
       { new: true, session }
@@ -34,6 +34,6 @@ export const paymentsRepository = {
   },
 
   findByReviewToken(token: string, session?: ClientSession) {
-    return PaymentTransaction.findOne({ reviewToken: token }).session(session ?? null);
+    return TransaccionPago.findOne({ tokenRevision: token }).session(session ?? null);
   },
 };

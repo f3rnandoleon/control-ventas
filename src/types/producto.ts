@@ -1,10 +1,10 @@
 export interface Variante {
-  variantId?: string;
+  varianteId?: string;
   color: string;
   colorSecundario?: string;
   talla: string;
   stock: number;
-  reservedStock?: number;
+  stockReservado?: number;
   imagenes?: string[];
   imagen?: string;
   descripcion?: string;

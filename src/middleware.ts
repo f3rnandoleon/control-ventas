@@ -1,20 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { checkRateLimit, RATE_LIMIT_CONFIGS } from "@/shared/http/rate-limit";
 
 const authPages = ["/login", "/register"];
 const dashboardRoutes = ["/dashboard"];
 const protectedApiRoutes = [
   "/api/admin",
   "/api/perfil",
-  "/api/cart",
+  "/api/carrito",
+  "/api/clientes",
+  "/api/entregas",
+  "/api/pagos",
+  "/api/pedidos",
   "/api/productos",
   "/api/uploads",
-  "/api/ventas",
-  "/api/orders",
-  "/api/fulfillment",
   "/api/pos",
-  "/api/payments",
   "/api/mis-pedidos",
   "/api/inventario",
   "/api/reportes",
@@ -22,7 +23,7 @@ const protectedApiRoutes = [
 ];
 
 const adminApiRoutes = ["/api/admin", "/api/reportes", "/api/usuarios", "/api/uploads"];
-const staffApiRoutes = ["/api/productos", "/api/ventas", "/api/inventario"];
+const staffApiRoutes = ["/api/productos", "/api/inventario"];
 
 function getDashboardHomeByRole(role?: string) {
   if (role === "ADMIN") return "/dashboard/admin";
@@ -33,6 +34,31 @@ function getDashboardHomeByRole(role?: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { method } = request;
+  const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
+
+  // --- RATE LIMITING ---
+  let rlResult = { allowed: true };
+
+  if (pathname.startsWith("/api/auth/login") || pathname.startsWith("/api/auth/signup") || pathname === "/login" || pathname === "/register") {
+    rlResult = checkRateLimit(`auth:${ip}`, RATE_LIMIT_CONFIGS.AUTH);
+  } else if (pathname.startsWith("/api/productos/publicos")) {
+    rlResult = checkRateLimit(`public:${ip}`, RATE_LIMIT_CONFIGS.PUBLIC);
+  } else if (pathname.startsWith("/api/")) {
+    // Para APIs protegidas, intentamos obtener el token primero para el ID de usuario
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const userId = token?.id as string | undefined;
+    const key = userId ? `user:${userId}` : `ip:${ip}`;
+    const config = method === "GET" ? RATE_LIMIT_CONFIGS.READ : RATE_LIMIT_CONFIGS.WRITE;
+    rlResult = checkRateLimit(key, config);
+  }
+
+  if (!rlResult.allowed) {
+    return NextResponse.json(
+      { message: "Demasiadas solicitudes. Inténtalo más tarde." },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
+  }
+  // ----------------------
 
   const isPublicProductosRoute = pathname.startsWith("/api/productos/publicos");
   const isAuthPage = authPages.includes(pathname);
@@ -46,7 +72,8 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/auth/signup") ||
-    pathname.startsWith("/api/health") ||
+    pathname.startsWith("/api/estado") ||
+    pathname.startsWith("/api/verificar/pago") ||
     isPublicProductosRoute
   ) {
     return NextResponse.next();
@@ -60,7 +87,7 @@ export async function middleware(request: NextRequest) {
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
-  const role = token?.role as string | undefined;
+  const role = token?.rol as string | undefined;
   const userId = token?.id as string | undefined;
 
   if (isAuthPage && token) {
@@ -141,14 +168,10 @@ export async function middleware(request: NextRequest) {
     staffApiRoutes.some((route) => pathname.startsWith(route)) &&
     !["ADMIN", "VENDEDOR"].includes(role || "")
   ) {
-    if (pathname.startsWith("/api/ventas") && role === "CLIENTE" && method === "POST") {
-      // Permitir que CLIENTE registre ventas WEB en /api/ventas
-    } else {
-      return NextResponse.json(
-        { message: "Acceso no autorizado" },
-        { status: 403 }
-      );
-    }
+    return NextResponse.json(
+      { message: "Acceso no autorizado" },
+      { status: 403 }
+    );
   }
 
   if (pathname.startsWith("/api/mis-pedidos") && role !== "CLIENTE") {
@@ -158,15 +181,19 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  if (pathname.startsWith("/api/orders")) {
+  if (pathname.startsWith("/api/pedidos")) {
     const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
     const isClientRead = role === "CLIENTE" && method === "GET";
+    const isClientUpdate =
+      role === "CLIENTE" &&
+      method === "PATCH" &&
+      /^\/api\/pedidos\/[^/]+$/.test(pathname);
     const isClientCheckout =
       role === "CLIENTE" &&
       method === "POST" &&
-      pathname.startsWith("/api/orders/checkout");
+      pathname.startsWith("/api/pedidos/checkout");
 
-    if (!isStaff && !isClientRead && !isClientCheckout) {
+    if (!isStaff && !isClientRead && !isClientUpdate && !isClientCheckout) {
       return NextResponse.json(
         { message: "Acceso no autorizado" },
         { status: 403 }
@@ -174,7 +201,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/api/fulfillment")) {
+  if (pathname.startsWith("/api/entregas")) {
     const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
     const isClientRead = role === "CLIENTE" && method === "GET";
 
@@ -197,14 +224,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/api/cart") && role !== "CLIENTE") {
+  if (pathname.startsWith("/api/carrito") && role !== "CLIENTE") {
     return NextResponse.json(
       { message: "Acceso no autorizado" },
       { status: 403 }
     );
   }
 
-  if (pathname.startsWith("/api/payments")) {
+  if (pathname.startsWith("/api/clientes") && role !== "CLIENTE") {
+    return NextResponse.json(
+      { message: "Acceso no autorizado" },
+      { status: 403 }
+    );
+  }
+
+  if (pathname.startsWith("/api/pagos")) {
     const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
     const isClient = role === "CLIENTE";
 
