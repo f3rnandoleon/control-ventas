@@ -31,8 +31,7 @@ export async function resolveApiAuth(
     if (token) {
       try {
         const secret = process.env.JWT_SECRET;
-        if (!secret) 
-        {
+        if (!secret) {
           throw new Error("JWT_SECRET no está definido en las variables de entorno");
         }
         // En Node.js (el runtime de App Router API Routes) `jsonwebtoken` funciona perfectamente.
