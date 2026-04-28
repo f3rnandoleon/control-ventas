@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/admin/cron/reservas-expiradas",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 1 * * *"
     }
   ]
 }

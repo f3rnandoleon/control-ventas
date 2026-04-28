@@ -11,7 +11,6 @@ import {
   getAvailableStockForVariant,
   releaseReservedStockForOrder,
   reserveStockForOrder,
-  consumeReservedStockForOrder,
   consumeStockForSale
 } from "@/modules/inventory/application/inventory.service";
 import { pedidosRepository } from "@/modules/orders/infrastructure/pedidos.repository";
