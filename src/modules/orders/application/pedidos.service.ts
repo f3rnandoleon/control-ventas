@@ -11,7 +11,8 @@ import {
   getAvailableStockForVariant,
   releaseReservedStockForOrder,
   reserveStockForOrder,
-  consumeReservedStockForOrder
+  consumeReservedStockForOrder,
+  consumeStockForSale
 } from "@/modules/inventory/application/inventory.service";
 import { pedidosRepository } from "@/modules/orders/infrastructure/pedidos.repository";
 import { syncFulfillmentForOrder } from "@/modules/fulfillment/application/fulfillment.service";
@@ -321,7 +322,7 @@ export async function crearVentaDirecta(
         throw new AppError(`Stock insuficiente`, 400);
       }
 
-      await consumeReservedStockForOrder({
+      await consumeStockForSale({
         producto,
         variante,
         cantidad: item.cantidad,
