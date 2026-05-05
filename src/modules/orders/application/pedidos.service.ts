@@ -296,7 +296,7 @@ export async function crearPedidoDesdeCarrito(
 
   // Notificación Telegram para métodos que no requieren subir comprobante QR (o WhatsApp)
   const isEfectivo = pedido.metodoPago === "EFECTIVO";
-  const isWhatsapp = (pedido.snapshotEntrega as any)?.metodo === "WHATSAPP";
+  const isWhatsapp = (pedido.snapshotEntrega as { metodo?: string } | null)?.metodo === "WHATSAPP";
 
   if (isEfectivo || isWhatsapp) {
     try {
@@ -304,7 +304,7 @@ export async function crearPedidoDesdeCarrito(
       const montoEscapado = escapeTelegramMd(`Bs ${pedido.total.toFixed(2)}`);
       const clienteEscapado = escapeTelegramMd(pedido.snapshotCliente.nombreCompleto);
       const metodoPagoEscapado = escapeTelegramMd(pedido.metodoPago);
-      const metodoEntregaEscapado = escapeTelegramMd((pedido.snapshotEntrega as any)?.metodo || "No especificado");
+      const metodoEntregaEscapado = escapeTelegramMd((pedido.snapshotEntrega as { metodo?: string } | null)?.metodo || "No especificado");
 
       const itemsText = pedido.items.length === 1 ? "1 producto" : `${pedido.items.length} productos`;
       const itemsEscapado = escapeTelegramMd(itemsText);
