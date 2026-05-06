@@ -27,7 +27,6 @@ import { generateOrderedId } from "@/utils/generarId";
 import { assertObjectId } from "@/utils/validacion";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import type { Variante } from "@/types/producto";
-import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 
 function createPedidoNumber() {
   return generateOrderedId("P");
@@ -294,43 +293,7 @@ export async function crearPedidoDesdeCarrito(
     return pedido;
   });
 
-  // Notificación Telegram para métodos que no requieren subir comprobante QR (o WhatsApp)
-  const isEfectivo = payload.metodoPago === "EFECTIVO";
-  const isWhatsapp = payload.entrega?.metodo === "WHATSAPP";
 
-  console.log(`[Checkout] Evaluando notificación Telegram: isEfectivo=${isEfectivo}, isWhatsapp=${isWhatsapp}, metodoPago=${payload.metodoPago}, metodoEntrega=${payload.entrega?.metodo}`);
-
-  if (isEfectivo || isWhatsapp) {
-    try {
-      const pedidoEscapado = escapeTelegramMd(pedido.numeroPedido);
-      const montoEscapado = escapeTelegramMd(`Bs ${pedido.total.toFixed(2)}`);
-      const clienteEscapado = escapeTelegramMd(pedido.snapshotCliente.nombreCompleto);
-      const metodoPagoEscapado = escapeTelegramMd(pedido.metodoPago);
-      const metodoEntregaEscapado = escapeTelegramMd((pedido.snapshotEntrega as { metodo?: string } | null)?.metodo || "No especificado");
-
-      const itemsText = pedido.items.length === 1 ? "1 producto" : `${pedido.items.length} productos`;
-      const itemsEscapado = escapeTelegramMd(itemsText);
-
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://control-ventas-azure.vercel.app";
-      const adminLink = `${appUrl}/dashboard/admin/pedidos`;
-      
-      console.log(`[Telegram] Enviando notificación para pedido ${pedido.numeroPedido}. AdminLink: ${adminLink}`);
-
-      await sendTelegramMessage(
-        `🆕 *NUEVO PEDIDO RECIBIDO*\n\n` +
-        `📦 Pedido: \`${pedidoEscapado}\`\n` +
-        `👤 Cliente: *${clienteEscapado}*\n` +
-        `💰 Total: *${montoEscapado}* \(${itemsEscapado}\)\n\n` +
-        `💳 Pago: *${metodoPagoEscapado}*\n` +
-        `🚚 Entrega: *${metodoEntregaEscapado}*\n\n` +
-        `📋 [Ver detalle del pedido](${adminLink})`
-      );
-
-      console.log(`[Telegram] Notificación enviada con éxito para ${pedido.numeroPedido}`);
-    } catch (tgError) {
-      console.error("[Telegram] Error al preparar o enviar notificación de pedido:", tgError);
-    }
-  }
 
   return pedido;
 }
