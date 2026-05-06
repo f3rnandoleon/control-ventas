@@ -295,8 +295,10 @@ export async function crearPedidoDesdeCarrito(
   });
 
   // Notificación Telegram para métodos que no requieren subir comprobante QR (o WhatsApp)
-  const isEfectivo = pedido.metodoPago === "EFECTIVO";
-  const isWhatsapp = (pedido.snapshotEntrega as { metodo?: string } | null)?.metodo === "WHATSAPP";
+  const isEfectivo = payload.metodoPago === "EFECTIVO";
+  const isWhatsapp = payload.entrega?.metodo === "WHATSAPP";
+
+  console.log(`[Checkout] Evaluando notificación Telegram: isEfectivo=${isEfectivo}, isWhatsapp=${isWhatsapp}, metodoPago=${payload.metodoPago}, metodoEntrega=${payload.entrega?.metodo}`);
 
   if (isEfectivo || isWhatsapp) {
     try {
@@ -311,7 +313,8 @@ export async function crearPedidoDesdeCarrito(
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://control-ventas-azure.vercel.app";
       const adminLink = `${appUrl}/dashboard/admin/pedidos`;
-      const linkEscapado = escapeTelegramMd(adminLink);
+      
+      console.log(`[Telegram] Enviando notificación para pedido ${pedido.numeroPedido}. AdminLink: ${adminLink}`);
 
       await sendTelegramMessage(
         `🆕 *NUEVO PEDIDO RECIBIDO*\n\n` +
@@ -320,10 +323,12 @@ export async function crearPedidoDesdeCarrito(
         `💰 Total: *${montoEscapado}* (${itemsEscapado})\n\n` +
         `💳 Pago: *${metodoPagoEscapado}*\n` +
         `🚚 Entrega: *${metodoEntregaEscapado}*\n\n` +
-        `📋 [Ver detalle del pedido](${linkEscapado})`
+        `📋 [Ver detalle del pedido](${adminLink})`
       );
+
+      console.log(`[Telegram] Notificación enviada con éxito para ${pedido.numeroPedido}`);
     } catch (tgError) {
-      console.error("[Telegram] Error al preparar notificación de pedido:", tgError);
+      console.error("[Telegram] Error al preparar o enviar notificación de pedido:", tgError);
     }
   }
 
