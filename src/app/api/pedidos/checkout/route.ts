@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         const clienteEscapado = escapeTelegramMd(pedido.snapshotCliente.nombreCompleto);
         const metodoPagoEscapado = escapeTelegramMd(pedido.metodoPago);
         const metodoEntregaEscapado = escapeTelegramMd(payload.entrega?.metodo || "No especificado");
-        
+
         const itemsText = pedido.items.length === 1 ? "1 producto" : `${pedido.items.length} productos`;
         const itemsEscapado = escapeTelegramMd(itemsText);
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
           `🆕 *NUEVO PEDIDO RECIBIDO*\n\n` +
           `📦 Pedido: \`${pedidoEscapado}\`\n` +
           `👤 Cliente: *${clienteEscapado}*\n` +
-          `💰 Total: *${montoEscapado}* \(${itemsEscapado}\)\n\n` +
+          `💰 Total: *${montoEscapado}*\n\n` +
           `💳 Pago: *${metodoPagoEscapado}*\n` +
           `🚚 Entrega: *${metodoEntregaEscapado}*\n\n` +
           `📋 [Ver detalle del pedido](${adminLink})`
