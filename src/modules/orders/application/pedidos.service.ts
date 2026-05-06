@@ -320,7 +320,7 @@ export async function crearPedidoDesdeCarrito(
         `🆕 *NUEVO PEDIDO RECIBIDO*\n\n` +
         `📦 Pedido: \`${pedidoEscapado}\`\n` +
         `👤 Cliente: *${clienteEscapado}*\n` +
-        `💰 Total: *${montoEscapado}* (${itemsEscapado})\n\n` +
+        `💰 Total: *${montoEscapado}* \(${itemsEscapado}\)\n\n` +
         `💳 Pago: *${metodoPagoEscapado}*\n` +
         `🚚 Entrega: *${metodoEntregaEscapado}*\n\n` +
         `📋 [Ver detalle del pedido](${adminLink})`
