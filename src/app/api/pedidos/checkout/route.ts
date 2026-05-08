@@ -44,8 +44,6 @@ export async function POST(request: Request) {
         const metodoPagoEscapado = escapeTelegramMd(pedido.metodoPago);
         const metodoEntregaEscapado = escapeTelegramMd(payload.entrega?.metodo || "No especificado");
 
-        const itemsText = pedido.items.length === 1 ? "1 producto" : `${pedido.items.length} productos`;
-        const itemsEscapado = escapeTelegramMd(itemsText);
 
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://control-ventas-azure.vercel.app";
         const adminLink = `${appUrl}/dashboard/admin/pedidos`;

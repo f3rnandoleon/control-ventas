@@ -2,6 +2,7 @@ import { connectDB } from "@/libs/mongodb";
 import Pedido from "@/models/pedido";
 import PaymentTransaction from "@/models/transaccionPago";
 import Inventario from "@/models/inventario";
+import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sales";
 import { AppError } from "@/shared/errors/AppError";
 
 type ReportFilters = {
@@ -67,10 +68,7 @@ export async function getGeneralReport(request: Request) {
   const paymentDateField = Object.keys(dateMatch).length > 0 ? { createdAt: dateMatch } : {};
 
   // Solo consideramos pedidos que NO esten cancelados y que representen una venta real para summary de ventas
-  const salesMatch = {
-    ...pedidoMatch,
-    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
-  };
+  const salesMatch = buildRecognizedSalesMatch(pedidoMatch);
 
   const [salesSummary, channelBreakdown, paymentBreakdown, orderBreakdown] =
     await Promise.all([
@@ -144,10 +142,7 @@ export async function getDailySalesReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  const salesMatch = {
-    ...buildMatch(dateMatch),
-    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
-  };
+  const salesMatch = buildRecognizedSalesMatch(buildMatch(dateMatch));
 
   return Pedido.aggregate([
     { $match: salesMatch },
@@ -169,10 +164,7 @@ export async function getMonthlySalesReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  const salesMatch = {
-    ...buildMatch(dateMatch),
-    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
-  };
+  const salesMatch = buildRecognizedSalesMatch(buildMatch(dateMatch));
 
   return Pedido.aggregate([
     { $match: salesMatch },
@@ -195,10 +187,7 @@ export async function getTopProductsReport(request: Request) {
   await connectDB();
   const { dateMatch, limit } = parseReportFilters(request);
 
-  const salesMatch = {
-    ...buildMatch(dateMatch),
-    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
-  };
+  const salesMatch = buildRecognizedSalesMatch(buildMatch(dateMatch));
 
   return Pedido.aggregate([
     { $match: salesMatch },
@@ -227,10 +216,7 @@ export async function getTopVariantsReport(request: Request) {
   await connectDB();
   const { dateMatch, limit } = parseReportFilters(request);
 
-  const salesMatch = {
-    ...buildMatch(dateMatch),
-    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
-  };
+  const salesMatch = buildRecognizedSalesMatch(buildMatch(dateMatch));
 
   return Pedido.aggregate([
     { $match: salesMatch },
@@ -264,10 +250,7 @@ export async function getSalesByChannelReport(request: Request) {
   await connectDB();
   const { dateMatch } = parseReportFilters(request);
 
-  const salesMatch = {
-    ...buildMatch(dateMatch),
-    estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] }
-  };
+  const salesMatch = buildRecognizedSalesMatch(buildMatch(dateMatch));
 
   return Pedido.aggregate([
     { $match: salesMatch },
@@ -289,11 +272,10 @@ export async function getSalesBySellerReport(request: Request) {
 
   return Pedido.aggregate([
     {
-      $match: {
+      $match: buildRecognizedSalesMatch({
         ...buildMatch(dateMatch),
-        estadoPedido: { $nin: ["CANCELLED", "PENDING_PAYMENT"] },
         vendedor: { $ne: null },
-      },
+      }),
     },
     {
       $group: {

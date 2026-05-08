@@ -20,7 +20,7 @@ export async function createVenta(data: CreatePedidoInput) {
 }
 
 export async function getVentas(): Promise<Pedido[]> {
-  const res = await fetch("/api/pedidos");
+  const res = await fetch("/api/pedidos?scope=sales");
 
   if (!res.ok) throw new Error("Error al obtener ventas");
   return res.json();

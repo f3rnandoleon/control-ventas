@@ -429,6 +429,20 @@ export async function listPedidosForActor(role: string, userId: string) {
   throw new AppError("No autorizado", 403);
 }
 
+export async function listRecognizedSalesForActor(role: string, userId: string) {
+  await connectDB();
+
+  if (role === "ADMIN") {
+    return pedidosRepository.listRecognizedSales();
+  }
+
+  if (role === "VENDEDOR") {
+    return pedidosRepository.listRecognizedSalesBySeller(userId);
+  }
+
+  throw new AppError("No autorizado", 403);
+}
+
 export async function getPedidoForActor(role: string, userId: string, id: string) {
   assertObjectId(id, "ID de pedido invalido");
   await connectDB();

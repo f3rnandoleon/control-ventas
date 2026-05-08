@@ -41,7 +41,7 @@ export default function AdminReportesPage() {
   `${date.getFullYear()}-${date.getMonth()}`;
 
   // Ventas por fecha
-  const ventasPorFecha = ventas.reduce<Record<string, number>>((acc, v) => {
+  const ventasPorFecha = ventasFiltradas.reduce<Record<string, number>>((acc, v) => {
     const fecha = new Date(v.createdAt).toLocaleDateString();
     acc[fecha] = (acc[fecha] || 0) + v.total;
     return acc;
@@ -64,7 +64,7 @@ export default function AdminReportesPage() {
     );
     const lastMonthKey = getMonthKey(lastMonthDate);
 
-    const mensual = ventas.reduce(
+    const mensual = ventasFiltradas.reduce(
       (acc: { actual: number; anterior: number }, v) => {
         const key = getMonthKey(new Date(v.createdAt));
         if (key === currentMonthKey) acc.actual += v.total;

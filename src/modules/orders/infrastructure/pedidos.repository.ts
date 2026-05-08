@@ -1,5 +1,6 @@
 import type { ClientSession } from "mongoose";
 import Pedido from "@/models/pedido";
+import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sales";
 
 export const pedidosRepository = {
   create(payload: Record<string, unknown>, session?: ClientSession) {
@@ -20,6 +21,24 @@ export const pedidosRepository = {
 
   listByCustomer(userId: string) {
     return Pedido.find({ cliente: userId })
+      .populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email")
+      .sort({ createdAt: -1 });
+  },
+
+  listRecognizedSales() {
+    return Pedido.find(buildRecognizedSalesMatch())
+      .populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email")
+      .sort({ createdAt: -1 });
+  },
+
+  listRecognizedSalesBySeller(userId: string) {
+    return Pedido.find(
+      buildRecognizedSalesMatch({
+        vendedor: userId,
+      })
+    )
       .populate("cliente", "nombreCompleto email")
       .populate("vendedor", "nombreCompleto email")
       .sort({ createdAt: -1 });
