@@ -13,6 +13,47 @@ import CloudinaryImage from "@/components/ui/CloudinaryImage";
 // Tipo extendido para incluir stock disponible en el formulario (no se envía al backend)
 type VentaFormValues = z.input<typeof createPedidoSchema>;
 type VentaFormSubmitValues = z.output<typeof createPedidoSchema>;
+type VentaFormItem = VentaFormValues["items"][number];
+type VentaVariant = Producto["variantes"][number];
+
+const buildVariantOptionValue = (
+  variant: Pick<VentaVariant, "varianteId" | "color" | "colorSecundario" | "talla">
+) =>
+  variant.varianteId ||
+  [variant.color, variant.colorSecundario || "", variant.talla].join("|");
+
+const buildSelectedVariantValue = (
+  item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>
+) => {
+  if (typeof item.varianteId === "string" && item.varianteId) {
+    return item.varianteId;
+  }
+
+  if (item.color && item.talla) {
+    return [item.color, item.colorSecundario || "", item.talla].join("|");
+  }
+
+  return "";
+};
+
+const formatVariantLabel = (
+  variant: Pick<VentaVariant, "color" | "colorSecundario" | "talla">
+) => `${variant.color}${variant.colorSecundario ? `/${variant.colorSecundario}` : ""} - ${variant.talla}`;
+
+const matchesSelectedVariant = (
+  variant: VentaVariant,
+  item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>
+) => {
+  if (item.varianteId && variant.varianteId) {
+    return variant.varianteId === item.varianteId;
+  }
+
+  return (
+    variant.color === item.color &&
+    variant.talla === item.talla &&
+    (variant.colorSecundario || "") === (item.colorSecundario || "")
+  );
+};
 
 export default function VentaPOS({
   productos,
@@ -54,6 +95,7 @@ export default function VentaPOS({
       productoId: "",
       varianteId: undefined,
       color: "",
+      colorSecundario: "",
       talla: "",
       cantidad: 1,
     });
@@ -94,10 +136,11 @@ export default function VentaPOS({
       }
 
       await createVenta({
-        items: data.items.map(({ productoId, varianteId, color, talla, cantidad }) => ({
+        items: data.items.map(({ productoId, varianteId, color, colorSecundario, talla, cantidad }) => ({
           productoId,
           varianteId,
           color,
+          colorSecundario,
           talla,
           cantidad,
         })),
@@ -147,26 +190,20 @@ export default function VentaPOS({
             productoId: "",
             varianteId: undefined,
             color: "",
+            colorSecundario: "",
             talla: "",
             cantidad: 1,
           };
           const productoSeleccionado = productos.find(p => p._id === currentItem.productoId);
           const varianteSeleccionada = productoSeleccionado?.variantes.find(
-            (v) =>
-              (currentItem.varianteId && v.varianteId === currentItem.varianteId) ||
-              (v.color === currentItem.color && v.talla === currentItem.talla)
+            (v) => matchesSelectedVariant(v, currentItem)
           );
           const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
           const stockDisponible = varianteSeleccionada?.stock ?? 0;
           const varianteLabel = varianteSeleccionada
-            ? `${varianteSeleccionada.color} - ${varianteSeleccionada.talla}`
+            ? formatVariantLabel(varianteSeleccionada)
             : "Variante sin seleccionar";
-          const selectedVariantValue =
-            typeof currentItem.varianteId === "string" && currentItem.varianteId
-              ? currentItem.varianteId
-              : currentItem.color && currentItem.talla
-                ? `${currentItem.color}|${currentItem.talla}`
-                : "";
+          const selectedVariantValue = buildSelectedVariantValue(currentItem);
           const precio = productoSeleccionado?.precioVenta || 0;
           const subtotalItem = precio * (currentItem.cantidad || 0);
 
@@ -203,6 +240,7 @@ export default function VentaPOS({
                   setValue(`items.${index}.productoId`, pid);
                   setValue(`items.${index}.varianteId`, undefined);
                   setValue(`items.${index}.color`, "");
+                  setValue(`items.${index}.colorSecundario`, "");
                   setValue(`items.${index}.talla`, "");
                   setValue(`items.${index}.cantidad`, 1);
                 }}
@@ -210,7 +248,7 @@ export default function VentaPOS({
                 <option value="">Seleccionar producto...</option>
                 {productos.map((p) => (
                   <option key={p._id} value={p._id}>
-                    {p.nombre}
+                    {p.nombre} - {p.modelo}
                   </option>
                 ))}
               </select>
@@ -225,14 +263,13 @@ export default function VentaPOS({
                     const val = e.target.value;
                     if (!val) return;
                     const variante = productoSeleccionado?.variantes.find(
-                      (v) =>
-                        v.varianteId === val ||
-                        `${v.color}|${v.talla}` === val
+                      (v) => buildVariantOptionValue(v) === val
                     );
 
                     if (variante) {
                       setValue(`items.${index}.varianteId`, variante.varianteId);
                       setValue(`items.${index}.color`, variante.color);
+                      setValue(`items.${index}.colorSecundario`, variante.colorSecundario || "");
                       setValue(`items.${index}.talla`, variante.talla);
                       // Reset cantidad si excede stock
                       if (currentItem.cantidad > variante.stock) {
@@ -242,19 +279,20 @@ export default function VentaPOS({
                   }}
                 >
                   <option value="">Variante...</option>
-                  {productoSeleccionado?.variantes.map((v) => (
+                  {productoSeleccionado?.variantes.map((v, optionIndex) => (
                     <option
-                      key={v.varianteId || `${v.color}-${v.talla}`}
-                      value={v.varianteId || `${v.color}|${v.talla}`}
+                      key={`${buildVariantOptionValue(v)}-${optionIndex}`}
+                      value={buildVariantOptionValue(v)}
                       disabled={v.stock <= 0}
                     >
-                      {v.color} - {v.talla} ({v.stock})
+                      {formatVariantLabel(v)} ({v.stock})
                     </option>
                   ))}
                 </select>
                 {/* Campos ocultos */}
                 <input type="hidden" {...register(`items.${index}.varianteId`)} />
                 <input type="hidden" {...register(`items.${index}.color`)} />
+                <input type="hidden" {...register(`items.${index}.colorSecundario`)} />
                 <input type="hidden" {...register(`items.${index}.talla`)} />
               </div>
 
