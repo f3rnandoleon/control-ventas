@@ -11,6 +11,11 @@ import { generarPDFCodigosBarras } from "@/utils/generarPDFCodigosBarras";
 
 type Mode = "LIST" | "ADD" | "EDIT";
 
+const getVariantGroupKey = (variante: Pick<Variante, "color" | "colorSecundario">) =>
+  `${variante.color.trim().toLowerCase()}::${(variante.colorSecundario || "")
+    .trim()
+    .toLowerCase()}`;
+
 export default function VariantesManager({
   producto,
   onUpdated,
@@ -20,6 +25,7 @@ export default function VariantesManager({
 }) {
   const [mode, setMode] = useState<Mode>("LIST");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const saveVariantes = async (variantes: Variante[]) => {
@@ -30,6 +36,7 @@ export default function VariantesManager({
       await onUpdated();
       setMode("LIST");
       setEditingIndex(null);
+      setEditingGroupKey(null);
       toast.success("Variantes actualizadas correctamente");
     } catch (error) {
       const message =
@@ -47,13 +54,20 @@ export default function VariantesManager({
      ADD / EDIT VIEW
   ========================= */
   if (mode === "ADD" || mode === "EDIT") {
+    const variantesDelGrupo =
+      mode === "EDIT" && editingGroupKey
+        ? producto.variantes.filter(
+            (variante) => getVariantGroupKey(variante) === editingGroupKey
+          )
+        : [];
+
     return (
       <div
         className="bg-white/5 border border-white/10 rounded-2xl p-6
         shadow-[0_0_20px_rgba(0,180,255,0.2)] space-y-4 "
       >
         <h3 className="text-lg font-semibold text-cyan-400">
-          {mode === "ADD" ? "Agregar variantes" : "Editar variante"}
+          {mode === "ADD" ? "Agregar variantes" : "Editar variantes del color"}
         </h3>
 
         <VarianteForm
@@ -62,13 +76,30 @@ export default function VariantesManager({
               ? producto.variantes[editingIndex]
               : undefined
           }
+          initialVariantes={mode === "EDIT" ? variantesDelGrupo : undefined}
           existingVariantes={producto.variantes}
           onSave={(data) => {
-            const nuevas = [...producto.variantes];
+            if (mode === "EDIT" && editingGroupKey) {
+              let inserted = false;
+              const nuevas = producto.variantes.flatMap((variante) => {
+                if (getVariantGroupKey(variante) !== editingGroupKey) {
+                  return [variante];
+                }
 
-            if (mode === "EDIT" && editingIndex !== null) {
-              nuevas[editingIndex] = data[0];
-            } else {
+                if (inserted) {
+                  return [];
+                }
+
+                inserted = true;
+                return data;
+              });
+
+              saveVariantes(nuevas);
+              return;
+            }
+
+            const nuevas = [...producto.variantes];
+            if (mode === "ADD") {
               nuevas.push(...data);
             }
 
@@ -77,6 +108,7 @@ export default function VariantesManager({
           onCancel={() => {
             setMode("LIST");
             setEditingIndex(null);
+            setEditingGroupKey(null);
           }}
         />
 
@@ -106,7 +138,11 @@ export default function VariantesManager({
         <div className="flex gap-2">
           <button
             className="btn-primary px-4 py-2  cursor-pointer"
-            onClick={() => setMode("ADD")}
+            onClick={() => {
+              setEditingIndex(null);
+              setEditingGroupKey(null);
+              setMode("ADD");
+            }}
           >
             + Agregar variantes
           </button>
@@ -180,6 +216,7 @@ export default function VariantesManager({
                 variante={v}
                 onEdit={() => {
                   setEditingIndex(index);
+                  setEditingGroupKey(getVariantGroupKey(v));
                   setMode("EDIT");
                 }}
                 onDelete={() => {

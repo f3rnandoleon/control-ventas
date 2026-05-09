@@ -10,10 +10,26 @@ import {
   DELIVERY_METHOD_LABELS,
 } from "@/constants/statusLabels";
 
+const FILTER_TABS = [
+  "TODOS",
+  "PENDING_PAYMENT",
+  "CONFIRMED",
+  "DELIVERED",
+  "CANCELLED",
+] as const;
+
+const filterLabelMap: Record<(typeof FILTER_TABS)[number], string> = {
+  TODOS: "Todos",
+  PENDING_PAYMENT: "Pendientes de Pago",
+  CONFIRMED: "Por Entregar",
+  DELIVERED: "Entregados",
+  CANCELLED: "Cancelados/Rechazados",
+};
+
 export default function OrdersClient() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("TODOS");
+  const [tab, setTab] = useState<(typeof FILTER_TABS)[number]>("TODOS");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Pedido | null>(null);
   const itemsPerPage = 10;
@@ -38,7 +54,9 @@ export default function OrdersClient() {
   }, []);
 
   const handleConfirmForDelivery = async (pedidoId: string) => {
-    if (!confirm("¿Confirmar este pedido para entrega? La reserva de stock se asegurará indefinidamente.")) return;
+    if (!confirm("¿Confirmar este pedido para entrega? La reserva de stock se asegurará indefinidamente.")) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/pedidos/${pedidoId}/confirm-for-delivery`, {
@@ -53,7 +71,9 @@ export default function OrdersClient() {
   };
 
   const handleConfirmCash = async (pedidoId: string) => {
-    if (!confirm("¿Confirmar entrega y cobro en efectivo? Se creará el pago y se descontará el stock.")) return;
+    if (!confirm("¿Confirmar entrega y cobro en efectivo? Se creará el pago y se descontará el stock.")) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/pedidos/${pedidoId}/confirm-cash`, {
@@ -112,7 +132,9 @@ export default function OrdersClient() {
   };
 
   const handleCancelOrder = async (pedidoId: string) => {
-    if (!confirm("¿Seguro que deseas cancelar este pedido? Se liberará el stock inmediatamente.")) return;
+    if (!confirm("¿Seguro que deseas cancelar este pedido? Se liberará el stock inmediatamente.")) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/pedidos/${pedidoId}`, {
@@ -139,11 +161,13 @@ export default function OrdersClient() {
     }
   };
 
-  const filteredOrders = pedidos.filter((o) => {
-    if (tab === "PENDING_PAYMENT") return o.estadoPedido === "PENDING_PAYMENT";
-    if (tab === "CONFIRMED") return ["CONFIRMED", "READY", "IN_TRANSIT"].includes(o.estadoPedido);
-    if (tab === "DELIVERED") return o.estadoPedido === "DELIVERED";
-    if (tab === "CANCELLED") return o.estadoPedido === "CANCELLED";
+  const filteredOrders = pedidos.filter((order) => {
+    if (tab === "PENDING_PAYMENT") return order.estadoPedido === "PENDING_PAYMENT";
+    if (tab === "CONFIRMED") {
+      return ["CONFIRMED", "READY", "IN_TRANSIT"].includes(order.estadoPedido);
+    }
+    if (tab === "DELIVERED") return order.estadoPedido === "DELIVERED";
+    if (tab === "CANCELLED") return order.estadoPedido === "CANCELLED";
     return true;
   });
 
@@ -155,37 +179,45 @@ export default function OrdersClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Gestión de Pedidos Web</h1>
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <h1 className="text-2xl font-bold tracking-tight">Gestion de Pedidos Web</h1>
       </div>
 
-      <div className="flex overflow-x-auto gap-2 pb-2">
-        {["TODOS", "PENDING_PAYMENT", "CONFIRMED", "DELIVERED", "CANCELLED"].map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setTab(t);
-              setCurrentPage(1);
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === t
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400"
-            }`}
-          >
-            {t === "TODOS" && "Todos"}
-            {t === "PENDING_PAYMENT" && "Pendientes de Pago"}
-            {t === "CONFIRMED" && "Por Entregar"}
-            {t === "DELIVERED" && "Entregados"}
-            {t === "CANCELLED" && "Cancelados/Rechazados"}
-          </button>
-        ))}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {FILTER_TABS.map((filterTab) => {
+          const isActive = tab === filterTab;
+
+          return (
+            <button
+              key={filterTab}
+              onClick={() => {
+                setTab(filterTab);
+                setCurrentPage(1);
+              }}
+              className="rounded-lg border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors"
+              style={{
+                background: isActive ? "var(--card-strong)" : "var(--subcard)",
+                color: isActive ? "var(--foreground)" : "var(--muted)",
+                borderColor: "var(--border)",
+                boxShadow: isActive ? "var(--shadow-soft)" : "none",
+              }}
+            >
+              {filterLabelMap[filterTab]}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+      <div className="surface-card overflow-hidden rounded-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-medium">
+          <table className="w-full text-left text-sm">
+            <thead
+              className="font-medium"
+              style={{
+                background: "var(--subcard)",
+                color: "var(--muted)",
+              }}
+            >
               <tr>
                 <th className="px-6 py-4">Pedido / Fecha</th>
                 <th className="px-6 py-4">Cliente</th>
@@ -195,130 +227,158 @@ export default function OrdersClient() {
                 <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                    <svg className="h-6 w-6 animate-spin mx-auto mb-2 text-indigo-500" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <td colSpan={6} className="px-6 py-8 text-center" style={{ color: "var(--muted)" }}>
+                    <svg
+                      className="mx-auto mb-2 h-6 w-6 animate-spin text-indigo-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     <p>Cargando pedidos...</p>
                   </td>
                 </tr>
               ) : paginatedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                    No hay pedidos en esta categoría.
+                  <td colSpan={6} className="px-6 py-8 text-center" style={{ color: "var(--muted)" }}>
+                    No hay pedidos en esta categoria.
                   </td>
                 </tr>
               ) : (
-                paginatedOrders.map((o) => (
-                  <tr key={o._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                paginatedOrders.map((order) => (
+                  <tr
+                    key={order._id}
+                    className="border-t transition-colors hover:bg-white/5"
+                    style={{ borderColor: "var(--border)" }}
+                  >
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        {o.numeroPedido}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">
+                      <div className="font-medium text-primary">{order.numeroPedido}</div>
+                      <div className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
                         {new Intl.DateTimeFormat("es-BO", {
                           day: "2-digit",
                           month: "2-digit",
                           year: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
-                        }).format(new Date(o.createdAt))}
+                        }).format(new Date(order.createdAt))}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        {o.snapshotCliente?.nombreCompleto || "Usuario anónimo"}
+                      <div className="font-medium text-primary">
+                        {order.snapshotCliente?.nombreCompleto || "Usuario anonimo"}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {o.snapshotCliente?.telefono || "Sin teléfono"}
+                      <div className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+                        {order.snapshotCliente?.telefono || "Sin telefono"}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        {DELIVERY_METHOD_LABELS[o.snapshotEntrega?.metodo ?? ""] || o.snapshotEntrega?.metodo || "—"}
+                      <div className="font-medium text-primary">
+                        {DELIVERY_METHOD_LABELS[order.snapshotEntrega?.metodo ?? ""] ||
+                          order.snapshotEntrega?.metodo ||
+                          "-"}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {o.snapshotEntrega?.puntoRecojo || ""}
+                      <div className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+                        {order.snapshotEntrega?.puntoRecojo || ""}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          o.estadoPago === "PAID"
+                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
+                          order.estadoPago === "PAID"
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400"
-                            : o.estadoPago === "FAILED"
+                            : order.estadoPago === "FAILED"
                               ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400"
                               : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400"
                         }`}
                       >
-                        {o.metodoPago} • {PAYMENT_STATUS_LABELS[o.estadoPago] || o.estadoPago}
+                        {order.metodoPago} • {PAYMENT_STATUS_LABELS[order.estadoPago] || order.estadoPago}
                       </span>
-                      <div className="font-medium text-slate-900 dark:text-white mt-1">
-                        Bs {o.total.toFixed(2)}
+                      <div className="mt-1 font-medium text-primary">
+                        Bs {order.total.toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                          o.estadoPedido === "CONFIRMED" || o.estadoPedido === "READY" || o.estadoPedido === "IN_TRANSIT"
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                          order.estadoPedido === "CONFIRMED" ||
+                          order.estadoPedido === "READY" ||
+                          order.estadoPedido === "IN_TRANSIT"
                             ? "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400"
-                            : o.estadoPedido === "DELIVERED"
+                            : order.estadoPedido === "DELIVERED"
                               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400"
-                              : o.estadoPedido === "CANCELLED"
+                              : order.estadoPedido === "CANCELLED"
                                 ? "bg-slate-100 text-slate-800 dark:bg-slate-500/20 dark:text-slate-400"
                                 : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400"
                         }`}
                       >
-                        {ORDER_STATUS_LABELS[o.estadoPedido] || o.estadoPedido}
+                        {ORDER_STATUS_LABELS[order.estadoPedido] || order.estadoPedido}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => fetchOrderDetails(o._id)}
-                        className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
-                      >
-                        Detalles
-                      </button>
-
-                      {o.estadoPedido === "PENDING_PAYMENT" && o.metodoPago === "EFECTIVO" && (
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <button
-                          onClick={() => handleConfirmForDelivery(o._id)}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30 transition-colors"
+                          onClick={() => fetchOrderDetails(order._id)}
+                          className="inline-flex items-center justify-center rounded border px-3 py-1.5 text-xs font-medium transition-colors"
+                          style={{
+                            color: "var(--foreground)",
+                            background: "var(--subcard)",
+                            borderColor: "var(--border)",
+                          }}
                         >
-                          Confirmar para Entrega
+                          Detalles
                         </button>
-                      )}
 
-                      {o.estadoPedido === "CONFIRMED" && o.estadoPago !== "PAID" && (
-                        <button
-                          onClick={() => handleConfirmCash(o._id)}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/30 transition-colors"
-                        >
-                          Entregar y Cobrar
-                        </button>
-                      )}
+                        {order.estadoPedido === "PENDING_PAYMENT" && order.metodoPago === "EFECTIVO" && (
+                          <button
+                            onClick={() => handleConfirmForDelivery(order._id)}
+                            className="inline-flex items-center justify-center rounded bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30"
+                          >
+                            Confirmar para Entrega
+                          </button>
+                        )}
 
-                      {o.estadoPedido === "CONFIRMED" && o.estadoPago === "PAID" && (
-                        <button
-                          onClick={() => handleDeliver(o._id)}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:hover:bg-indigo-500/30 transition-colors"
-                        >
-                          Marcar Entregado
-                        </button>
-                      )}
+                        {order.estadoPedido === "CONFIRMED" && order.estadoPago !== "PAID" && (
+                          <button
+                            onClick={() => handleConfirmCash(order._id)}
+                            className="inline-flex items-center justify-center rounded bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/30"
+                          >
+                            Entregar y Cobrar
+                          </button>
+                        )}
 
-                      {o.estadoPedido !== "CANCELLED" && o.estadoPedido !== "DELIVERED" && (
-                        <button
-                          onClick={() => handleCancelOrder(o._id)}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30 transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      )}
+                        {order.estadoPedido === "CONFIRMED" && order.estadoPago === "PAID" && (
+                          <button
+                            onClick={() => handleDeliver(order._id)}
+                            className="inline-flex items-center justify-center rounded bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:hover:bg-indigo-500/30"
+                          >
+                            Marcar Entregado
+                          </button>
+                        )}
+
+                        {order.estadoPedido !== "CANCELLED" && order.estadoPedido !== "DELIVERED" && (
+                          <button
+                            onClick={() => handleCancelOrder(order._id)}
+                            className="inline-flex items-center justify-center rounded bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -328,22 +388,38 @@ export default function OrdersClient() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/20">
-            <div className="text-sm text-slate-500">
-              Mostrando página {currentPage} de {totalPages}
+          <div
+            className="flex items-center justify-between border-t px-6 py-4"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--subcard)",
+            }}
+          >
+            <div className="text-sm" style={{ color: "var(--muted)" }}>
+              Mostrando pagina {currentPage} de {totalPages}
             </div>
             <div className="flex space-x-2">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded border border-slate-200 text-sm font-medium disabled:opacity-50 dark:border-slate-700"
+                className="rounded border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                style={{
+                  borderColor: "var(--border)",
+                  color: "var(--foreground)",
+                  background: "var(--card-strong)",
+                }}
               >
                 Anterior
               </button>
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded border border-slate-200 text-sm font-medium disabled:opacity-50 dark:border-slate-700"
+                className="rounded border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                style={{
+                  borderColor: "var(--border)",
+                  color: "var(--foreground)",
+                  background: "var(--card-strong)",
+                }}
               >
                 Siguiente
               </button>
@@ -353,7 +429,10 @@ export default function OrdersClient() {
       </div>
 
       {selectedOrder && (
-        <OrderDetailModal Pedido={selectedOrder} onClose={() => setSelectedOrder(null)} />
+        <OrderDetailModal
+          Pedido={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+        />
       )}
     </div>
   );

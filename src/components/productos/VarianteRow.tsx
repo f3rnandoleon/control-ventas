@@ -51,8 +51,8 @@ export default function VarianteRow({
       <td>{variante.stock}</td>
 
       <td className="text-right space-x-3">
-        <button className="btn-link" onClick={onEdit}>
-          Editar
+        <button className="btn-link" onClick={onEdit} title="Editar todas las tallas de este color">
+          Editar grupo
         </button>
 
         {/* QR individual (ya lo tienes) */}

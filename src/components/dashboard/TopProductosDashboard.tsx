@@ -3,7 +3,7 @@
 export default function TopProductosDashboard({
   productos,
 }: {
-  productos: { nombre: string; totalVendidos: number }[];
+  productos: { nombre: string; modelo: string; totalVendidos: number }[];
 }) {
   return (
     <div
@@ -22,7 +22,7 @@ export default function TopProductosDashboard({
             border-b border-white/5 pb-2"
           >
             <span>
-              #{index + 1} {p.nombre}
+              #{index + 1} {p.nombre} ({p.modelo})
             </span>
             <span className="text-cyan-400 font-semibold">
               {p.totalVendidos}

@@ -13,6 +13,7 @@ import {
 } from "@/constants/variant-options";
 
 type VarianteTallaForm = {
+  varianteId?: string;
   talla: string;
   stock: number;
   codigoBarra?: string;
@@ -40,37 +41,59 @@ const normalizeVariantKey = (
 
 export default function VarianteForm({
   initialData,
+  initialVariantes,
   existingVariantes = [],
   onSave,
   onCancel,
 }: {
   initialData?: Variante;
+  initialVariantes?: Variante[];
   existingVariantes?: Variante[];
   onSave: (data: Variante[]) => void;
   onCancel: () => void;
 }) {
+  const editingVariantes =
+    initialVariantes && initialVariantes.length > 0
+      ? initialVariantes
+      : initialData
+        ? [initialData]
+        : [];
+  const firstEditingVariant = editingVariantes[0];
+  const editingVariantIds = new Set(
+    editingVariantes
+      .map((variante) => variante.varianteId)
+      .filter((varianteId): varianteId is string => Boolean(varianteId))
+  );
+  const editingVariantKeys = new Set(
+    editingVariantes.map((variante) =>
+      normalizeVariantKey(
+        variante.color,
+        variante.colorSecundario,
+        variante.talla
+      )
+    )
+  );
   const [sharedForm, setSharedForm] = useState<VarianteSharedForm>({
-    color: initialData?.color || "",
-    colorSecundario: initialData?.colorSecundario || "",
-    descripcion: initialData?.descripcion || "",
-    imagenes: getVarianteImagenes(initialData),
+    color: firstEditingVariant?.color || "",
+    colorSecundario: firstEditingVariant?.colorSecundario || "",
+    descripcion: firstEditingVariant?.descripcion || "",
+    imagenes: getVarianteImagenes(firstEditingVariant),
   });
   const [sizeRows, setSizeRows] = useState<VarianteTallaForm[]>(() => {
-    if (initialData) {
-      return [
-        {
-          talla: initialData.talla || "",
-          stock: initialData.stock || 0,
-          codigoBarra: initialData.codigoBarra || "",
-          qrCode: initialData.qrCode || "",
-        },
-      ];
+    if (editingVariantes.length > 0) {
+      return editingVariantes.map((variante) => ({
+        varianteId: variante.varianteId,
+        talla: variante.talla || "",
+        stock: variante.stock || 0,
+        codigoBarra: variante.codigoBarra || "",
+        qrCode: variante.qrCode || "",
+      }));
     }
 
     return [createEmptySizeRow()];
   });
   const [uploadingImage, setUploadingImage] = useState(false);
-  const isEdit = Boolean(initialData);
+  const isEdit = editingVariantes.length > 0;
   const colorOptions = getVariantSelectOptions(sharedForm.color, COLOR_OPTIONS);
   const secondaryColorOptions = getVariantSelectOptions(
     sharedForm.colorSecundario,
@@ -196,24 +219,29 @@ export default function VarianteForm({
       return;
     }
 
-    const originalKey = initialData
-      ? normalizeVariantKey(
-          initialData.color,
-          initialData.colorSecundario,
-          initialData.talla
-        )
-      : null;
-
     const existingKeys = new Set(
       existingVariantes
         .map((variante) =>
-          normalizeVariantKey(
-            variante.color,
-            variante.colorSecundario,
-            variante.talla
-          )
+          ({
+            key: normalizeVariantKey(
+              variante.color,
+              variante.colorSecundario,
+              variante.talla
+            ),
+            isEditingVariant:
+              (variante.varianteId &&
+                editingVariantIds.has(variante.varianteId)) ||
+              editingVariantKeys.has(
+                normalizeVariantKey(
+                  variante.color,
+                  variante.colorSecundario,
+                  variante.talla
+                )
+              ),
+          })
         )
-        .filter((key) => key !== originalKey)
+        .filter((entry) => !entry.isEditingVariant)
+        .map((entry) => entry.key)
     );
 
     if (draftKeys.some((key) => existingKeys.has(key))) {
@@ -225,6 +253,7 @@ export default function VarianteForm({
 
     onSave(
       sanitizedRows.map((row) => ({
+        varianteId: row.varianteId || undefined,
         color,
         colorSecundario: colorSecundario || undefined,
         talla: row.talla,
@@ -277,26 +306,20 @@ export default function VarianteForm({
       <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-white">
-              {isEdit ? "Datos de la variante" : "Tallas y cantidades"}
+            <p className="text-sm font-medium text-white">Tallas y cantidades</p>
+            <p className="text-xs text-gray-400">
+              Reutiliza el mismo color, descripcion e imagenes para varias
+              tallas.
             </p>
-            {!isEdit && (
-              <p className="text-xs text-gray-400">
-                Reutiliza el mismo color, descripcion e imagenes para varias
-                tallas.
-              </p>
-            )}
           </div>
 
-          {!isEdit && (
-            <button
-              type="button"
-              className="btn-link"
-              onClick={addSizeRow}
-            >
-              + Agregar talla
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-link"
+            onClick={addSizeRow}
+          >
+            + Agregar talla
+          </button>
         </div>
 
         <div className="space-y-3">
@@ -330,7 +353,7 @@ export default function VarianteForm({
                   updateSizeRow(index, "stock", Number(e.target.value))
                 }
               />
-              {!isEdit && sizeRows.length > 1 ? (
+              {sizeRows.length > 1 ? (
                 <button
                   type="button"
                   className="btn-danger"
@@ -401,7 +424,7 @@ export default function VarianteForm({
         </div>
       )}
 
-      {isEdit && (
+      {isEdit && sizeRows.length === 1 && (
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="label">Codigo de barras</label>

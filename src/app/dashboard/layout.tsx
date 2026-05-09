@@ -21,7 +21,7 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-gray-400 bg-neutral-900">
+      <div className="flex min-h-screen items-center justify-center bg-primary text-primary">
         Cargando...
       </div>
     );
@@ -32,10 +32,10 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-neutral-900 text-white overflow-hidden font-outfit">
+    <div className="flex min-h-screen bg-primary text-primary overflow-hidden font-outfit transition-colors">
       <Sidebar role={user.rol} />
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="page-glow flex-1 overflow-y-auto p-4 md:p-6 transition-colors">
         <div className="mx-auto max-w-7xl space-y-6">
           {children}
         </div>
