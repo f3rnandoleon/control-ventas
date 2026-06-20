@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import {
   validateRequest,
   validationErrorResponse,
@@ -10,11 +9,15 @@ import {
   listCatalog,
 } from "@/modules/catalog/application/catalog.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
+import { requireAdminApiAuth, requireStaffApiAuth } from "@/libs/requireApiAuth";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireStaffApiAuth(request);
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const withStock = searchParams.get("withStock") === "true";
 
@@ -30,16 +33,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const headersList = await headers();
-    const role = headersList.get("x-user-role");
-    const userId = headersList.get("x-user-id");
-
-    if (role !== "ADMIN") {
-      return NextResponse.json(
-        { message: "Solo ADMIN puede crear productos" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminApiAuth(request);
+    if (auth.response) return auth.response;
 
     const validation = await validateRequest(createProductoSchema, request);
 
@@ -47,7 +42,7 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const producto = await createCatalogProduct(validation.data, userId);
+    const producto = await createCatalogProduct(validation.data, auth.userAuth.id);
 
     return NextResponse.json(
       { message: "Producto creado correctamente", producto },

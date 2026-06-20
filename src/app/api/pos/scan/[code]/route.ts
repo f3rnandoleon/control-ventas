@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { scanVariantForPos } from "@/modules/pos/application/pos.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
+import { requireStaffApiAuth } from "@/libs/requireApiAuth";
 
 export const runtime = "nodejs";
 
@@ -11,11 +11,8 @@ type Context = {
 
 export async function GET(request: Request, context: Context) {
   try {
-    const userAuth = await resolveApiAuth(request);
-
-    if (!userAuth) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
+    const auth = await requireStaffApiAuth(request);
+    if (auth.response) return auth.response;
 
     const { code } = await context.params;
     const result = await scanVariantForPos(code);

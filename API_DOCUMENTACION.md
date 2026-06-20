@@ -256,15 +256,28 @@ Recomendacion:
   "precioVenta": 120,
   "precioCosto": 70,
   "categoria": "Chompas",
+  "descripcion": "Chompa de lana de alpaca premium",
+  "marca": "Antigravity",
+  "descuento": 0,
+  "stockTotal": 10,
+  "stockMinimo": 5,
+  "totalVendidos": 0,
+  "estado": "ACTIVO",
   "variantes": [
     {
       "varianteId": "665f...",
       "color": "Azul",
+      "colorSecundario": "Gris",
       "talla": "M",
       "stock": 10,
       "stockReservado": 2,
       "codigoBarra": "123456",
-      "qrCode": "QR-123456"
+      "qrCode": "QR-123456",
+      "descripcion": "Detalles grises en cuello",
+      "imagenes": [
+        "https://res.cloudinary.com/..."
+      ],
+      "imagen": "https://res.cloudinary.com/..."
     }
   ]
 }
@@ -283,6 +296,7 @@ Recomendacion:
       "variante": {
         "varianteId": "665f...",
         "color": "Azul",
+        "colorSecundario": "Gris",
         "talla": "M"
       },
       "productoSnapshot": {
@@ -331,8 +345,9 @@ Recomendacion:
 
 Notas:
 
+- Para `CLIENTE` (catálogo público), la API sanea algunos campos de seguridad: se oculta `precioCosto` del producto, y `codigoBarra` junto con `qrCode` de las variantes.
 - Para `CLIENTE`, la API sanea algunos pedidos y oculta costos/ganancias internas.
-- Para `ADMIN` y `VENDEDOR`, puede devolver informacion financiera completa.
+- Para `ADMIN` y `VENDEDOR`, puede devolver informacion financiera y códigos internos completos.
 
 ## TransaccionPago
 
@@ -380,6 +395,9 @@ Notas:
 | `GET` | `/api/verificar/pago/:token` | Token de un solo uso | Vista de verificacion de comprobante |
 | `POST` | `/api/verificar/pago/:token/confirm` | Token de un solo uso | Confirma pago QR |
 | `POST` | `/api/verificar/pago/:token/reject` | Token de un solo uso | Rechaza pago QR |
+
+> [!IMPORTANT]
+> Los endpoints públicos de catálogo (`/api/productos/publicos` y `/api/productos/publicos/:id`) devuelven el listado/detalle de productos sanitizado para el cliente final (`CLIENTE`). Se omiten los campos sensibles `precioCosto`, `variantes.codigoBarra` y `variantes.qrCode`.
 
 ### Ejemplo `GET /api/estado`
 
@@ -605,11 +623,17 @@ Body ejemplo `POST /api/productos`:
   "variantes": [
     {
       "color": "Azul",
+      "colorSecundario": "Gris",
       "talla": "M",
       "stock": 10,
       "stockReservado": 0,
       "codigoBarra": "123456",
-      "qrCode": "QR-123456"
+      "qrCode": "QR-123456",
+      "descripcion": "Detalles grises en cuello",
+      "imagenes": [
+        "https://res.cloudinary.com/..."
+      ],
+      "imagen": "https://res.cloudinary.com/..."
     }
   ]
 }
@@ -630,6 +654,7 @@ Body ejemplo `POST /api/inventario`:
   "productoId": "665f...",
   "varianteId": "665f...",
   "color": "Azul",
+  "colorSecundario": "Gris",
   "talla": "M",
   "tipo": "ENTRADA",
   "cantidad": 5,
@@ -677,6 +702,7 @@ Body ejemplo `POST /api/carrito/items`:
   "productoId": "665f...",
   "varianteId": "665f...",
   "color": "Azul",
+  "colorSecundario": "Gris",
   "talla": "M",
   "cantidad": 2
 }
@@ -687,6 +713,7 @@ Body ejemplo `POST /api/pedidos/checkout`:
 ```json
 {
   "metodoPago": "QR",
+  "direccionId": "665f...",
   "notas": "Entregar con anticipacion",
   "entrega": {
     "metodo": "PICKUP_POINT",
@@ -694,6 +721,23 @@ Body ejemplo `POST /api/pedidos/checkout`:
     "telefono": "76543210",
     "nombreDestinatario": "Cliente Demo",
     "programadoPara": "Viernes 17:00-19:00"
+  }
+}
+```
+
+Para envío nacional (`SHIPPING_NATIONAL`), la entrega requiere:
+```json
+{
+  "metodoPago": "QR",
+  "entrega": {
+    "metodo": "SHIPPING_NATIONAL",
+    "departamento": "Cochabamba",
+    "ciudad": "Cochabamba",
+    "empresaEnvio": "BolivarCargo",
+    "sucursal": "Av Melchor",
+    "nombreRemitente": "Juan Perez",
+    "ciRemitente": "1234567",
+    "telefonoRemitente": "71234567"
   }
 }
 ```
@@ -711,6 +755,10 @@ Reglas de negocio importantes:
 |---|---|---|---|
 | `GET` | `/api/pedidos` | `ADMIN`, `VENDEDOR`, `CLIENTE` | Lista pedidos visibles para el actor |
 | `GET` | `/api/pedidos/:id` | `ADMIN`, `VENDEDOR`, `CLIENTE` | Detalle de pedido |
+
+Query params:
+
+- `GET /api/pedidos?scope=sales` (Opcional, lista ventas directas/POS registradas en canal `APP_QR` o `TIENDA` por el actor autenticado)
 | `PATCH` | `/api/pedidos/:id` | `ADMIN`, `VENDEDOR`, `CLIENTE` | Actualiza estado o entrega segun rol |
 | `POST` | `/api/pedidos/:id/confirm-for-delivery` | `ADMIN`, `VENDEDOR` | Confirma pedido pendiente para entrega |
 | `POST` | `/api/pedidos/:id/confirm-cash` | `ADMIN`, `VENDEDOR` | Confirma pedido en efectivo |
@@ -783,6 +831,36 @@ Recomendacion:
 
 - para movil usar siempre `idempotencyKey`
 
+### `POST /api/pagos/:id/confirm`
+
+Body (opcional):
+
+```json
+{
+  "referenciaExterna": "REF-EXTERNA-123"
+}
+```
+
+### `POST /api/pagos/:id/fail`
+
+Body (opcional):
+
+```json
+{
+  "motivo": "Comprobante inválido o borroso"
+}
+```
+
+### `POST /api/pagos/:id/refund`
+
+Body (opcional):
+
+```json
+{
+  "motivo": "Cliente canceló el pedido"
+}
+```
+
 ### `POST /api/pagos/:id/upload-comprobante`
 
 Request:
@@ -837,6 +915,7 @@ Body ejemplo `PATCH /api/entregas/:id/status`:
   "estado": "IN_TRANSIT",
   "codigoSeguimiento": "TRK-001",
   "nombreTransportista": "Trans Copacabana",
+  "asignadoA": "665f...",
   "notas": "Despachado a las 18:30"
 }
 ```
@@ -859,12 +938,19 @@ Body ejemplo `POST /api/pos/sales`:
       "productoId": "665f...",
       "varianteId": "665f...",
       "color": "Azul",
+      "colorSecundario": "Gris",
       "talla": "M",
       "cantidad": 1
     }
   ],
   "metodoPago": "EFECTIVO",
-  "descuento": 0
+  "descuento": 0,
+  "delivery": {
+    "metodo": "PICKUP_POINT",
+    "puntoRecojo": "Plaza del Estudiante",
+    "telefono": "76543210",
+    "nombreDestinatario": "Cliente Demo"
+  }
 }
 ```
 

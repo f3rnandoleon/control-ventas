@@ -3,10 +3,10 @@ import {
   validateRequest,
   validationErrorResponse,
 } from "@/middleware/validate.middleware";
-import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { refundPaymentSchema } from "@/schemas/payment.schema";
 import { refundPaymentTransaction } from "@/modules/payments/application/payments.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
+import { requireStaffApiAuth } from "@/libs/requireApiAuth";
 
 export const runtime = "nodejs";
 
@@ -16,11 +16,8 @@ type Context = {
 
 export async function POST(request: Request, context: Context) {
   try {
-    const userAuth = await resolveApiAuth(request);
-
-    if (!userAuth) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
+    const auth = await requireStaffApiAuth(request);
+    if (auth.response) return auth.response;
 
     const validation = await validateRequest(refundPaymentSchema, request);
 
@@ -29,7 +26,7 @@ export async function POST(request: Request, context: Context) {
     }
 
     const { id } = await context.params;
-    const result = await refundPaymentTransaction(userAuth, id, validation.data);
+    const result = await refundPaymentTransaction(auth.userAuth, id, validation.data);
 
     return NextResponse.json({
       message: "Pago reembolsado correctamente",

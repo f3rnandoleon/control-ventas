@@ -1,22 +1,15 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
 import { validateRequest, validationErrorResponse } from "@/middleware/validate.middleware";
 import { createUsuarioSchema } from "@/schemas/usuario.schema";
 import { asegurarPerfilClienteParaUsuario } from "@/modules/clientes/application/clientes.service";
+import { requireAdminApiAuth } from "@/libs/requireApiAuth";
 
-export async function GET() {
-  const headersList = await headers();
-  const role = headersList.get("x-user-role");
-
-  if (role !== "ADMIN") {
-    return NextResponse.json(
-      { message: "No autorizado" },
-      { status: 403 }
-    );
-  }
+export async function GET(request: Request) {
+  const auth = await requireAdminApiAuth(request);
+  if (auth.response) return auth.response;
 
   await connectDB();
   const users = await User.find()
@@ -27,15 +20,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const headersList = await headers();
-  const role = headersList.get("x-user-role");
-
-  if (role !== "ADMIN") {
-    return NextResponse.json(
-      { message: "No autorizado" },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminApiAuth(request);
+  if (auth.response) return auth.response;
 
   // Validar datos con Zod
   const validation = await validateRequest(createUsuarioSchema, request);

@@ -1,6 +1,6 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { uploadVariantImageToCloudinary } from "@/libs/cloudinary";
+import { requireAdminApiAuth } from "@/libs/requireApiAuth";
 
 export const runtime = "nodejs";
 
@@ -8,15 +8,8 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const headersList = await headers();
-    const role = headersList.get("x-user-role");
-
-    if (role !== "ADMIN") {
-      return NextResponse.json(
-        { message: "Solo ADMIN puede subir imagenes de variantes" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminApiAuth(request);
+    if (auth.response) return auth.response;
 
     const formData = await request.formData();
     const file = formData.get("file");

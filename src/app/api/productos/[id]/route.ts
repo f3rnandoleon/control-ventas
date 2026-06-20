@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { updateProductoSchema } from "@/schemas/producto.schema";
 import {
   validateRequest,
@@ -11,6 +10,7 @@ import {
   updateCatalogProduct,
 } from "@/modules/catalog/application/catalog.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
+import { requireAdminApiAuth, requireStaffApiAuth } from "@/libs/requireApiAuth";
 
 export const runtime = "nodejs";
 
@@ -18,8 +18,11 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   try {
+    const auth = await requireStaffApiAuth(request);
+    if (auth.response) return auth.response;
+
     const { id } = await context.params;
     const producto = await getCatalogProductById(id);
     return NextResponse.json(producto);
@@ -34,23 +37,8 @@ export async function GET(_request: Request, context: Context) {
 export async function PUT(request: Request, context: Context) {
   try {
     const { id } = await context.params;
-    const headersList = await headers();
-    const role = headersList.get("x-user-role");
-    const userIdRaw = headersList.get("x-user-id");
-
-    if (role !== "ADMIN") {
-      return NextResponse.json(
-        { message: "Solo ADMIN puede actualizar productos" },
-        { status: 403 }
-      );
-    }
-
-    if (!userIdRaw) {
-      return NextResponse.json(
-        { message: "Usuario no autenticado" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAdminApiAuth(request);
+    if (auth.response) return auth.response;
 
     const validation = await validateRequest(updateProductoSchema, request);
 
@@ -58,7 +46,7 @@ export async function PUT(request: Request, context: Context) {
       return validationErrorResponse(validation.errors);
     }
 
-    const producto = await updateCatalogProduct(id, validation.data, userIdRaw);
+    const producto = await updateCatalogProduct(id, validation.data, auth.userAuth.id);
 
     return NextResponse.json({
       message: "Producto actualizado correctamente",
@@ -72,18 +60,11 @@ export async function PUT(request: Request, context: Context) {
   }
 }
 
-export async function DELETE(_request: Request, context: Context) {
+export async function DELETE(request: Request, context: Context) {
   try {
     const { id } = await context.params;
-    const headersList = await headers();
-    const role = headersList.get("x-user-role");
-
-    if (role !== "ADMIN") {
-      return NextResponse.json(
-        { message: "Solo ADMIN puede eliminar productos" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminApiAuth(request);
+    if (auth.response) return auth.response;
 
     await deleteCatalogProduct(id);
 

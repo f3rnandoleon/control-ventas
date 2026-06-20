@@ -100,6 +100,12 @@ function assertPedidoAccess(actor: AuthActor, pedido: { cliente?: mongoose.Types
   }
 }
 
+function assertStaffActor(actor: AuthActor) {
+  if (!["ADMIN", "VENDEDOR"].includes(actor.rol)) {
+    throw new AppError("No autorizado", 403);
+  }
+}
+
 async function consumeStockForPedido(
   pedido: InstanceType<typeof Pedido>,
   actor: AuthActor,
@@ -386,6 +392,7 @@ export async function refundPaymentTransaction(
   paymentId: string,
   input: RefundPaymentInput
 ) {
+  assertStaffActor(actor);
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
 
