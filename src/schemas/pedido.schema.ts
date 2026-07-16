@@ -105,7 +105,6 @@ export const createPedidoSchema = z.object({
   descuento: z
     .number()
     .nonnegative("El descuento no puede ser negativo")
-    .max(100, "El descuento no puede exceder el 100%")
     .default(0)
     .optional(),
 });

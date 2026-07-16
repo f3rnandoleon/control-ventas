@@ -366,8 +366,7 @@ export async function crearVentaDirecta(
     }
 
     const descuentoAplicado = payload.descuento || 0;
-    const multiplicadorDescuento = 1 - descuentoAplicado / 100;
-    const total = subtotal * multiplicadorDescuento;
+    const total = Math.max(0, subtotal - descuentoAplicado);
 
     const pedido = await pedidosRepository.create({
       numeroPedido: createPedidoNumber(),
