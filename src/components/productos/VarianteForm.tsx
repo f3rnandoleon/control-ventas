@@ -7,10 +7,11 @@ import { uploadVarianteImages } from "@/services/upload.service";
 import { getVarianteImagenes } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import {
-  COLOR_OPTIONS,
   TALLA_OPTIONS,
+  getColorOptions,
   getVariantSelectOptions,
 } from "@/constants/variant-options";
+import ColorSwatch from "@/components/ui/ColorSwatch";
 
 type VarianteTallaForm = {
   varianteId?: string;
@@ -94,11 +95,8 @@ export default function VarianteForm({
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const isEdit = editingVariantes.length > 0;
-  const colorOptions = getVariantSelectOptions(sharedForm.color, COLOR_OPTIONS);
-  const secondaryColorOptions = getVariantSelectOptions(
-    sharedForm.colorSecundario,
-    COLOR_OPTIONS
-  );
+  const colorOptions = getColorOptions(sharedForm.color);
+  const secondaryColorOptions = getColorOptions(sharedForm.colorSecundario);
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -269,38 +267,27 @@ export default function VarianteForm({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <select
-          className="input"
-          value={sharedForm.color}
-          onChange={(e) =>
-            setSharedForm((prev) => ({ ...prev, color: e.target.value }))
-          }
-        >
-          <option value="">Selecciona un color</option>
-          {colorOptions.map((color) => (
-            <option key={color} value={color}>
-              {color}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <select className="input" value={sharedForm.color} onChange={(e) =>
+            setSharedForm((prev) => ({ ...prev, color: e.target.value }))}>
+            <option value="">Selecciona un color</option>
+            {colorOptions.map((color) => (
+              <option key={color.value} value={color.value}>{color.label}</option>
+            ))}
+          </select>
+          <ColorSwatch colorName={sharedForm.color} />
+        </div>
 
-        <select
-          className="input"
-          value={sharedForm.colorSecundario}
-          onChange={(e) =>
-            setSharedForm((prev) => ({
-              ...prev,
-              colorSecundario: e.target.value,
-            }))
-          }
-        >
-          <option value="">Color secundario (opcional)</option>
-          {secondaryColorOptions.map((color) => (
-            <option key={color} value={color}>
-              {color}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <select className="input" value={sharedForm.colorSecundario} onChange={(e) =>
+            setSharedForm((prev) => ({ ...prev, colorSecundario: e.target.value }))}>
+            <option value="">Color secundario (opcional)</option>
+            {secondaryColorOptions.map((color) => (
+              <option key={color.value} value={color.value}>{color.label}</option>
+            ))}
+          </select>
+          <ColorSwatch colorName={sharedForm.colorSecundario} />
+        </div>
       </div>
 
       <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">

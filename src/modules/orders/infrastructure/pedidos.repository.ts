@@ -1,5 +1,6 @@
 import type { ClientSession } from "mongoose";
 import Pedido from "@/models/pedido";
+import User from "@/models/user";
 import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sales";
 
 export const pedidosRepository = {
@@ -26,22 +27,20 @@ export const pedidosRepository = {
       .sort({ createdAt: -1 });
   },
 
-  listRecognizedSales() {
-    return Pedido.find(buildRecognizedSalesMatch())
+  listRecognizedSales(filters?: SalesRepositoryFilters) {
+    if (!filters) return Pedido.find(buildRecognizedSalesMatch())
       .populate("cliente", "nombreCompleto email")
       .populate("vendedor", "nombreCompleto email")
       .sort({ createdAt: -1 });
+    return listRecognizedSalesPage(filters);
   },
 
-  listRecognizedSalesBySeller(userId: string) {
-    return Pedido.find(
-      buildRecognizedSalesMatch({
-        vendedor: userId,
-      })
-    )
+  listRecognizedSalesBySeller(userId: string, filters?: SalesRepositoryFilters) {
+    if (!filters) return Pedido.find(buildRecognizedSalesMatch({ vendedor: userId }))
       .populate("cliente", "nombreCompleto email")
       .populate("vendedor", "nombreCompleto email")
       .sort({ createdAt: -1 });
+    return listRecognizedSalesPage({ ...filters, actorSellerId: userId });
   },
 
   findById(id: string, session?: ClientSession) {
@@ -73,3 +72,49 @@ export const pedidosRepository = {
       .limit(limit);
   },
 };
+
+export type SalesRepositoryFilters = {
+  page: number;
+  limit: number;
+  from?: Date;
+  toExclusive?: Date;
+  customer?: string;
+  seller?: string;
+  paymentMethod?: "EFECTIVO" | "QR";
+  actorSellerId?: string;
+};
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+async function listRecognizedSalesPage(filters: SalesRepositoryFilters) {
+  const extraMatch: Record<string, unknown> = {};
+  if (filters.actorSellerId) extraMatch.vendedor = filters.actorSellerId;
+  if (filters.paymentMethod) extraMatch.metodoPago = filters.paymentMethod;
+  if (filters.from || filters.toExclusive) {
+    extraMatch.createdAt = {
+      ...(filters.from ? { $gte: filters.from } : {}),
+      ...(filters.toExclusive ? { $lt: filters.toExclusive } : {}),
+    };
+  }
+  if (filters.customer) {
+    extraMatch["snapshotCliente.nombreCompleto"] = {
+      $regex: escapeRegex(filters.customer), $options: "i",
+    };
+  }
+  if (filters.seller && !filters.actorSellerId) {
+    const sellers = await User.find({
+      rol: { $in: ["ADMIN", "VENDEDOR"] },
+      nombreCompleto: { $regex: escapeRegex(filters.seller), $options: "i" },
+    }).select("_id").lean();
+    extraMatch.vendedor = { $in: sellers.map((seller) => seller._id) };
+  }
+
+  const match = buildRecognizedSalesMatch(extraMatch);
+  const [items, total] = await Promise.all([
+    Pedido.find(match).populate("cliente", "nombreCompleto email")
+      .populate("vendedor", "nombreCompleto email").sort({ createdAt: -1 })
+      .skip((filters.page - 1) * filters.limit).limit(filters.limit),
+    Pedido.countDocuments(match),
+  ]);
+  return { items, total };
+}

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -54,7 +55,7 @@ function runBackup() {
   try {
     // Intentar ver si existe global
     execSync('mongodump --version', { stdio: 'ignore' });
-  } catch (err) {
+  } catch {
     // Si falla, usar el fallback seguro de la instalación en Windows
     mongodumpPath = windowsFallback;
   }

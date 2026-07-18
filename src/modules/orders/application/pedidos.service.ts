@@ -27,6 +27,7 @@ import { generateOrderedId } from "@/utils/generarId";
 import { assertObjectId } from "@/utils/validacion";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import type { Variante } from "@/types/producto";
+import type { SalesQueryInput } from "@/schemas/sales-query.schema";
 
 function createPedidoNumber() {
   return generateOrderedId("P");
@@ -440,6 +441,42 @@ export async function listRecognizedSalesForActor(role: string, userId: string) 
   }
 
   throw new AppError("No autorizado", 403);
+}
+
+const boliviaDayBoundaryUtc = (date: string, addDay = false) => {
+  const boundary = new Date(`${date}T04:00:00.000Z`);
+  if (addDay) boundary.setUTCDate(boundary.getUTCDate() + 1);
+  return boundary;
+};
+
+export async function listRecognizedSalesPageForActor(
+  role: string,
+  userId: string,
+  query: SalesQueryInput
+) {
+  await connectDB();
+  const filters = {
+    page: query.page,
+    limit: query.limit,
+    from: query.from ? boliviaDayBoundaryUtc(query.from) : undefined,
+    toExclusive: query.to ? boliviaDayBoundaryUtc(query.to, true) : undefined,
+    customer: query.customer,
+    seller: query.seller,
+    paymentMethod: query.paymentMethod,
+  };
+  const result = role === "ADMIN"
+    ? await pedidosRepository.listRecognizedSales(filters)
+    : role === "VENDEDOR"
+      ? await pedidosRepository.listRecognizedSalesBySeller(userId, filters)
+      : null;
+  if (!result || !("items" in result)) throw new AppError("No autorizado", 403);
+  return {
+    items: result.items,
+    page: query.page,
+    limit: query.limit,
+    total: result.total,
+    totalPages: Math.max(1, Math.ceil(result.total / query.limit)),
+  };
 }
 
 export async function getPedidoForActor(role: string, userId: string, id: string) {

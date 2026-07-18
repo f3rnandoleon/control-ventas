@@ -199,7 +199,7 @@ export default function VentaPOS({
             (v) => matchesSelectedVariant(v, currentItem)
           );
           const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
-          const stockDisponible = varianteSeleccionada?.stock ?? 0;
+          const stockDisponible = varianteSeleccionada?.stockDisponible ?? varianteSeleccionada?.stock ?? 0;
           const varianteLabel = varianteSeleccionada
             ? formatVariantLabel(varianteSeleccionada)
             : "Variante sin seleccionar";
@@ -272,8 +272,9 @@ export default function VentaPOS({
                       setValue(`items.${index}.colorSecundario`, variante.colorSecundario || "");
                       setValue(`items.${index}.talla`, variante.talla);
                       // Reset cantidad si excede stock
-                      if (currentItem.cantidad > variante.stock) {
-                        setValue(`items.${index}.cantidad`, variante.stock);
+                      const disponible = variante.stockDisponible ?? variante.stock;
+                      if (currentItem.cantidad > disponible) {
+                        setValue(`items.${index}.cantidad`, disponible);
                       }
                     }
                   }}
@@ -283,9 +284,9 @@ export default function VentaPOS({
                     <option
                       key={`${buildVariantOptionValue(v)}-${optionIndex}`}
                       value={buildVariantOptionValue(v)}
-                      disabled={v.stock <= 0}
+                      disabled={(v.stockDisponible ?? v.stock) <= 0}
                     >
-                      {formatVariantLabel(v)} ({v.stock})
+                      {formatVariantLabel(v)} ({v.stockDisponible ?? v.stock})
                     </option>
                   ))}
                 </select>

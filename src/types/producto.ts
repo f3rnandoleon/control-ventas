@@ -5,6 +5,7 @@ export interface Variante {
   talla: string;
   stock: number;
   stockReservado?: number;
+  stockDisponible?: number;
   imagenes?: string[];
   imagen?: string;
   descripcion?: string;
@@ -22,4 +23,9 @@ export interface Producto {
   totalVendidos: number;
   categoria?: string;
   variantes: Variante[];
+  stockTotal?: number;
+  stockReservadoTotal?: number;
+  stockDisponible?: number;
+  stockMinimo?: number;
+  estado?: "ACTIVO" | "INACTIVO" | "AGOTADO";
 }

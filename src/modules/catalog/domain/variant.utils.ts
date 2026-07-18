@@ -44,14 +44,22 @@ export const withVariantAvailability = <
 
 export const withComputedStock = <T extends { stockTotal?: number; stockMinimo?: number; variantes?: Array<{ stock?: number | null }> }>(
   producto: T
-) => ({
-  ...producto,
-  stockTotal:
-    (producto.variantes && producto.variantes.length > 0)
-      ? producto.variantes.reduce(
-          (total, variante) => total + (variante.stock || 0),
-          0
-        )
-      : (producto.stockTotal || 0),
-  stockMinimo: producto.stockMinimo ?? 5,
-});
+) => {
+  const variantes = producto.variantes ?? [];
+  const stockTotal = variantes.length
+    ? variantes.reduce((total, variante) => total + Math.max(0, variante.stock || 0), 0)
+    : Math.max(0, producto.stockTotal || 0);
+  const stockReservadoTotal = variantes.reduce(
+    (total, variante) =>
+      total + getVariantReservedStock(variante as VariantStockShape),
+    0
+  );
+
+  return {
+    ...producto,
+    stockTotal,
+    stockReservadoTotal,
+    stockDisponible: Math.max(0, stockTotal - stockReservadoTotal),
+    stockMinimo: producto.stockMinimo ?? 5,
+  };
+};

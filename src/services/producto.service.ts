@@ -16,8 +16,9 @@ async function getApiErrorMessage(response: Response, fallback: string) {
   }
 }
 
-export async function getProductos(): Promise<Producto[]> {
-  const res = await fetch("/api/productos");
+export async function getProductos(options?: { withStock?: boolean }): Promise<Producto[]> {
+  const query = options?.withStock ? "?withStock=true" : "";
+  const res = await fetch(`/api/productos${query}`);
   if (!res.ok) throw new Error("Error al obtener productos");
   return res.json();
 }
