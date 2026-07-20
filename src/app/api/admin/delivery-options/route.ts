@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
+import { replaceDeliveryOptions } from "@/modules/delivery-options/application/delivery-options.service";
+import { deliveryOptionsSchema } from "@/schemas/delivery-options.schema";
+import { isAppError } from "@/shared/errors/AppError";
 
 export const runtime = "nodejs";
 
@@ -13,28 +14,37 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 
-    const body = await request.json();
-    const filePath = path.join(process.cwd(), "data", "delivery-options.json");
+    const parsed = deliveryOptionsSchema.safeParse(await request.json());
 
-    // Validacion basica: asegurar que sea un objeto con las secciones correctas
-    if (!body.pickupPoints || !body.pickupSchedules || !body.shippingCompanies) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { message: "Datos de entrega invalidos" },
+        {
+          message: "Datos de entrega invalidos",
+          errors: parsed.error.flatten(),
+        },
         { status: 400 }
       );
     }
 
-    await fs.writeFile(filePath, JSON.stringify(body, null, 2), "utf-8");
+    const data = await replaceDeliveryOptions(parsed.data, {
+      id: userAuth.id,
+      rol: "ADMIN",
+    });
 
     return NextResponse.json({
       message: "Opciones de entrega actualizadas correctamente",
-      data: body,
+      data,
     });
   } catch (error) {
     console.error("Error updating delivery options:", error);
     return NextResponse.json(
-      { message: "Error al actualizar las opciones de entrega" },
-      { status: 500 }
+      {
+        message: isAppError(error)
+          ? error.message
+          : "Error al actualizar las opciones de entrega",
+        ...(isAppError(error) && error.code ? { code: error.code } : {}),
+      },
+      { status: isAppError(error) ? error.statusCode : 500 }
     );
   }
 }
