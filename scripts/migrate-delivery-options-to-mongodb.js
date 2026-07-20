@@ -1,12 +1,21 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require("fs");
 const path = require("path");
+const dns = require("dns");
 const mongoose = require("mongoose");
 
 const projectRoot = path.join(__dirname, "..");
 const sourcePath = path.join(projectRoot, "data", "delivery-options.json");
 const envPath = path.join(projectRoot, ".env.local");
 const force = process.argv.includes("--force");
+
+// El driver de MongoDB usa consultas SRV. Algunos DNS de Windows o del ISP las
+// rechazan aunque los resolvers publicos funcionen correctamente.
+const dnsServers = (process.env.MONGODB_DNS_SERVERS || "1.1.1.1,8.8.8.8")
+  .split(",")
+  .map((server) => server.trim())
+  .filter(Boolean);
+dns.setServers(dnsServers);
 
 function getMongoUrl() {
   if (process.env.MONGODB_URL) return process.env.MONGODB_URL;
