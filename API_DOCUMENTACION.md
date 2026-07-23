@@ -1,5 +1,9 @@
 # Documentacion API - Control Ventas
 
+**Estado del documento:** actualizado al 20 de julio de 2026.
+
+La referencia primaria para el inventario de rutas es `src/app/api/**/route.ts`. Los contratos de datos se validan con los esquemas de `src/schemas` y la persistencia se implementa con los modelos de `src/models`.
+
 ## Proposito
 
 Este documento describe la API actual del proyecto `control-ventas` tal como esta implementada hoy en el repositorio.
@@ -28,6 +32,7 @@ La API esta construida sobre Next.js App Router, con endpoints en `src/app/api/*
 - `orders/pedidos`
 - `payments/pagos`
 - `fulfillment/entregas`
+- `delivery-options`
 - `inventory/inventario`
 - `pos`
 - `reports`
@@ -39,6 +44,7 @@ Modelo central de negocio actual:
 - `Pedido` es la entidad unificada para venta y order legacy
 - `TransaccionPago` representa el estado financiero
 - `Entrega` representa el estado logistico
+- `DeliveryOptions` representa la configuracion editable de puntos de encuentro, horarios y envios nacionales
 
 ## Base URL
 
@@ -212,6 +218,7 @@ Recomendacion:
 | Variable | Uso |
 |---|---|
 | `MONGODB_URL` | Conexion a MongoDB |
+| `MONGODB_DNS_SERVERS` | Lista opcional de DNS separados por coma para el script de migracion de opciones de entrega; por defecto `1.1.1.1,8.8.8.8` |
 | `JWT_SECRET` | Firma de JWT Bearer |
 | `JWT_EXPIRES_IN` | Duracion del access token |
 | `NEXTAUTH_SECRET` | Sesiones NextAuth |
@@ -382,6 +389,52 @@ Notas:
 }
 ```
 
+## Opciones de entrega
+
+Las opciones disponibles durante checkout se almacenan en MongoDB, en la coleccion `deliveryoptions`, como un documento singleton identificado por `key: "default"`.
+
+```json
+{
+  "key": "default",
+  "pickupPoints": [
+    {
+      "id": "plaza-del-estudiante",
+      "name": "Plaza Del Estudiante"
+    }
+  ],
+  "pickupSchedules": [
+    {
+      "id": "lunes-1200-1800",
+      "day": "Lunes",
+      "start": "12:00",
+      "end": "18:00",
+      "label": "Lunes: 12:00-18:00"
+    }
+  ],
+  "shippingCompanies": [
+    {
+      "id": "bolivar-cargo",
+      "name": "BolivarCargo",
+      "departments": [
+        {
+          "name": "Cochabamba",
+          "branches": ["Av Melchor"]
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-07-20T05:00:00.000Z",
+  "updatedAt": "2026-07-20T05:00:00.000Z"
+}
+```
+
+Notas de persistencia:
+
+- `key` tiene indice unico y evita configuraciones principales duplicadas.
+- La API publica no expone `key`, `_id`, `createdAt`, `updatedAt` ni `__v`.
+- Los pedidos guardan su seleccion en `Pedido.snapshotEntrega`; cambiar la configuracion no modifica pedidos historicos.
+- `data/delivery-options.json` se conserva solamente como fuente para la migracion inicial y no se usa durante las peticiones HTTP.
+
 ## Endpoints
 
 ## 1. Publicos y de salud
@@ -447,6 +500,21 @@ Notas:
   ]
 }
 ```
+
+Comportamiento:
+
+- Lee exclusivamente el documento `key: "default"` de MongoDB.
+- No usa cache HTTP en el servicio cliente actual (`cache: "no-store"`).
+- Si la configuracion no fue migrada, responde `503`:
+
+```json
+{
+  "message": "Las opciones de entrega aun no fueron migradas a MongoDB",
+  "code": "DELIVERY_OPTIONS_NOT_CONFIGURED"
+}
+```
+
+- Un error inesperado de conexion o lectura responde `500`.
 
 ## 2. Autenticacion
 
@@ -924,12 +992,12 @@ Body ejemplo `PATCH /api/entregas/:id/status`:
 
 | Metodo | Ruta | Auth | Descripcion |
 |---|---|---|---|
-| `POST` | `/api/pos/sales` | `ADMIN`, `VENDEDOR` | Registra venta POS como `Pedido` en canal `APP_QR` |
+| `POST` | `/api/pos/sales` | `ADMIN`, `VENDEDOR` | Registra venta POS como `Pedido` en canal `APP_QR` o `TIENDA` |
 | `GET` | `/api/pos/my-sales` | `ADMIN`, `VENDEDOR` | Lista ventas POS del actor |
 | `GET` | `/api/pos/summary` | `ADMIN`, `VENDEDOR` | Resumen agregado del actor |
 | `GET` | `/api/pos/scan/:code` | `ADMIN`, `VENDEDOR` | Busca producto por QR o codigo de barras |
 
-Body ejemplo `POST /api/pos/sales`:
+Body ejemplo `POST /api/pos/sales` con entrega/recojo:
 
 ```json
 {
@@ -953,6 +1021,33 @@ Body ejemplo `POST /api/pos/sales`:
   }
 }
 ```
+
+Body ejemplo `POST /api/pos/sales` para venta presencial en tienda:
+
+```json
+{
+  "items": [
+    {
+      "productoId": "665f...",
+      "varianteId": "665f...",
+      "color": "Azul",
+      "colorSecundario": "Gris",
+      "talla": "M",
+      "cantidad": 1
+    }
+  ],
+  "metodoPago": "EFECTIVO",
+  "descuento": 0
+}
+```
+
+Notas de comportamiento:
+
+- `delivery` es opcional unicamente en `POST /api/pos/sales`.
+- Si `delivery` se omite, la venta se registra como presencial en canal `TIENDA`.
+- Si `delivery` se incluye, debe enviarse completo segun el metodo seleccionado.
+- Omitir `delivery` no crea una entidad `Entrega`.
+- Este cambio no modifica el contrato de los endpoints web de checkout o pedidos.
 
 Ejemplo de `GET /api/pos/summary`:
 
@@ -1022,7 +1117,7 @@ Body ejemplo `POST /api/usuarios`:
 | Metodo | Ruta | Auth | Descripcion |
 |---|---|---|---|
 | `GET` | `/api/admin/audit-events?limit=50` | `ADMIN` | Lista eventos de auditoria |
-| `PATCH` | `/api/admin/delivery-options` | `ADMIN` | Actualiza `data/delivery-options.json` |
+| `PATCH` | `/api/admin/delivery-options` | `ADMIN` | Reemplaza atomicamente la configuracion singleton en MongoDB |
 | `GET` | `/api/admin/ops/overview` | `ADMIN` | Overview operativo |
 | `POST` | `/api/admin/ops/verify-core` | `ADMIN` | Verificacion E2E del core |
 | `POST` | `/api/admin/cron/reservas-expiradas` | `x-cron-secret` | Libera reservas expiradas |
@@ -1041,9 +1136,72 @@ Body `PATCH /api/admin/delivery-options`:
 
 ```json
 {
-  "pickupPoints": [],
-  "pickupSchedules": [],
-  "shippingCompanies": []
+  "pickupPoints": [
+    {
+      "id": "plaza-del-estudiante",
+      "name": "Plaza Del Estudiante"
+    }
+  ],
+  "pickupSchedules": [
+    {
+      "id": "lunes-1200-1800",
+      "day": "Lunes",
+      "start": "12:00",
+      "end": "18:00",
+      "label": "Lunes: 12:00-18:00"
+    }
+  ],
+  "shippingCompanies": [
+    {
+      "id": "bolivar-cargo",
+      "name": "BolivarCargo",
+      "departments": [
+        {
+          "name": "Cochabamba",
+          "branches": ["Av Melchor"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Respuesta exitosa:
+
+```json
+{
+  "message": "Opciones de entrega actualizadas correctamente",
+  "data": {
+    "pickupPoints": [],
+    "pickupSchedules": [],
+    "shippingCompanies": []
+  }
+}
+```
+
+Reglas de validacion de opciones de entrega:
+
+- Las tres colecciones (`pickupPoints`, `pickupSchedules`, `shippingCompanies`) son obligatorias, aunque pueden estar vacias.
+- Los IDs usan minusculas, numeros y guiones, con un maximo de 120 caracteres.
+- Los IDs deben ser unicos dentro de cada coleccion.
+- Las horas usan formato `HH:mm` de 24 horas y `end` debe ser posterior a `start`.
+- No se permiten departamentos duplicados dentro de una empresa.
+- No se permiten sucursales duplicadas dentro de un departamento.
+- Limites actuales: 200 puntos, 200 horarios, 100 empresas, 50 departamentos por empresa y 200 sucursales por departamento.
+- Solo `ADMIN` puede modificar esta configuracion; un actor no autorizado recibe `403`.
+- Cada actualizacion exitosa registra `DELIVERY_OPTIONS_UPDATED` en `EventoAuditoria`, incluyendo conteos anteriores y nuevos.
+
+Error de validacion:
+
+```json
+{
+  "message": "Datos de entrega invalidos",
+  "errors": {
+    "formErrors": [],
+    "fieldErrors": {
+      "pickupSchedules": ["Los identificadores no pueden estar duplicados"]
+    }
+  }
 }
 ```
 
@@ -1052,6 +1210,39 @@ Header del cron:
 ```http
 x-cron-secret: <CRON_SECRET>
 ```
+
+### Migracion inicial de opciones de entrega
+
+La migracion carga `data/delivery-options.json` en la coleccion `deliveryoptions`.
+
+```bash
+npm run migrate:delivery-options
+```
+
+Caracteristicas del comando:
+
+- Usa `MONGODB_URL` del entorno o de `.env.local`.
+- Valida la estructura y detecta IDs, departamentos y sucursales duplicados.
+- Es idempotente: si ya existe `key: "default"`, termina sin modificarlo.
+- Crea un indice unico sobre `key`.
+- Usa los DNS configurados en `MONGODB_DNS_SERVERS`; si no se define, usa `1.1.1.1,8.8.8.8` para resolver conexiones `mongodb+srv`.
+
+Para reemplazar deliberadamente una configuracion existente con el JSON local:
+
+```bash
+npm run migrate:delivery-options:force
+```
+
+`migrate:delivery-options:force` es una operacion destructiva sobre la configuracion vigente y no debe ejecutarse como parte habitual del arranque o despliegue.
+
+Orden recomendado para un entorno nuevo:
+
+1. Configurar `MONGODB_URL` con la misma base utilizada por la aplicacion.
+2. Autorizar temporalmente la IP desde la que se ejecuta la migracion en MongoDB Atlas.
+3. Ejecutar `npm run migrate:delivery-options`.
+4. Confirmar la existencia de `deliveryoptions` con `key: "default"`.
+5. Probar `GET /api/delivery-options` y esperar status `200`.
+6. Retirar reglas de red amplias o temporales en Atlas.
 
 ## Garantias de consistencia
 
@@ -1062,12 +1253,14 @@ Hoy los flujos criticos relevantes trabajan con transacciones o secuencias contr
 - confirmacion por token
 - ajustes de inventario
 - sincronizacion de entregas
+- reemplazo atomico de opciones de entrega mediante un unico `findOneAndUpdate` con `upsert`
 
 Ademas:
 
 - las reservas expiradas se liberan por cron
 - ops overview detecta estados anomalos
 - auditoria registra eventos de dominio cuando corresponde
+- los pedidos conservan snapshots de entrega independientes de los cambios posteriores en configuracion
 
 ## Flujos recomendados
 
@@ -1108,6 +1301,8 @@ Ademas:
 4. Tratar pagos QR como flujo asincrono.
 5. Cachear `delivery-options` y catalogo publico cuando tenga sentido.
 
+Al cachear `delivery-options`, invalidar o revalidar el cache despues de un `PATCH /api/admin/delivery-options`; el cliente web incluido actualmente solicita los datos con `cache: "no-store"`.
+
 ### Lo que la app no debe asumir
 
 - que existe endpoint de refresh token
@@ -1145,5 +1340,6 @@ Los contratos publicos mas importantes hoy son:
 - pedidos
 - pagos
 - entregas
+- opciones de entrega persistidas en MongoDB
 
 Los dominios de `reportes`, `ops`, `auditoria`, `usuarios` y `admin/**` deben tratarse como contratos internos de negocio y operacion.

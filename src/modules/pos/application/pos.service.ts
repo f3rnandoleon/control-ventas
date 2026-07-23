@@ -3,6 +3,11 @@ import { connectDB } from "@/libs/mongodb";
 import Pedido from "@/models/pedido";
 import { findCatalogProductByCode } from "@/modules/catalog/application/catalog.service";
 import { crearVentaDirecta } from "@/modules/orders/application/pedidos.service";
+import {
+  buildPosSalesFilter,
+  POS_SALE_CHANNELS,
+  resolvePosSaleChannel,
+} from "@/modules/pos/domain/pos-sale.shared";
 import type { CreatePosSaleInput } from "@/schemas/pos.schema";
 import { AppError } from "@/shared/errors/AppError";
 
@@ -11,7 +16,12 @@ type SalesActor = {
   rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
 };
 
-function assertStaff(actor: SalesActor) {
+type StaffActor = {
+  id: string;
+  rol: "ADMIN" | "VENDEDOR";
+};
+
+function assertStaff(actor: SalesActor): asserts actor is StaffActor {
   if (!["ADMIN", "VENDEDOR"].includes(actor.rol)) {
     throw new AppError("No autorizado", 403);
   }
@@ -36,21 +46,19 @@ export async function createPosSale(
   input: CreatePosSaleInput
 ) {
   assertStaff(actor);
+  const { delivery, ...saleData } = input;
 
-  return crearVentaDirecta(actor as unknown as { id: string; rol: "ADMIN" | "VENDEDOR" }, {
-    ...input,
-    canal: "APP_QR",
-  } as unknown as Parameters<typeof crearVentaDirecta>[1]);
+  return crearVentaDirecta(actor, {
+    ...saleData,
+    canal: resolvePosSaleChannel(delivery),
+  });
 }
 
 export async function listMyPosSales(actor: SalesActor) {
   assertStaff(actor);
   await connectDB();
 
-  return Pedido.find({
-    vendedor: actor.id,
-    canal: "APP_QR",
-  })
+  return Pedido.find(buildPosSalesFilter(actor.id))
     .populate("vendedor", "nombreCompleto email")
     .sort({ createdAt: -1 });
 }
@@ -64,7 +72,7 @@ export async function getMyPosSummary(actor: SalesActor) {
     {
       $match: {
         vendedor: sellerId,
-        canal: "APP_QR",
+        canal: { $in: [...POS_SALE_CHANNELS] },
       },
     },
     {
