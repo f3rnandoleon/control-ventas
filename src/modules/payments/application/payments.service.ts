@@ -31,6 +31,7 @@ const REVIEW_TOKEN_PURPOSE = "PAYMENT_PROOF_REVIEW";
 const REVIEW_TOKEN_EXPIRATION_HOURS = 48;
 
 type PaymentReviewPedido = {
+  _id: mongoose.Types.ObjectId;
   numeroPedido: string;
   canal: string;
   metodoPago: string;
@@ -41,20 +42,38 @@ type PaymentReviewPedido = {
   estadoPago: string;
   estadoEntrega: string;
   createdAt: Date;
+  notas?: string | null;
+  snapshotCliente?: {
+    nombreCompleto?: string | null;
+    email?: string | null;
+    telefono?: string | null;
+    tipoDocumento?: string | null;
+    numeroDocumento?: string | null;
+  } | null;
   snapshotEntrega?: {
     metodo?: string | null;
+    puntoRecojo?: string | null;
+    direccion?: string | null;
+    telefono?: string | null;
+    nombreDestinatario?: string | null;
+    programadoPara?: string | null;
     departamento?: string | null;
     ciudad?: string | null;
     empresaEnvio?: string | null;
     sucursal?: string | null;
+    nombreRemitente?: string | null;
+    ciRemitente?: string | null;
+    telefonoRemitente?: string | null;
   } | null;
   items: Array<{
     productoSnapshot: {
       nombre: string;
       modelo?: string;
+      sku?: string;
       imagen?: string;
     };
     variante: {
+      varianteId?: string;
       color: string;
       talla: string;
       colorSecundario?: string;
@@ -607,7 +626,10 @@ export async function uploadComprobanteAndGenerateToken(
   return { payment, tokenRevision };
 }
 
-export async function getPaymentByReviewToken(token: string) {
+export async function getPaymentByReviewToken(
+  token: string,
+  options: { includeStaffDetails?: boolean } = {}
+) {
   await connectDB();
   const payment = await paymentsRepository.findByReviewTokenHash(hashReviewToken(token));
   if (!payment) throw new AppError("Link de verificacion invalido", 404);
@@ -615,8 +637,37 @@ export async function getPaymentByReviewToken(token: string) {
     .lean<PaymentReviewPedido | null>();
   if (!pedido) throw new AppError("Pedido no encontrado", 404);
 
+  const includeStaffDetails = options.includeStaffDetails === true;
+  const publicSnapshotEntrega = pedido.snapshotEntrega
+    ? {
+        metodo: pedido.snapshotEntrega.metodo,
+        departamento: pedido.snapshotEntrega.departamento,
+        ciudad: pedido.snapshotEntrega.ciudad,
+        empresaEnvio: pedido.snapshotEntrega.empresaEnvio,
+        sucursal: pedido.snapshotEntrega.sucursal,
+      }
+    : null;
+  const staffSnapshotEntrega = pedido.snapshotEntrega
+    ? {
+        metodo: pedido.snapshotEntrega.metodo,
+        puntoRecojo: pedido.snapshotEntrega.puntoRecojo,
+        direccion: pedido.snapshotEntrega.direccion,
+        telefono: pedido.snapshotEntrega.telefono,
+        nombreDestinatario: pedido.snapshotEntrega.nombreDestinatario,
+        programadoPara: pedido.snapshotEntrega.programadoPara,
+        departamento: pedido.snapshotEntrega.departamento,
+        ciudad: pedido.snapshotEntrega.ciudad,
+        empresaEnvio: pedido.snapshotEntrega.empresaEnvio,
+        sucursal: pedido.snapshotEntrega.sucursal,
+        nombreRemitente: pedido.snapshotEntrega.nombreRemitente,
+        ciRemitente: pedido.snapshotEntrega.ciRemitente,
+        telefonoRemitente: pedido.snapshotEntrega.telefonoRemitente,
+      }
+    : null;
+
   return {
     payment: {
+      ...(includeStaffDetails ? { _id: payment._id.toString() } : {}),
       numeroPago: payment.numeroPago,
       metodoPago: payment.metodoPago,
       monto: payment.monto,
@@ -625,6 +676,7 @@ export async function getPaymentByReviewToken(token: string) {
       createdAt: payment.createdAt,
     },
     pedido: {
+      ...(includeStaffDetails ? { _id: pedido._id.toString() } : {}),
       numeroPedido: pedido.numeroPedido,
       canal: pedido.canal,
       metodoPago: pedido.metodoPago,
@@ -635,22 +687,32 @@ export async function getPaymentByReviewToken(token: string) {
       estadoPago: pedido.estadoPago,
       estadoEntrega: pedido.estadoEntrega,
       createdAt: pedido.createdAt,
-      snapshotEntrega: pedido.snapshotEntrega
+      ...(includeStaffDetails
         ? {
-            metodo: pedido.snapshotEntrega.metodo,
-            departamento: pedido.snapshotEntrega.departamento,
-            ciudad: pedido.snapshotEntrega.ciudad,
-            empresaEnvio: pedido.snapshotEntrega.empresaEnvio,
-            sucursal: pedido.snapshotEntrega.sucursal,
+            notas: pedido.notas,
+            snapshotCliente: pedido.snapshotCliente
+              ? {
+                  nombreCompleto: pedido.snapshotCliente.nombreCompleto,
+                  email: pedido.snapshotCliente.email,
+                  telefono: pedido.snapshotCliente.telefono,
+                  tipoDocumento: pedido.snapshotCliente.tipoDocumento,
+                  numeroDocumento: pedido.snapshotCliente.numeroDocumento,
+                }
+              : null,
           }
-        : null,
+        : {}),
+      snapshotEntrega: includeStaffDetails
+        ? staffSnapshotEntrega
+        : publicSnapshotEntrega,
       items: pedido.items.map((item) => ({
         productoSnapshot: {
           nombre: item.productoSnapshot.nombre,
           modelo: item.productoSnapshot.modelo,
+          ...(includeStaffDetails ? { sku: item.productoSnapshot.sku } : {}),
           imagen: item.productoSnapshot.imagen,
         },
         variante: {
+          ...(includeStaffDetails ? { varianteId: item.variante.varianteId } : {}),
           color: item.variante.color,
           talla: item.variante.talla,
           colorSecundario: item.variante.colorSecundario,

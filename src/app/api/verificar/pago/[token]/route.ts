@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { getPaymentByReviewToken } from "@/modules/payments/application/payments.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 import { checkRateLimit } from "@/shared/http/rate-limit";
@@ -19,7 +21,7 @@ function getClientIp(request: Request) {
  * GET /api/verificar/pago/:token
  * Ruta pública: no requiere autenticación.
  */
-export async function GET(request: Request, context: Context) {
+export async function GET(request: NextRequest, context: Context) {
   try {
     const { token } = await context.params;
     const rateLimit = checkRateLimit(
@@ -44,9 +46,23 @@ export async function GET(request: Request, context: Context) {
       );
     }
 
-    const reviewData = await getPaymentByReviewToken(token);
+    const authToken = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+    const role = authToken?.rol as string | undefined;
+    const isStaff = ["ADMIN", "VENDEDOR"].includes(role || "");
+    const reviewData = await getPaymentByReviewToken(token, {
+      includeStaffDetails: isStaff,
+    });
 
-    return NextResponse.json(reviewData, {
+    return NextResponse.json({
+      ...reviewData,
+      permissions: {
+        canResolve: isStaff,
+        requiresLogin: !isStaff,
+      },
+    }, {
       headers: {
         "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer",

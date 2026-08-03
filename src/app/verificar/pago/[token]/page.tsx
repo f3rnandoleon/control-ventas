@@ -8,8 +8,12 @@ import {
 } from "@/constants/statusLabels";
 
 type PaymentReviewData = {
+  permissions?: {
+    canResolve: boolean;
+    requiresLogin: boolean;
+  };
   payment: {
-    _id: string;
+    _id?: string;
     numeroPago: string;
     metodoPago: string;
     monto: number;
@@ -18,7 +22,7 @@ type PaymentReviewData = {
     createdAt: string;
   };
   pedido: {
-    _id: string;
+    _id?: string;
     numeroPedido: string;
     canal: string;
     metodoPago: string;
@@ -112,6 +116,11 @@ export default function VerificarPagoPage() {
       });
       if (!res.ok) {
         const err = await res.json();
+        if (res.status === 401) {
+          setErrorMsg("Debes iniciar sesion como administrador o vendedor para confirmar.");
+          setState("ready");
+          return;
+        }
         throw new Error(err.message);
       }
       setState("confirmed");
@@ -131,6 +140,11 @@ export default function VerificarPagoPage() {
       });
       if (!res.ok) {
         const err = await res.json();
+        if (res.status === 401) {
+          setErrorMsg("Debes iniciar sesion como administrador o vendedor para rechazar.");
+          setState("ready");
+          return;
+        }
         throw new Error(err.message);
       }
       setState("rejected");
@@ -220,6 +234,8 @@ export default function VerificarPagoPage() {
   if (!data) return null;
 
   const { payment, pedido } = data;
+  const canResolve = data.permissions?.canResolve === true;
+  const loginUrl = `/login?callbackUrl=${encodeURIComponent(`/verificar/pago/${token}`)}`;
   const isProcessing = state === "confirming" || state === "rejecting";
   const deliveryLabel = DELIVERY_METHOD_LABELS[pedido.snapshotEntrega?.metodo ?? ""] || pedido.snapshotEntrega?.metodo || "—";
   const createdAtFormatted = new Intl.DateTimeFormat('es-BO', { 
@@ -409,6 +425,12 @@ export default function VerificarPagoPage() {
                         <p className="text-indigo-300 text-sm font-bold">{pedido.snapshotEntrega.programadoPara}</p>
                       </div>
                     )}
+                    {pedido.snapshotEntrega?.telefono && (
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Celular</p>
+                        <p className="text-slate-200 text-sm font-bold">{pedido.snapshotEntrega.telefono}</p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     {pedido.snapshotEntrega?.departamento && (
@@ -421,6 +443,12 @@ export default function VerificarPagoPage() {
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Transportadora</p>
                         <p className="text-slate-200 text-sm font-bold">{pedido.snapshotEntrega.empresaEnvio}</p>
+                      </div>
+                    )}
+                    {pedido.snapshotEntrega?.sucursal && (
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Sucursal</p>
+                        <p className="text-slate-200 text-sm font-bold">{pedido.snapshotEntrega.sucursal}</p>
                       </div>
                     )}
                   </div>
@@ -459,8 +487,8 @@ export default function VerificarPagoPage() {
             <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
               <h3 className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-600 mb-4 italic">Metadatos de Auditoría</h3>
               <div className="grid grid-cols-2 gap-4 text-[10px] font-mono text-slate-500">
-                <p>ORDER_ID: <span className="text-slate-400">{pedido._id}</span></p>
-                <p>PAYMENT_ID: <span className="text-slate-400">{payment._id}</span></p>
+                <p>ORDER_ID: <span className="text-slate-400">{pedido._id || "Inicia sesion"}</span></p>
+                <p>PAYMENT_ID: <span className="text-slate-400">{payment._id || "Inicia sesion"}</span></p>
                 <p>CHANNEL: <span className="text-slate-400">{pedido.canal}</span></p>
                 <p>METHOD: <span className="text-slate-400">{payment.metodoPago}</span></p>
               </div>
@@ -471,7 +499,22 @@ export default function VerificarPagoPage() {
 
         {/* Action Panel */}
         <div className="sticky bottom-6 z-40">
-          {showRejectForm ? (
+          {!canResolve ? (
+            <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <p className="text-white font-bold">Sesion de staff requerida</p>
+                <p className="text-slate-400 text-sm mt-1">
+                  Inicia sesion como administrador o vendedor para confirmar o rechazar este comprobante.
+                </p>
+              </div>
+              <a
+                href={loginUrl}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-center transition-colors"
+              >
+                Iniciar sesion
+              </a>
+            </div>
+          ) : showRejectForm ? (
             <div className="bg-slate-900 border border-red-500/40 rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
               <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                 <span className="text-red-500">⚠️</span> Justificar Rechazo

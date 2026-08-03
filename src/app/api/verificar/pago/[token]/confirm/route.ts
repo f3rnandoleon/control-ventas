@@ -1,19 +1,36 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { confirmPaymentByToken } from "@/modules/payments/application/payments.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
-import { requireStaffApiAuth } from "@/libs/requireApiAuth";
 
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ token: string }> };
 
-export async function POST(request: Request, context: Context) {
+async function resolveStaffFromSession(request: NextRequest) {
+  const authToken = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+  const role = authToken?.rol as "ADMIN" | "VENDEDOR" | "CLIENTE" | undefined;
+  const id = authToken?.id as string | undefined;
+
+  if (!id || !role) return null;
+  if (!["ADMIN", "VENDEDOR"].includes(role)) return null;
+
+  return { id, rol: role };
+}
+
+export async function POST(request: NextRequest, context: Context) {
   try {
-    const auth = await requireStaffApiAuth(request);
-    if (auth.response) return auth.response;
+    const userAuth = await resolveStaffFromSession(request);
+    if (!userAuth) {
+      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
+    }
 
     const { token } = await context.params;
-    const result = await confirmPaymentByToken(auth.userAuth, token);
+    const result = await confirmPaymentByToken(userAuth, token);
 
     return NextResponse.json(
       {
