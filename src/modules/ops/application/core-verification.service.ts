@@ -242,7 +242,7 @@ export async function runCoreEndToEndVerification(
 
     await waitUniqueTick();
     await confirmPaymentTransaction(
-      customerActor,
+      sellerActor,
       payment._id.toString(),
       {
         referenciaExterna: `e2e-confirmed-${context.stamp}`,
@@ -312,7 +312,7 @@ export async function runCoreEndToEndVerification(
       idempotencyKey: `e2e-failed-${context.stamp}`,
     });
     context.createdPaymentIds.push(failedPayment._id.toString());
-    await failPaymentTransaction(customerActor, failedPayment._id.toString(), {
+    await failPaymentTransaction(sellerActor, failedPayment._id.toString(), {
       motivo: "E2E failure path",
     });
 
@@ -350,7 +350,7 @@ export async function runCoreEndToEndVerification(
     });
     context.createdPaymentIds.push(refundPayment._id.toString());
     await confirmPaymentTransaction(
-      customerActor,
+      sellerActor,
       refundPayment._id.toString(),
       {}
     );

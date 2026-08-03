@@ -19,7 +19,10 @@ export interface TransaccionPago {
   falladoEn?: string | null;
   reembolsadoEn?: string | null;
   urlComprobante?: string | null;
-  tokenRevision?: string | null;
+  tokenRevisionPurpose?: "PAYMENT_PROOF_REVIEW" | null;
+  tokenRevisionExpiresAt?: string | null;
+  tokenRevisionUsedAt?: string | null;
+  tokenRevisionUsedBy?: string | null;
   tokenRevisionUsado?: boolean;
   createdAt: string;
   updatedAt: string;

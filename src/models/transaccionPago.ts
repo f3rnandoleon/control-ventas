@@ -72,6 +72,34 @@ const transaccionPagoSchema = new Schema(
         sparse: true,
       },
     },
+    tokenRevisionHash: {
+      type: String,
+      index: {
+        unique: true,
+        sparse: true,
+      },
+    },
+    tokenRevisionPurpose: {
+      type: String,
+      enum: ["PAYMENT_PROOF_REVIEW", null],
+      default: null,
+      index: true,
+    },
+    tokenRevisionExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    tokenRevisionUsedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    tokenRevisionUsedBy: {
+      type: Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     tokenRevisionUsado: {
       type: Boolean,
       default: false,
@@ -85,6 +113,12 @@ const transaccionPagoSchema = new Schema(
 transaccionPagoSchema.index({ pedidoId: 1, createdAt: -1 });
 transaccionPagoSchema.index({ cliente: 1, createdAt: -1 });
 transaccionPagoSchema.index({ estado: 1, createdAt: -1 });
+transaccionPagoSchema.index({
+  tokenRevisionHash: 1,
+  tokenRevisionPurpose: 1,
+  tokenRevisionUsedAt: 1,
+  tokenRevisionExpiresAt: 1,
+});
 
 const TransaccionPago =
   models.TransaccionPago ||

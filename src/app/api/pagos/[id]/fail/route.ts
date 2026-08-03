@@ -22,6 +22,10 @@ export async function POST(request: Request, context: Context) {
       return NextResponse.json({ message: "No autenticado" }, { status: 401 });
     }
 
+    if (!["ADMIN", "VENDEDOR"].includes(userAuth.rol)) {
+      return NextResponse.json({ message: "No autorizado" }, { status: 403 });
+    }
+
     const validation = await validateRequest(failPaymentSchema, request);
 
     if (!validation.success) {

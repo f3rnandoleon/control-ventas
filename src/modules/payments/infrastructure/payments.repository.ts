@@ -33,7 +33,35 @@ export const paymentsRepository = {
     );
   },
 
-  findByReviewToken(token: string, session?: ClientSession) {
-    return TransaccionPago.findOne({ tokenRevision: token }).session(session ?? null);
+  findByReviewTokenHash(tokenHash: string, session?: ClientSession) {
+    return TransaccionPago.findOne({
+      tokenRevisionHash: tokenHash,
+      tokenRevisionPurpose: "PAYMENT_PROOF_REVIEW",
+      tokenRevisionUsedAt: null,
+      tokenRevisionExpiresAt: { $gt: new Date() },
+    }).session(session ?? null);
+  },
+
+  consumeReviewTokenHash(
+    tokenHash: string,
+    usedBy: string,
+    session?: ClientSession
+  ) {
+    return TransaccionPago.findOneAndUpdate(
+      {
+        tokenRevisionHash: tokenHash,
+        tokenRevisionPurpose: "PAYMENT_PROOF_REVIEW",
+        tokenRevisionUsedAt: null,
+        tokenRevisionExpiresAt: { $gt: new Date() },
+      },
+      {
+        $set: {
+          tokenRevisionUsedAt: new Date(),
+          tokenRevisionUsedBy: usedBy,
+          tokenRevisionUsado: true,
+        },
+      },
+      { new: true, session }
+    );
   },
 };

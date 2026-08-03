@@ -27,6 +27,21 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}));
     const parsed = runCoreVerificationSchema.parse(body);
+
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { message: "La verificacion E2E del core esta deshabilitada en produccion" },
+        { status: 403 }
+      );
+    }
+
+    if (!parsed.cleanup) {
+      return NextResponse.json(
+        { message: "cleanup=false no esta permitido en una base operativa" },
+        { status: 400 }
+      );
+    }
+
     const result = await runCoreEndToEndVerification(
       {
         id: userAuth.id,

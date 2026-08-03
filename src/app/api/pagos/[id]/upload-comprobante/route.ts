@@ -84,7 +84,6 @@ export async function POST(request: Request, context: Context) {
       {
         message: "Comprobante subido correctamente. El administrador fue notificado.",
         urlComprobante: payment.urlComprobante,
-        verifyLink,
       },
       { status: 201 }
     );

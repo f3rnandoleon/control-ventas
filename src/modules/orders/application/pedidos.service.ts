@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
+import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
 
 import { getValidatedCartForCheckout, clearCartByUserId } from "@/modules/cart/application/cart.service";
@@ -84,48 +85,116 @@ async function releasePedidoReservation(pedido: {
   }
 }
 
+async function acquireCronLease(name: string, leaseMs: number) {
+  const now = new Date();
+  const leaseUntil = new Date(now.getTime() + leaseMs);
+  try {
+    const lock = await CronLock.findOneAndUpdate(
+      {
+        name,
+        $or: [{ leaseUntil: { $lte: now } }, { leaseUntil: { $exists: false } }],
+      },
+      { $set: { leaseUntil } },
+      { upsert: true, new: true, includeResultMetadata: true }
+    );
+
+    return Boolean(lock.lastErrorObject?.updatedExisting || lock.lastErrorObject?.upserted);
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+async function releaseCronLease(name: string) {
+  await CronLock.updateOne(
+    { name },
+    { $set: { leaseUntil: new Date(0) } }
+  );
+}
+
 export async function releaseExpiredReservations(limit = 100) {
   await connectDB();
-  const expiredPedidos = await pedidosRepository.findExpiredReserved(limit);
-  let releasedCount = 0;
-  const details: string[] = [];
-
-  for (const expiredPedido of expiredPedidos) {
-    const wasReleased = await runInTransaction(async (session) => {
-      const pedido = await pedidosRepository.findById(
-        expiredPedido._id.toString(),
-        session
-      );
-
-      if (
-        !pedido ||
-        pedido.estadoReservaStock !== "RESERVED" ||
-        !pedido.reservaExpiraEn ||
-        pedido.reservaExpiraEn >= new Date()
-      ) {
-        return false;
-      }
-
-      await releasePedidoReservation(pedido, session);
-
-      pedido.estadoReservaStock = "RELEASED";
-      pedido.estadoPedido = "CANCELLED";
-      pedido.estadoPago = "FAILED";
-      pedido.estadoEntrega = "CANCELLED";
-      pedido.reservadoEn = null;
-      pedido.reservaExpiraEn = null;
-      await pedido.save({ session });
-
-      return true;
-    });
-
-    if (wasReleased) {
-      releasedCount += 1;
-      details.push(expiredPedido._id.toString());
-    }
+  const lockName = "release-expired-reservations";
+  const lockAcquired = await acquireCronLease(lockName, 10 * 60 * 1000);
+  if (!lockAcquired) {
+    return {
+      releasedCount: 0,
+      failedCount: 0,
+      remainingExpiredCount: await pedidosRepository.countExpiredReserved(),
+      details: [],
+      locked: true,
+    };
   }
 
-  return { releasedCount, details };
+  const startedAt = Date.now();
+  const maxDurationMs = 50 * 1000;
+  let releasedCount = 0;
+  let failedCount = 0;
+  const details: string[] = [];
+
+  try {
+    while (Date.now() - startedAt < maxDurationMs) {
+      const expiredPedidos = await pedidosRepository.findExpiredReserved(limit);
+      if (expiredPedidos.length === 0) break;
+
+      for (const expiredPedido of expiredPedidos) {
+        try {
+          const wasReleased = await runInTransaction(async (session) => {
+            const pedido = await pedidosRepository.findById(
+              expiredPedido._id.toString(),
+              session
+            );
+
+            if (
+              !pedido ||
+              pedido.estadoReservaStock !== "RESERVED" ||
+              !pedido.reservaExpiraEn ||
+              pedido.reservaExpiraEn >= new Date()
+            ) {
+              return false;
+            }
+
+            await releasePedidoReservation(pedido, session);
+
+            pedido.estadoReservaStock = "RELEASED";
+            pedido.estadoPedido = "CANCELLED";
+            pedido.estadoPago = "FAILED";
+            pedido.estadoEntrega = "CANCELLED";
+            pedido.reservadoEn = null;
+            pedido.reservaExpiraEn = null;
+            await pedido.save({ session });
+
+            return true;
+          });
+
+          if (wasReleased) {
+            releasedCount += 1;
+            details.push(expiredPedido._id.toString());
+          }
+        } catch {
+          failedCount += 1;
+        }
+      }
+    }
+
+    return {
+      releasedCount,
+      failedCount,
+      remainingExpiredCount: await pedidosRepository.countExpiredReserved(),
+      details,
+      locked: false,
+    };
+  } finally {
+    await releaseCronLease(lockName);
+  }
 }
 
 export async function crearPedidoDesdeCarrito(

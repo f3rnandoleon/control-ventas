@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { createHash, randomUUID } from "crypto";
 import { connectDB } from "@/libs/mongodb";
 import Pedido from "@/models/pedido";
 import Producto from "@/models/producto";
@@ -25,6 +26,54 @@ type AuthActor = {
   id: string;
   rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
 };
+
+const REVIEW_TOKEN_PURPOSE = "PAYMENT_PROOF_REVIEW";
+const REVIEW_TOKEN_EXPIRATION_HOURS = 48;
+
+type PaymentReviewPedido = {
+  numeroPedido: string;
+  canal: string;
+  metodoPago: string;
+  subtotal: number;
+  descuento: number;
+  total: number;
+  estadoPedido: string;
+  estadoPago: string;
+  estadoEntrega: string;
+  createdAt: Date;
+  snapshotEntrega?: {
+    metodo?: string | null;
+    departamento?: string | null;
+    ciudad?: string | null;
+    empresaEnvio?: string | null;
+    sucursal?: string | null;
+  } | null;
+  items: Array<{
+    productoSnapshot: {
+      nombre: string;
+      modelo?: string;
+      imagen?: string;
+    };
+    variante: {
+      color: string;
+      talla: string;
+      colorSecundario?: string;
+    };
+    cantidad: number;
+    precioUnitario: number;
+    totalLinea: number;
+  }>;
+};
+
+function hashReviewToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function createReviewTokenExpirationDate() {
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + REVIEW_TOKEN_EXPIRATION_HOURS);
+  return expiresAt;
+}
 
 function assertObjectId(value: string, message: string) {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -104,6 +153,34 @@ function assertStaffActor(actor: AuthActor) {
   if (!["ADMIN", "VENDEDOR"].includes(actor.rol)) {
     throw new AppError("No autorizado", 403);
   }
+}
+
+async function rejectNonStaffPaymentAttempt(
+  actor: AuthActor,
+  paymentId: string,
+  action: string,
+  session?: mongoose.ClientSession
+) {
+  if (["ADMIN", "VENDEDOR"].includes(actor.rol)) {
+    return;
+  }
+
+  await recordAuditEventSafe(
+    {
+      accion: action,
+      tipoEntidad: "PAYMENT",
+      idEntidad: paymentId,
+      idActor: mongoose.Types.ObjectId.isValid(actor.id) ? actor.id : null,
+      rolActor: actor.rol,
+      estado: "FAILED",
+      metadata: {
+        reason: "ROLE_NOT_ALLOWED",
+      },
+    },
+    session
+  );
+
+  throw new AppError("No autorizado", 403);
 }
 
 async function consumeStockForPedido(
@@ -238,6 +315,8 @@ export async function confirmPaymentTransaction(
 ) {
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
+  await rejectNonStaffPaymentAttempt(actor, paymentId, "PAYMENT_CONFIRM_REJECTED");
+  assertStaffActor(actor);
 
   return runInTransaction(async (session) => {
     const payment = await paymentsRepository.findById(paymentId, session);
@@ -247,7 +326,10 @@ export async function confirmPaymentTransaction(
     }
 
     const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
-    assertPedidoAccess(actor, pedido);
+
+    if (payment.metodoPago !== pedido.metodoPago) {
+      throw new AppError("El metodo de pago no coincide con el pedido", 409);
+    }
 
     if (
       pedido.estadoPedido === "CANCELLED" &&
@@ -309,6 +391,8 @@ export async function failPaymentTransaction(
 ) {
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
+  await rejectNonStaffPaymentAttempt(actor, paymentId, "PAYMENT_FAIL_REJECTED");
+  assertStaffActor(actor);
 
   return runInTransaction(async (session) => {
     const payment = await paymentsRepository.findById(paymentId, session);
@@ -318,7 +402,10 @@ export async function failPaymentTransaction(
     }
 
     const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
-    assertPedidoAccess(actor, pedido);
+
+    if (payment.metodoPago !== pedido.metodoPago) {
+      throw new AppError("El metodo de pago no coincide con el pedido", 409);
+    }
 
     if (pedido.estadoReservaStock === "RESERVED") {
       for (const item of pedido.items) {
@@ -498,9 +585,14 @@ export async function uploadComprobanteAndGenerateToken(
   if (payment.cliente?.toString() !== idActor) throw new AppError("No autorizado", 403);
   if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
 
-  const tokenRevision = crypto.randomUUID();
+  const tokenRevision = randomUUID();
   payment.urlComprobante = comprobanteUrl;
-  payment.tokenRevision = tokenRevision;
+  payment.tokenRevision = undefined;
+  payment.tokenRevisionHash = hashReviewToken(tokenRevision);
+  payment.tokenRevisionPurpose = REVIEW_TOKEN_PURPOSE;
+  payment.tokenRevisionExpiresAt = createReviewTokenExpirationDate();
+  payment.tokenRevisionUsedAt = null;
+  payment.tokenRevisionUsedBy = null;
   payment.tokenRevisionUsado = false;
   await payment.save();
 
@@ -517,47 +609,120 @@ export async function uploadComprobanteAndGenerateToken(
 
 export async function getPaymentByReviewToken(token: string) {
   await connectDB();
-  const payment = await paymentsRepository.findByReviewToken(token);
+  const payment = await paymentsRepository.findByReviewTokenHash(hashReviewToken(token));
   if (!payment) throw new AppError("Link de verificacion invalido", 404);
-  if (payment.tokenRevisionUsado) throw new AppError("Este link ya fue utilizado", 410);
   const pedido = await Pedido.findById(payment.pedidoId)
-    .populate("cliente", "nombreCompleto email")
-    .lean();
+    .lean<PaymentReviewPedido | null>();
   if (!pedido) throw new AppError("Pedido no encontrado", 404);
-  return { payment, pedido };
+
+  return {
+    payment: {
+      numeroPago: payment.numeroPago,
+      metodoPago: payment.metodoPago,
+      monto: payment.monto,
+      estado: payment.estado,
+      urlComprobante: payment.urlComprobante,
+      createdAt: payment.createdAt,
+    },
+    pedido: {
+      numeroPedido: pedido.numeroPedido,
+      canal: pedido.canal,
+      metodoPago: pedido.metodoPago,
+      subtotal: pedido.subtotal,
+      descuento: pedido.descuento,
+      total: pedido.total,
+      estadoPedido: pedido.estadoPedido,
+      estadoPago: pedido.estadoPago,
+      estadoEntrega: pedido.estadoEntrega,
+      createdAt: pedido.createdAt,
+      snapshotEntrega: pedido.snapshotEntrega
+        ? {
+            metodo: pedido.snapshotEntrega.metodo,
+            departamento: pedido.snapshotEntrega.departamento,
+            ciudad: pedido.snapshotEntrega.ciudad,
+            empresaEnvio: pedido.snapshotEntrega.empresaEnvio,
+            sucursal: pedido.snapshotEntrega.sucursal,
+          }
+        : null,
+      items: pedido.items.map((item) => ({
+        productoSnapshot: {
+          nombre: item.productoSnapshot.nombre,
+          modelo: item.productoSnapshot.modelo,
+          imagen: item.productoSnapshot.imagen,
+        },
+        variante: {
+          color: item.variante.color,
+          talla: item.variante.talla,
+          colorSecundario: item.variante.colorSecundario,
+        },
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        totalLinea: item.totalLinea,
+      })),
+    },
+  };
 }
 
-export async function confirmPaymentByToken(token: string) {
+export async function confirmPaymentByToken(
+  actor: AuthActor,
+  token: string,
+  input: ConfirmPaymentInput = {}
+) {
+  assertStaffActor(actor);
   await connectDB();
   return runInTransaction(async (session) => {
-    const payment = await paymentsRepository.findByReviewToken(token, session);
+    const payment = await paymentsRepository.consumeReviewTokenHash(
+      hashReviewToken(token),
+      actor.id,
+      session
+    );
     if (!payment) throw new AppError("Link invalido", 404);
-    if (payment.tokenRevisionUsado) throw new AppError("Este link ya fue utilizado", 410);
+    if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
     const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
     if (pedido.estadoPedido === "CANCELLED") throw new AppError("El pedido ya fue cancelado", 409);
-    
-    const tokenActor: AuthActor = { id: "token-review", rol: "ADMIN" };
-    await consumeStockForPedido(pedido, tokenActor, session);
+    if (payment.metodoPago !== pedido.metodoPago) {
+      throw new AppError("El metodo de pago no coincide con el pedido", 409);
+    }
 
-    payment.estado = "PAID"; payment.confirmadoEn = new Date(); payment.tokenRevisionUsado = true;
+    await consumeStockForPedido(pedido, actor, session);
+
+    payment.estado = "PAID";
+    payment.confirmadoEn = new Date();
+    payment.falladoEn = null;
+    payment.motivoFallo = null;
+    if (input.referenciaExterna) payment.referenciaExterna = input.referenciaExterna;
     await payment.save({ session });
     pedido.estadoPago = "PAID"; pedido.estadoPedido = "CONFIRMED";
     
-    if (pedido.estadoEntrega !== "DELIVERED") pedido.estadoEntrega = "PENDING";
+    if (pedido.estadoEntrega !== "DELIVERED") {
+      pedido.estadoEntrega = pedido.snapshotEntrega?.metodo ? "PENDING" : "NOT_APPLICABLE";
+    }
     await pedido.save({ session });
     await syncFulfillmentForOrder(pedido, session);
-    await recordAuditEventSafe({ accion: "PAYMENT_CONFIRMED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision" } }, session);
+    await recordAuditEventSafe({ accion: "PAYMENT_CONFIRMED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: actor.id, rolActor: actor.rol, estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision" } }, session);
     return { payment, pedido };
   });
 }
 
-export async function rejectPaymentByToken(token: string, reason?: string) {
+export async function rejectPaymentByToken(
+  actor: AuthActor,
+  token: string,
+  reason?: string
+) {
+  assertStaffActor(actor);
   await connectDB();
   return runInTransaction(async (session) => {
-    const payment = await paymentsRepository.findByReviewToken(token, session);
+    const payment = await paymentsRepository.consumeReviewTokenHash(
+      hashReviewToken(token),
+      actor.id,
+      session
+    );
     if (!payment) throw new AppError("Link invalido", 404);
-    if (payment.tokenRevisionUsado) throw new AppError("Este link ya fue utilizado", 410);
+    if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
     const pedido = await getPedidoForPayment(payment.pedidoId.toString(), session);
+    if (payment.metodoPago !== pedido.metodoPago) {
+      throw new AppError("El metodo de pago no coincide con el pedido", 409);
+    }
     if (pedido.estadoReservaStock === "RESERVED") {
       for (const item of pedido.items) {
         const producto = await Producto.findById(item.productoId).session(session);
@@ -568,7 +733,7 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
       }
     }
     payment.estado = "FAILED"; payment.falladoEn = new Date();
-    payment.motivoFallo = reason || "Comprobante rechazado"; payment.tokenRevisionUsado = true;
+    payment.motivoFallo = reason || "Comprobante rechazado";
     await payment.save({ session });
     pedido.estadoPago = "FAILED"; pedido.estadoPedido = "CANCELLED";
     pedido.estadoEntrega = "CANCELLED"; pedido.estadoReservaStock = "RELEASED";
@@ -576,7 +741,7 @@ export async function rejectPaymentByToken(token: string, reason?: string) {
     pedido.motivoCancelacion = reason || "Comprobante rechazado";
     await pedido.save({ session });
     await syncFulfillmentForOrder(pedido, session);
-    await recordAuditEventSafe({ accion: "PAYMENT_FAILED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: "TOKEN_REVIEW", rolActor: "ADMIN", estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision", reason } }, session);
+    await recordAuditEventSafe({ accion: "PAYMENT_FAILED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: actor.id, rolActor: actor.rol, estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision", reason } }, session);
     return { payment, pedido };
   });
 }

@@ -71,6 +71,13 @@ export const pedidosRepository = {
       .sort({ reservaExpiraEn: 1 })
       .limit(limit);
   },
+
+  countExpiredReserved() {
+    return Pedido.countDocuments({
+      estadoReservaStock: "RESERVED",
+      reservaExpiraEn: { $lt: new Date() },
+    });
+  },
 };
 
 export type SalesRepositoryFilters = {

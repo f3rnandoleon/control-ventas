@@ -2,19 +2,25 @@ import { NextResponse } from "next/server";
 import { releaseExpiredReservations } from "@/modules/orders/application/pedidos.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
-export async function POST(request: Request) {
+function isAuthorizedCronRequest(request: Request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return request.headers.get("authorization") === `Bearer ${secret}`;
+}
+
+export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get("x-cron-secret");
-    if (authHeader !== process.env.CRON_SECRET) {
+    if (!isAuthorizedCronRequest(request)) {
       return NextResponse.json({ message: "No autorizado" }, { status: 401 });
     }
 
-    const { releasedCount, details } = await releaseExpiredReservations();
+    const startedAt = Date.now();
+    const result = await releaseExpiredReservations();
 
     return NextResponse.json({
-      message: "Proceso de liberación de reservas completado",
-      releasedCount,
-      details,
+      message: "Proceso de liberacion de reservas completado",
+      ...result,
+      durationMs: Date.now() - startedAt,
     });
   } catch (error) {
     return handleRouteError(error, {
@@ -22,4 +28,8 @@ export async function POST(request: Request) {
       logLabel: "CRON RESERVAS ERROR:",
     });
   }
+}
+
+export async function POST(request: Request) {
+  return GET(request);
 }

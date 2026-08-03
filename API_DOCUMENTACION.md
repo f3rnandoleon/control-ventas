@@ -367,8 +367,7 @@ Notas:
   "monto": 240,
   "estado": "PENDING",
   "referenciaExterna": null,
-  "urlComprobante": null,
-  "tokenRevision": null
+  "urlComprobante": null
 }
 ```
 
@@ -943,8 +942,7 @@ Response:
 ```json
 {
   "message": "Comprobante subido correctamente. El administrador fue notificado.",
-  "urlComprobante": "https://res.cloudinary.com/...",
-  "verifyLink": "https://control-ventas-azure.vercel.app/verificar/pago/<token>"
+  "urlComprobante": "https://res.cloudinary.com/..."
 }
 ```
 
@@ -954,7 +952,7 @@ Response:
 2. crear pago
 3. subir comprobante
 4. revisar con link tokenizado
-5. confirmar o rechazar por token
+5. confirmar o rechazar con sesion `ADMIN` o `VENDEDOR`; el token solo localiza el recurso
 
 ## 9. Entregas
 
@@ -1120,7 +1118,7 @@ Body ejemplo `POST /api/usuarios`:
 | `PATCH` | `/api/admin/delivery-options` | `ADMIN` | Reemplaza atomicamente la configuracion singleton en MongoDB |
 | `GET` | `/api/admin/ops/overview` | `ADMIN` | Overview operativo |
 | `POST` | `/api/admin/ops/verify-core` | `ADMIN` | Verificacion E2E del core |
-| `POST` | `/api/admin/cron/reservas-expiradas` | `x-cron-secret` | Libera reservas expiradas |
+| `GET` | `/api/admin/cron/reservas-expiradas` | `Authorization: Bearer <CRON_SECRET>` | Libera reservas expiradas |
 
 Body `POST /api/admin/ops/verify-core`:
 
@@ -1208,7 +1206,7 @@ Error de validacion:
 Header del cron:
 
 ```http
-x-cron-secret: <CRON_SECRET>
+Authorization: Bearer <CRON_SECRET>
 ```
 
 ### Migracion inicial de opciones de entrega
