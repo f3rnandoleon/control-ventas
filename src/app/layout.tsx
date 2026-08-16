@@ -2,7 +2,6 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import ClientOnly from "@/components/ClientOnly";
 import { Providers } from "@/components/Providers";
-import ThemeToggle from "@/components/ui/ThemeToggle";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,7 +9,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="text-primary antialiased">
         <ClientOnly>
           <Providers>
-            <ThemeToggle />
             {children}
             <Toaster
               richColors

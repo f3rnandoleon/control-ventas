@@ -24,19 +24,6 @@ const getVariantKey = (variant: Pick<VentaVariant, "varianteId" | "color" | "col
 const getItemKey = (item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>) =>
   item.varianteId || [item.color || "", item.colorSecundario || "", item.talla || ""].join("|");
 
-const matchesVariant = (
-  variant: VentaVariant,
-  item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>
-) => {
-  if (item.varianteId && variant.varianteId) return variant.varianteId === item.varianteId;
-
-  return (
-    variant.color === item.color &&
-    variant.talla === item.talla &&
-    (variant.colorSecundario || "") === (item.colorSecundario || "")
-  );
-};
-
 const getProductoImage = (producto: Producto) => {
   const variantWithImage = producto.variantes.find((variant) => getVarianteImagenPrincipal(variant));
   return variantWithImage ? getVarianteImagenPrincipal(variantWithImage) : undefined;
@@ -70,7 +57,7 @@ export default function VentaPOS({
     mode: "onChange",
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  const { fields, append } = useFieldArray({ control, name: "items" });
   const [search, setSearch] = useState("");
   const [categoriaActiva, setCategoriaActiva] = useState("TODO");
   const [productoActivo, setProductoActivo] = useState<Producto | null>(null);
@@ -79,8 +66,6 @@ export default function VentaPOS({
   const [valorDescuento, setValorDescuento] = useState<number>(0);
 
   const watchedItems = watch("items") ?? [];
-  const metodoPago = watch("metodoPago");
-
   const categorias = useMemo(() => {
     const values = productos.map((producto) => producto.categoria?.trim()).filter(Boolean) as string[];
     return ["TODO", ...Array.from(new Set(values))];
@@ -135,6 +120,7 @@ export default function VentaPOS({
       }
 
       setValue(`items.${existingIndex}.cantidad`, nextQuantity, { shouldValidate: true });
+      toast.success("Variante adicionada correctamente");
       return;
     }
 
@@ -146,16 +132,7 @@ export default function VentaPOS({
       talla: variant.talla,
       cantidad: 1,
     });
-  };
-
-  const updateQuantity = (index: number, quantity: number) => {
-    const item = watchedItems[index];
-    const producto = productos.find((p) => p._id === item?.productoId);
-    const variant = producto?.variantes.find((v) => matchesVariant(v, item));
-    const stockDisponible = variant ? getStockDisponible(variant) : 0;
-    const nextQuantity = Math.max(1, Math.min(quantity, stockDisponible || 1));
-
-    setValue(`items.${index}.cantidad`, nextQuantity, { shouldValidate: true });
+    toast.success("Variante adicionada correctamente");
   };
 
   const onSubmit = async (data: VentaFormSubmitValues) => {
@@ -194,6 +171,7 @@ export default function VentaPOS({
     <div className="surface-card-strong flex h-[calc(100dvh-8rem)] min-h-0 flex-col overflow-hidden rounded-2xl md:h-[calc(100dvh-3rem)]">
       <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          Seleccione los productos.
           <div className="w-fit rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
             {fields.length} {fields.length === 1 ? "item" : "items"}
           </div>
@@ -306,130 +284,41 @@ export default function VentaPOS({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                {fields.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-6 text-center text-sm text-gray-400">
-                    Todavia no agregaste productos.
-                  </div>
-                )}
-
-                {fields.map((field, index) => {
-                  const item = watchedItems[index];
-                  const producto = productos.find((p) => p._id === item?.productoId);
-                  const variant = producto?.variantes.find((v) => matchesVariant(v, item));
-                  const image = variant ? getVarianteImagenPrincipal(variant) || (producto ? getProductoImage(producto) : undefined) : undefined;
-                  const stockDisponible = variant ? getStockDisponible(variant) : 0;
-                  const precio = producto?.precioVenta ?? 0;
-                  const cantidad = item?.cantidad || 1;
-
-                  return (
-                    <div key={field.id} className="surface-subcard rounded-xl p-3">
-                      <div className="flex gap-3">
-                        {image ? (
-                          <CloudinaryImage
-                            src={image}
-                            alt={producto?.nombre || "Producto"}
-                            width={72}
-                            height={72}
-                            className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="h-16 w-16 shrink-0 rounded-lg bg-slate-800" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="line-clamp-1 text-sm font-semibold">{producto?.nombre || "Producto"}</p>
-                              <p className="line-clamp-1 text-xs text-gray-400">{producto?.modelo || "-"}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => remove(index)}
-                              className="rounded-full px-2 py-1 text-xs font-semibold text-red-300 hover:bg-red-500/10"
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                          <p className="mt-1 text-xs text-gray-300">
-                            {item.color}{item.colorSecundario ? ` / ${item.colorSecundario}` : ""} - Talla {item.talla}
-                          </p>
-                          <div className="mt-2 flex items-center justify-between gap-3">
-                            <div className="flex h-8 items-center overflow-hidden rounded-lg border border-white/10">
-                              <button type="button" onClick={() => updateQuantity(index, cantidad - 1)} className="h-full px-3 text-gray-300 hover:bg-white/10">-</button>
-                              <input
-                                type="number"
-                                {...register(`items.${index}.cantidad`, { valueAsNumber: true, min: 1 })}
-                                min={1}
-                                max={stockDisponible}
-                                onChange={(event) => updateQuantity(index, Number(event.target.value) || 1)}
-                                className="h-full w-10 border-x border-white/10 bg-transparent text-center text-xs outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(index, cantidad + 1)}
-                                disabled={cantidad >= stockDisponible}
-                                className="h-full px-3 text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] text-gray-500">Stock {stockDisponible}</p>
-                              <p className="text-sm font-bold text-cyan-300">{formatMoney(precio * cantidad)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <input type="hidden" {...register(`items.${index}.productoId`)} />
-                      <input type="hidden" {...register(`items.${index}.varianteId`)} />
-                      <input type="hidden" {...register(`items.${index}.color`)} />
-                      <input type="hidden" {...register(`items.${index}.colorSecundario`)} />
-                      <input type="hidden" {...register(`items.${index}.talla`)} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-4 shrink-0 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-end">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Metodo de pago</label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-semibold transition ${metodoPago === "EFECTIVO" ? "border-cyan-500 bg-cyan-500/20 text-cyan-200" : "border-white/10 bg-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <input type="radio" {...register("metodoPago")} value="EFECTIVO" className="hidden" />
-                  Efectivo
-                </label>
-                <label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-semibold transition ${metodoPago === "QR" ? "border-cyan-500 bg-cyan-500/20 text-cyan-200" : "border-white/10 bg-white/5 text-gray-400 hover:bg-white/10"}`}>
-                  <input type="radio" {...register("metodoPago")} value="QR" className="hidden" />
-                  QR
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Descuento</label>
-              <div className="flex gap-2">
-                <div className="flex overflow-hidden rounded-xl border border-white/10">
-                  <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-sm font-bold ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>Bs</button>
-                  <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-sm font-bold ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>%</button>
+            <div className="hidden">
+              {fields.map((field, index) => (
+                <div key={field.id}>
+                  <input type="hidden" {...register(`items.${index}.productoId`)} />
+                  <input type="hidden" {...register(`items.${index}.varianteId`)} />
+                  <input type="hidden" {...register(`items.${index}.color`)} />
+                  <input type="hidden" {...register(`items.${index}.colorSecundario`)} />
+                  <input type="hidden" {...register(`items.${index}.talla`)} />
+                  <input type="hidden" {...register(`items.${index}.cantidad`, { valueAsNumber: true })} />
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
-                  step="0.01"
-                  value={valorDescuento || ""}
-                  onChange={(event) => handleDescuentoChange(Number(event.target.value) || 0)}
-                  placeholder="0.00"
-                  className="input min-w-0 flex-1 px-3 py-2"
-                />
-              </div>
+              ))}
             </div>
-          </div>
 
-          <div className="surface-subcard space-y-3 rounded-xl p-4">
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto text-sm sm:text-base lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start">
+              <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:text-xs">Descuento</label>
+                <div className="flex gap-2">
+                  <div className="flex overflow-hidden rounded-xl border border-white/10">
+                    <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>Bs</button>
+                    <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>%</button>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
+                    step="0.01"
+                    value={valorDescuento || ""}
+                    onChange={(event) => handleDescuentoChange(Number(event.target.value) || 0)}
+                    placeholder="0.00"
+                    className="input min-w-0 flex-1 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
             <div className="flex justify-between text-sm text-gray-400">
               <span>Subtotal</span>
               <span>{formatMoney(subtotal)}</span>
@@ -450,7 +339,7 @@ export default function VentaPOS({
             >
               {isSubmitting ? "Procesando..." : "Confirmar venta"}
             </button>
-          </div>
+              </div>
             </div>
           </div>
         </div>

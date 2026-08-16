@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 import {
   dashboardMenu,
   type DashboardRole,
@@ -122,12 +123,15 @@ export default function Sidebar({ role }: { role: string }) {
         })}
       </nav>
 
-      <button
-        onClick={() => setOpenLogout(true)}
-        className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left font-medium text-red-700 transition hover:bg-red-100"
-      >
-        Cerrar sesion
-      </button>
+      <div className="mt-6 space-y-3">
+        <ThemeToggle className="w-full" />
+        <button
+          onClick={() => setOpenLogout(true)}
+          className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left font-medium text-red-700 transition hover:bg-red-100"
+        >
+          Cerrar sesion
+        </button>
+      </div>
     </aside>
   );
 
