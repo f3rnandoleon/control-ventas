@@ -31,3 +31,9 @@ export function getVarianteImagenPrincipal(
 ) {
   return getVarianteImagenes(variante)[0];
 }
+
+export function getVarianteSegundaImagen(
+  variante?: VarianteImagenLike | null
+) {
+  return getVarianteImagenes(variante)[1];
+}

@@ -13,6 +13,7 @@ import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import { getEstadoStock, getStockProducto } from "@/utils/stock";
 import { generarReporteStockPDF } from "@/utils/reportes/generarReporteStock";
 import { generarReporteProductoPDF } from "@/utils/reportes/generarReporteProducto";
+import { generarImagenVariantesDisponibles } from "@/utils/reportes/generarImagenVariantes";
 
 export default function AdminProductosPage() {
   type ModalView = "PRODUCTO" | "VARIANTES";
@@ -23,6 +24,7 @@ export default function AdminProductosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
 
   const loadProductos = async () => {
     setLoading(true);
@@ -77,6 +79,18 @@ export default function AdminProductosPage() {
     catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo eliminar el producto"); }
   };
 
+  const handleDownloadVariantsImage = async (producto: Producto) => {
+    setDownloadingImageId(producto._id);
+    try {
+      await generarImagenVariantesDisponibles(producto);
+      toast.success("Imagen de variantes descargada");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo descargar la imagen");
+    } finally {
+      setDownloadingImageId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -106,6 +120,7 @@ export default function AdminProductosPage() {
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}>Editar</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}>Variantes</button>
                   <button className="btn-link mr-3" onClick={() => generarReporteProductoPDF(producto)}>Reporte</button>
+                  <button className="btn-link mr-3" disabled={downloadingImageId === producto._id} onClick={() => void handleDownloadVariantsImage(producto)}>{downloadingImageId === producto._id ? "Generando..." : "Imagen variantes"}</button>
                   <button className="btn-danger" onClick={() => void handleDelete(producto)}>Eliminar</button>
                 </td>
               </tr>;
