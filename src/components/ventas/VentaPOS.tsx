@@ -310,12 +310,33 @@ export default function VentaPOS({
                   {fields.map((field, index) => {
                     const item = watchedItems[index];
                     const producto = productos.find((p) => p._id === item?.productoId);
+                    const variant = producto?.variantes.find((candidate) => {
+                      if (item?.varianteId && candidate.varianteId) return candidate.varianteId === item.varianteId;
+
+                      return (
+                        candidate.color === item?.color &&
+                        candidate.talla === item?.talla &&
+                        (candidate.colorSecundario || "") === (item?.colorSecundario || "")
+                      );
+                    });
+                    const image = variant ? getVarianteImagenPrincipal(variant) || (producto ? getProductoImage(producto) : undefined) : undefined;
                     const cantidad = item?.cantidad || 1;
                     const precio = producto?.precioVenta ?? 0;
 
                     return (
                       <div key={field.id} className="rounded-lg border border-white/10 bg-white/5 p-2">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          {image ? (
+                            <CloudinaryImage
+                              src={image}
+                              alt={producto?.nombre || "Producto"}
+                              width={56}
+                              height={56}
+                              className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="h-14 w-14 shrink-0 rounded-lg bg-slate-800" />
+                          )}
                           <div className="min-w-0">
                             <p className="line-clamp-1 font-semibold">{producto?.nombre || "Producto"}</p>
                             <p className="line-clamp-1 text-[11px] text-gray-400 sm:text-xs">{producto?.modelo || "-"}</p>
@@ -323,7 +344,7 @@ export default function VentaPOS({
                               {item.color}{item.colorSecundario ? ` / ${item.colorSecundario}` : ""} - Talla {item.talla}
                             </p>
                           </div>
-                          <div className="shrink-0 text-right">
+                          <div className="ml-auto shrink-0 text-right">
                             <p className="text-[11px] text-gray-400 sm:text-xs">Cant. {cantidad}</p>
                             <p className="font-bold text-cyan-300">{formatMoney(precio * cantidad)}</p>
                           </div>
