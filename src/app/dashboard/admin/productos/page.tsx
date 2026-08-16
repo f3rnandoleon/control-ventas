@@ -28,7 +28,8 @@ export default function AdminProductosPage() {
   const [imageProduct, setImageProduct] = useState<Producto | null>(null);
   const [selectedTallas, setSelectedTallas] = useState<string[]>([]);
   const [generalImageOpen, setGeneralImageOpen] = useState(false);
-  const [selectedGeneralProductIds, setSelectedGeneralProductIds] = useState<string[]>([]);
+  const [selectedGeneralProductNames, setSelectedGeneralProductNames] = useState<string[]>([]);
+  const [selectedGeneralCategorias, setSelectedGeneralCategorias] = useState<string[]>([]);
   const [selectedGeneralTallas, setSelectedGeneralTallas] = useState<string[]>([]);
 
   const loadProductos = async () => {
@@ -85,6 +86,45 @@ export default function AdminProductosPage() {
   const productosParaImagenGeneral = useMemo(() => productos.filter((producto) =>
     producto.variantes.some((variante) => getVarianteSegundaImagen(variante) && getStockDisponibleVariante(variante) > 0)
   ), [productos]);
+
+  const categoriasParaImagenGeneral = useMemo(() => {
+    const values = new Set<string>();
+    productosParaImagenGeneral.forEach((producto) => values.add(producto.categoria?.trim() || "Sin categoria"));
+    return [...values].sort((a, b) => a.localeCompare(b, "es"));
+  }, [productosParaImagenGeneral]);
+
+  const productosGeneralesFiltradosPorCategoria = useMemo(() => {
+    const categoriasSeleccionadas = new Set(selectedGeneralCategorias);
+    if (categoriasSeleccionadas.size === 0) return productosParaImagenGeneral;
+    return productosParaImagenGeneral.filter((producto) =>
+      categoriasSeleccionadas.has(producto.categoria?.trim() || "Sin categoria")
+    );
+  }, [productosParaImagenGeneral, selectedGeneralCategorias]);
+
+  const gruposProductosParaImagenGeneral = useMemo(() => {
+    const groups = new Map<string, { nombre: string; modelos: string[]; totalProductos: number }>();
+    productosGeneralesFiltradosPorCategoria.forEach((producto) => {
+      const nombre = producto.nombre.trim() || "Sin nombre";
+      const key = nombre.toLocaleLowerCase("es");
+      const current = groups.get(key) || { nombre, modelos: [], totalProductos: 0 };
+      const modelo = producto.modelo?.trim() || "Sin modelo";
+      if (!current.modelos.includes(modelo)) current.modelos.push(modelo);
+      current.totalProductos += 1;
+      groups.set(key, current);
+    });
+    return [...groups.values()]
+      .map((group) => ({ ...group, modelos: group.modelos.sort((a, b) => a.localeCompare(b, "es")) }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [productosGeneralesFiltradosPorCategoria]);
+
+  const nombresProductosParaImagenGeneral = useMemo(() => {
+    const names = new Map<string, string>();
+    productosParaImagenGeneral.forEach((producto) => {
+      const nombre = producto.nombre.trim() || "Sin nombre";
+      names.set(nombre.toLocaleLowerCase("es"), nombre);
+    });
+    return [...names.values()].sort((a, b) => a.localeCompare(b, "es"));
+  }, [productosParaImagenGeneral]);
 
   const tallasParaImagenGeneral = useMemo(() => {
     const tallas = new Set<string>();
@@ -143,16 +183,25 @@ export default function AdminProductosPage() {
       toast.error("No hay productos con variantes disponibles y segunda imagen");
       return;
     }
-    setSelectedGeneralProductIds(productosParaImagenGeneral.map((producto) => producto._id));
+    setSelectedGeneralCategorias(categoriasParaImagenGeneral);
+    setSelectedGeneralProductNames(nombresProductosParaImagenGeneral);
     setSelectedGeneralTallas(tallasParaImagenGeneral);
     setGeneralImageOpen(true);
   };
 
-  const toggleGeneralProduct = (productoId: string) => {
-    setSelectedGeneralProductIds((current) =>
-      current.includes(productoId)
-        ? current.filter((value) => value !== productoId)
-        : [...current, productoId]
+  const toggleGeneralCategory = (categoria: string) => {
+    setSelectedGeneralCategorias((current) =>
+      current.includes(categoria)
+        ? current.filter((value) => value !== categoria)
+        : [...current, categoria]
+    );
+  };
+
+  const toggleGeneralProduct = (productoNombre: string) => {
+    setSelectedGeneralProductNames((current) =>
+      current.includes(productoNombre)
+        ? current.filter((value) => value !== productoNombre)
+        : [...current, productoNombre]
     );
   };
 
@@ -184,7 +233,11 @@ export default function AdminProductosPage() {
   };
 
   const handleDownloadGeneralVariantsImage = async () => {
-    if (selectedGeneralProductIds.length === 0) {
+    if (selectedGeneralCategorias.length === 0) {
+      toast.error("Selecciona al menos una categoria");
+      return;
+    }
+    if (selectedGeneralProductNames.length === 0) {
       toast.error("Selecciona al menos un producto");
       return;
     }
@@ -192,10 +245,20 @@ export default function AdminProductosPage() {
       toast.error("Selecciona al menos una talla");
       return;
     }
+    const categoriasSeleccionadas = new Set(selectedGeneralCategorias);
+    const productosSeleccionados = new Set(selectedGeneralProductNames.map((nombre) => nombre.toLocaleLowerCase("es")));
+    const selectedProductIds = productosParaImagenGeneral
+      .filter((producto) => categoriasSeleccionadas.has(producto.categoria?.trim() || "Sin categoria"))
+      .filter((producto) => productosSeleccionados.has((producto.nombre.trim() || "Sin nombre").toLocaleLowerCase("es")))
+      .map((producto) => producto._id);
+    if (selectedProductIds.length === 0) {
+      toast.error("No hay modelos disponibles para esa seleccion");
+      return;
+    }
     setDownloadingImageId("GENERAL");
     try {
       await generarImagenGeneralVariantesDisponibles(productos, {
-        productoIds: selectedGeneralProductIds,
+        productoIds: selectedProductIds,
         tallas: selectedGeneralTallas,
       });
       toast.success("Imagen general descargada");
@@ -286,35 +349,60 @@ export default function AdminProductosPage() {
       )}
       {generalImageOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+          <div className="w-full max-w-6xl rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-white">Imagen general de variantes</h2>
-              <p className="mt-1 text-sm text-gray-400">Elige los productos y tallas que quieres incluir.</p>
+              <p className="mt-1 text-sm text-gray-400">Elige categorias, productos y tallas que quieres incluir.</p>
             </div>
-            <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <div className="grid gap-6 lg:grid-cols-[240px_1fr_280px]">
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-medium text-white">Categorias</h3>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralCategorias(categoriasParaImagenGeneral)}>Todas</button>
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralCategorias([])}>Limpiar</button>
+                  </div>
+                </div>
+                <div className="grid max-h-96 gap-3 overflow-y-auto pr-1">
+                  {categoriasParaImagenGeneral.map((categoria) => (
+                    <label key={categoria} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedGeneralCategorias.includes(categoria)}
+                        onChange={() => toggleGeneralCategory(categoria)}
+                        className="h-4 w-4"
+                      />
+                      <span>{categoria}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
               <section>
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h3 className="font-medium text-white">Productos</h3>
                   <div className="flex gap-2">
-                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductIds(productosParaImagenGeneral.map((producto) => producto._id))}>Todos</button>
-                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductIds([])}>Limpiar</button>
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductNames(gruposProductosParaImagenGeneral.map((group) => group.nombre))}>Todos</button>
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductNames([])}>Limpiar</button>
                   </div>
                 </div>
                 <div className="grid max-h-96 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
-                  {productosParaImagenGeneral.map((producto) => (
-                    <label key={producto._id} className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                  {gruposProductosParaImagenGeneral.map((grupo) => (
+                    <label key={grupo.nombre} className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
                       <input
                         type="checkbox"
-                        checked={selectedGeneralProductIds.includes(producto._id)}
-                        onChange={() => toggleGeneralProduct(producto._id)}
+                        checked={selectedGeneralProductNames.includes(grupo.nombre)}
+                        onChange={() => toggleGeneralProduct(grupo.nombre)}
                         className="mt-1 h-4 w-4"
                       />
                       <span>
-                        <span className="block font-medium text-white">{producto.nombre}</span>
-                        <span className="block text-gray-400">{producto.modelo}</span>
+                        <span className="block font-medium text-white">{grupo.nombre}</span>
+                        <span className="block text-gray-400">{grupo.modelos.length} modelos: {grupo.modelos.join(", ")}</span>
                       </span>
                     </label>
                   ))}
+                  {gruposProductosParaImagenGeneral.length === 0 && (
+                    <p className="col-span-full rounded-lg border border-white/10 bg-white/5 px-3 py-4 text-sm text-gray-400">No hay productos para las categorias seleccionadas.</p>
+                  )}
                 </div>
               </section>
               <section>
