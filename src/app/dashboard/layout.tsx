@@ -35,7 +35,7 @@ export default function DashboardLayout({
     <div className="flex min-h-screen bg-primary text-primary overflow-hidden font-outfit transition-colors">
       <Sidebar role={user.rol} />
 
-      <main className="page-glow flex-1 overflow-y-auto p-4 pt-24 md:p-6 transition-colors">
+      <main className="page-glow flex-1 overflow-y-auto p-0 pt-16 md:p-6 transition-colors">
         <div className="mx-auto max-w-7xl space-y-6">
           {children}
         </div>

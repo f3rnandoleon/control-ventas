@@ -17,10 +17,7 @@ export default function AdminNuevaVentaPage() {
   }, [refreshKey]);
 
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-l text-gray-400">Seleccione un producto.</p>
-      </div>
+    <div>
       <VentaPOS productos={productos} onSuccess={() => setRefreshKey((key) => key + 1)} />
     </div>
   );

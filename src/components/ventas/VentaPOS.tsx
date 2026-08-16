@@ -168,7 +168,7 @@ export default function VentaPOS({
   };
 
   return (
-    <div className="surface-card-strong flex h-[calc(100dvh-8rem)] min-h-0 flex-col overflow-hidden rounded-2xl md:h-[calc(100dvh-3rem)]">
+    <div className="surface-card-strong flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
       <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           Seleccione los productos.
@@ -260,7 +260,7 @@ export default function VentaPOS({
       <button
         type="button"
         onClick={() => setListaCompleta(true)}
-        className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-2xl shadow-sky-900/25 transition hover:bg-sky-500"
+        className="fixed bottom-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-2xl shadow-sky-900/25 transition hover:bg-sky-500 sm:text-sm"
       >
         <span>Lista de venta</span>
         <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{fields.length}</span>
@@ -269,16 +269,17 @@ export default function VentaPOS({
 
       {listaCompleta && (
         <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm">
-          <div className="surface-card-strong absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col rounded-t-2xl p-4 shadow-2xl sm:p-5">
+          <div className="surface-card-strong absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col rounded-t-2xl p-3 shadow-2xl sm:p-5">
             <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-bold">Lista de venta</h3>
-                <p className="text-xs text-gray-400">Productos seleccionados para confirmar.</p>
+                <h3 className="text-base font-bold sm:text-lg">Lista de venta</h3>
+                <p className="text-[11px] text-gray-400 sm:text-xs">Variantes seleccionadas para confirmar.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setListaCompleta(false)}
-                className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-white/10"
+                aria-label="Ocultar lista de venta"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-xl font-bold text-[var(--accent-strong)] hover:bg-white/10"
               >
                 v
               </button>
@@ -297,48 +298,85 @@ export default function VentaPOS({
               ))}
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto text-sm sm:text-base lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start">
-              <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:text-xs">Descuento</label>
-                <div className="flex gap-2">
-                  <div className="flex overflow-hidden rounded-xl border border-white/10">
-                    <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>Bs</button>
-                    <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>%</button>
-                  </div>
-                  <input
-                    type="number"
-                    min={0}
-                    max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
-                    step="0.01"
-                    value={valorDescuento || ""}
-                    onChange={(event) => handleDescuentoChange(Number(event.target.value) || 0)}
-                    placeholder="0.00"
-                    className="input min-w-0 flex-1 px-3 py-2 text-sm"
-                  />
+            <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto text-xs sm:gap-4 sm:text-sm lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start">
+              <div className="surface-subcard max-h-64 overflow-y-auto rounded-xl p-3 sm:max-h-[58vh] sm:p-4">
+                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:text-xs">Variantes agregadas</h4>
+                <div className="space-y-2">
+                  {fields.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-gray-400">
+                      Todavia no agregaste variantes.
+                    </p>
+                  )}
+                  {fields.map((field, index) => {
+                    const item = watchedItems[index];
+                    const producto = productos.find((p) => p._id === item?.productoId);
+                    const cantidad = item?.cantidad || 1;
+                    const precio = producto?.precioVenta ?? 0;
+
+                    return (
+                      <div key={field.id} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="line-clamp-1 font-semibold">{producto?.nombre || "Producto"}</p>
+                            <p className="line-clamp-1 text-[11px] text-gray-400 sm:text-xs">{producto?.modelo || "-"}</p>
+                            <p className="mt-1 text-[11px] text-gray-400 sm:text-xs">
+                              {item.color}{item.colorSecundario ? ` / ${item.colorSecundario}` : ""} - Talla {item.talla}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[11px] text-gray-400 sm:text-xs">Cant. {cantidad}</p>
+                            <p className="font-bold text-cyan-300">{formatMoney(precio * cantidad)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
-            <div className="flex justify-between text-sm text-gray-400">
-              <span>Subtotal</span>
-              <span>{formatMoney(subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-amber-300">
-              <span>Descuento</span>
-              <span>-{formatMoney(montoDescuento)}</span>
-            </div>
-            <div className="flex items-end justify-between border-t border-white/10 pt-3">
-              <span className="font-semibold text-gray-300">Total</span>
-              <span className="text-2xl font-bold">{formatMoney(total)}</span>
-            </div>
-            <button
-              type="button"
-              className="btn-primary w-full py-3 text-base"
-              onClick={handleSubmit(onSubmit)}
-              disabled={isSubmitting || fields.length === 0}
-            >
-              {isSubmitting ? "Procesando..." : "Confirmar venta"}
-            </button>
+              <div className="space-y-3">
+                <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:text-xs">Descuento</label>
+                  <div className="flex gap-2">
+                    <div className="flex overflow-hidden rounded-xl border border-white/10">
+                      <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>Bs</button>
+                      <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>%</button>
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
+                      step="0.01"
+                      value={valorDescuento || ""}
+                      onChange={(event) => handleDescuentoChange(Number(event.target.value) || 0)}
+                      placeholder="0.00"
+                      className="input min-w-0 flex-1 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
+                  <div className="flex justify-between text-xs text-gray-400 sm:text-sm">
+                    <span>Subtotal</span>
+                    <span>{formatMoney(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-amber-300 sm:text-sm">
+                    <span>Descuento</span>
+                    <span>-{formatMoney(montoDescuento)}</span>
+                  </div>
+                  <div className="flex items-end justify-between border-t border-white/10 pt-3">
+                    <span className="font-semibold text-gray-300">Total</span>
+                    <span className="text-xl font-bold sm:text-2xl">{formatMoney(total)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary w-full py-3 text-sm sm:text-base"
+                    onClick={handleSubmit(onSubmit)}
+                    disabled={isSubmitting || fields.length === 0}
+                  >
+                    {isSubmitting ? "Procesando..." : "Confirmar venta"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

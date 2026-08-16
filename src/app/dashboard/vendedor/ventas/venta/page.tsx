@@ -17,8 +17,7 @@ export default function VendedorNuevaVentaPage() {
   }, [refreshKey]);
 
   return (
-    <div className="space-y-3">
-      
+    <div>
       <VentaPOS productos={productos} onSuccess={() => setRefreshKey((key) => key + 1)} />
     </div>
   );
