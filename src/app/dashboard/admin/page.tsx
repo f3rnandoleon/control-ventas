@@ -60,7 +60,7 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <Link
-          href="/dashboard/admin/ventas?vista=nueva"
+          href="/dashboard/admin/ventas/venta"
           className="btn-primary w-full text-center lg:w-auto"
         >
           Registrar venta

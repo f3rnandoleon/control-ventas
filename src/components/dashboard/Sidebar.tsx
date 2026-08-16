@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import {
@@ -11,13 +11,19 @@ import {
 } from "./dashboardMenu";
 
 export default function Sidebar({ role }: { role: string }) {
-  const items = dashboardMenu[role as DashboardRole] || [];
+  const items = useMemo(() => dashboardMenu[role as DashboardRole] || [], [role]);
   const { logout, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   const [openLogout, setOpenLogout] = useState(false);
   const [openMobile, setOpenMobile] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+
+  useEffect(() => {
+    const activeGroup = items.find((item) => item.children?.some((child) => pathname === child.href));
+    setOpenGroup(activeGroup?.href ?? null);
+  }, [items, pathname]);
 
   const handleLogout = () => {
     logout();
@@ -50,8 +56,53 @@ export default function Sidebar({ role }: { role: string }) {
 
       <nav className="flex-1 space-y-2">
         {items.map((item) => {
+          const hasChildren = Boolean(item.children?.length);
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isOpen = openGroup === item.href;
+
+          if (hasChildren) {
+            return (
+              <div key={item.href} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setOpenGroup((current) => current === item.href ? null : item.href)}
+                  aria-expanded={isOpen}
+                  className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
+                    isActive
+                      ? "bg-sky-600 text-white shadow-[0_12px_24px_rgba(2,132,199,0.22)]"
+                      : "text-slate-700 hover:bg-sky-50 hover:text-sky-800"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <span className="text-xs">{isOpen ? "^" : "v"}</span>
+                </button>
+                {isOpen && (
+                  <div className="ml-3 space-y-1 border-l border-sky-100 pl-3">
+                    {item.children?.map((child) => {
+                      const childActive = pathname === child.href;
+
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={() => setOpenMobile(false)}
+                          aria-current={childActive ? "page" : undefined}
+                          className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
+                            childActive
+                              ? "bg-sky-100 text-sky-900"
+                              : "text-slate-600 hover:bg-sky-50 hover:text-sky-800"
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return (
             <Link

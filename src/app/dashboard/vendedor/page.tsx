@@ -44,7 +44,7 @@ export default function VendedorDashboardPage() {
 
       <div className="flex gap-4">
         <Link
-          href="/dashboard/vendedor/ventas?vista=nueva"
+          href="/dashboard/vendedor/ventas/venta"
           className="btn-primary"
         >
           Registrar venta
@@ -56,7 +56,7 @@ export default function VendedorDashboardPage() {
           Ver productos
         </Link>
         <Link
-          href="/dashboard/vendedor/inventario"
+          href="/dashboard/vendedor/inventario/stock"
           className="btn-secondary"
         >
           Revisar inventario
