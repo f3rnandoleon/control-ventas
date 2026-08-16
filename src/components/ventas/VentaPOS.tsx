@@ -1,52 +1,34 @@
 "use client";
+
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState } from "react";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import { createPedidoSchema } from "@/schemas/pedido.schema";
 import { createVenta } from "@/services/pedidos.service";
-import { Producto } from "@/types/producto";
+import type { Producto } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
-import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
-// Tipo extendido para incluir stock disponible en el formulario (no se envía al backend)
 type VentaFormValues = z.input<typeof createPedidoSchema>;
 type VentaFormSubmitValues = z.output<typeof createPedidoSchema>;
 type VentaFormItem = VentaFormValues["items"][number];
 type VentaVariant = Producto["variantes"][number];
 
-const buildVariantOptionValue = (
-  variant: Pick<VentaVariant, "varianteId" | "color" | "colorSecundario" | "talla">
-) =>
-  variant.varianteId ||
-  [variant.color, variant.colorSecundario || "", variant.talla].join("|");
+const getStockDisponible = (variant: VentaVariant) => variant.stockDisponible ?? variant.stock ?? 0;
 
-const buildSelectedVariantValue = (
-  item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>
-) => {
-  if (typeof item.varianteId === "string" && item.varianteId) {
-    return item.varianteId;
-  }
+const getVariantKey = (variant: Pick<VentaVariant, "varianteId" | "color" | "colorSecundario" | "talla">) =>
+  variant.varianteId || [variant.color, variant.colorSecundario || "", variant.talla].join("|");
 
-  if (item.color && item.talla) {
-    return [item.color, item.colorSecundario || "", item.talla].join("|");
-  }
+const getItemKey = (item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>) =>
+  item.varianteId || [item.color || "", item.colorSecundario || "", item.talla || ""].join("|");
 
-  return "";
-};
-
-const formatVariantLabel = (
-  variant: Pick<VentaVariant, "color" | "colorSecundario" | "talla">
-) => `${variant.color}${variant.colorSecundario ? `/${variant.colorSecundario}` : ""} - ${variant.talla}`;
-
-const matchesSelectedVariant = (
+const matchesVariant = (
   variant: VentaVariant,
   item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>
 ) => {
-  if (item.varianteId && variant.varianteId) {
-    return variant.varianteId === item.varianteId;
-  }
+  if (item.varianteId && variant.varianteId) return variant.varianteId === item.varianteId;
 
   return (
     variant.color === item.color &&
@@ -54,6 +36,13 @@ const matchesSelectedVariant = (
     (variant.colorSecundario || "") === (item.colorSecundario || "")
   );
 };
+
+const getProductoImage = (producto: Producto) => {
+  const variantWithImage = producto.variantes.find((variant) => getVarianteImagenPrincipal(variant));
+  return variantWithImage ? getVarianteImagenPrincipal(variantWithImage) : undefined;
+};
+
+const formatMoney = (value: number) => `Bs ${value.toFixed(2)}`;
 
 export default function VentaPOS({
   productos,
@@ -81,37 +70,41 @@ export default function VentaPOS({
     mode: "onChange",
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "items",
-  });
-
-  // Estado local para el tipo de descuento (Bs o %)
+  const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  const [search, setSearch] = useState("");
+  const [categoriaActiva, setCategoriaActiva] = useState("TODO");
+  const [productoActivoId, setProductoActivoId] = useState<string | null>(null);
   const [tipoDescuento, setTipoDescuento] = useState<"BS" | "PORCENTAJE">("BS");
   const [valorDescuento, setValorDescuento] = useState<number>(0);
 
-  const agregarItem = () => {
-    append({
-      productoId: "",
-      varianteId: undefined,
-      color: "",
-      colorSecundario: "",
-      talla: "",
-      cantidad: 1,
-    });
-  };
-
-  // Observar items para calcular totales
   const watchedItems = watch("items") ?? [];
+  const metodoPago = watch("metodoPago");
 
-  const subtotal = watchedItems?.reduce((sum, item) => {
-    if (!item.productoId || !item.cantidad) return sum;
+  const categorias = useMemo(() => {
+    const values = productos.map((producto) => producto.categoria?.trim()).filter(Boolean) as string[];
+    return ["TODO", ...Array.from(new Set(values))];
+  }, [productos]);
+
+  const productosFiltrados = useMemo(() => {
+    const text = search.trim().toLowerCase();
+
+    return productos.filter((producto) => {
+      const matchesCategoria = categoriaActiva === "TODO" || producto.categoria === categoriaActiva;
+      const matchesSearch = !text || [producto.nombre, producto.modelo, producto.sku]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(text));
+
+      return matchesCategoria && matchesSearch;
+    });
+  }, [categoriaActiva, productos, search]);
+
+  const productoActivo = productos.find((producto) => producto._id === productoActivoId) ?? null;
+
+  const subtotal = watchedItems.reduce((sum, item) => {
     const producto = productos.find((p) => p._id === item.productoId);
-    if (!producto) return sum;
-    return sum + producto.precioVenta * item.cantidad;
-  }, 0) || 0;
+    return sum + (producto?.precioVenta ?? 0) * (item.cantidad || 0);
+  }, 0);
 
-  // Calcular el monto de descuento en Bs
   const montoDescuento =
     tipoDescuento === "PORCENTAJE"
       ? Math.min((valorDescuento / 100) * subtotal, subtotal)
@@ -119,13 +112,51 @@ export default function VentaPOS({
 
   const total = Math.max(subtotal - montoDescuento, 0);
 
-  const handleDescuentoChange = (val: number) => {
-    const cleaned = Math.max(0, val);
-    if (tipoDescuento === "PORCENTAJE" && cleaned > 100) {
-      setValorDescuento(100);
-    } else {
-      setValorDescuento(cleaned);
+  const handleDescuentoChange = (value: number) => {
+    const cleaned = Math.max(0, value);
+    setValorDescuento(tipoDescuento === "PORCENTAJE" ? Math.min(cleaned, 100) : Math.min(cleaned, subtotal));
+  };
+
+  const addVariant = (producto: Producto, variant: VentaVariant) => {
+    const stockDisponible = getStockDisponible(variant);
+    if (stockDisponible <= 0) {
+      toast.error("Esta variante no tiene stock disponible");
+      return;
     }
+
+    const existingIndex = watchedItems.findIndex(
+      (item) => item.productoId === producto._id && getItemKey(item) === getVariantKey(variant)
+    );
+
+    if (existingIndex >= 0) {
+      const nextQuantity = (watchedItems[existingIndex].cantidad || 0) + 1;
+      if (nextQuantity > stockDisponible) {
+        toast.error("No hay mas stock disponible para esta variante");
+        return;
+      }
+
+      setValue(`items.${existingIndex}.cantidad`, nextQuantity, { shouldValidate: true });
+      return;
+    }
+
+    append({
+      productoId: producto._id,
+      varianteId: variant.varianteId,
+      color: variant.color,
+      colorSecundario: variant.colorSecundario || "",
+      talla: variant.talla,
+      cantidad: 1,
+    });
+  };
+
+  const updateQuantity = (index: number, quantity: number) => {
+    const item = watchedItems[index];
+    const producto = productos.find((p) => p._id === item?.productoId);
+    const variant = producto?.variantes.find((v) => matchesVariant(v, item));
+    const stockDisponible = variant ? getStockDisponible(variant) : 0;
+    const nextQuantity = Math.max(1, Math.min(quantity, stockDisponible || 1));
+
+    setValue(`items.${index}.cantidad`, nextQuantity, { shouldValidate: true });
   };
 
   const onSubmit = async (data: VentaFormSubmitValues) => {
@@ -151,387 +182,322 @@ export default function VentaPOS({
 
       reset({ items: [], metodoPago: "EFECTIVO", canal: "TIENDA", descuento: 0 });
       setValorDescuento(0);
+      setProductoActivoId(null);
 
       toast.success("Venta registrada correctamente");
       onSuccess();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error al registrar venta";
-      toast.error(message)
+      toast.error(err instanceof Error ? err.message : "Error al registrar venta");
     }
   };
 
   return (
-    <div className="bg-gray-900/50 border border-white/10 rounded-2xl p-6 space-y-6 shadow-2xl backdrop-blur-sm">
-      <div className="flex justify-between items-center border-b border-white/10 pb-4">
-        <h2 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
-          <span>🛍️</span> Nueva venta
-        </h2>
-        <span className="text-sm text-gray-400 bg-white/5 px-3 py-1 rounded-full">
-          {fields.length} {fields.length === 1 ? 'item' : 'items'}
-        </span>
-      </div>
-
-      {/* Header de la tabla */}
-      {fields.length > 0 && (
-        <div className="grid grid-cols-[auto_3fr_2fr_1fr_1fr_1fr_auto] gap-4 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          <div>Imagen</div>
-          <div>Producto</div>
-          <div>Variante</div>
-          <div className="text-center">Cant</div>
-          <div className="text-right">Precio</div>
-          <div className="text-right">Subtotal</div>
-          <div></div>
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <section className="space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Selecciona los productos</h2>
+            <p className="text-sm text-gray-400">Busca por nombre, modelo o SKU y elige una variante disponible.</p>
+          </div>
+          <div className="rounded-full bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-300">
+            {fields.length} {fields.length === 1 ? "item" : "items"}
+          </div>
         </div>
-      )}
 
-      <div className="space-y-3">
-        {fields.map((field, index) => {
-          const currentItem = watchedItems[index] ?? {
-            productoId: "",
-            varianteId: undefined,
-            color: "",
-            colorSecundario: "",
-            talla: "",
-            cantidad: 1,
-          };
-          const productoSeleccionado = productos.find(p => p._id === currentItem.productoId);
-          const varianteSeleccionada = productoSeleccionado?.variantes.find(
-            (v) => matchesSelectedVariant(v, currentItem)
-          );
-          const imagenVariante = getVarianteImagenPrincipal(varianteSeleccionada);
-          const stockDisponible = varianteSeleccionada?.stockDisponible ?? varianteSeleccionada?.stock ?? 0;
-          const varianteLabel = varianteSeleccionada
-            ? formatVariantLabel(varianteSeleccionada)
-            : "Variante sin seleccionar";
-          const selectedVariantValue = buildSelectedVariantValue(currentItem);
-          const precio = productoSeleccionado?.precioVenta || 0;
-          const subtotalItem = precio * (currentItem.cantidad || 0);
+        <div className="relative">
+          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-500">⌕</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nombre, modelo o SKU..."
+            className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-gray-500 focus:border-cyan-400/60 focus:bg-white/10"
+          />
+        </div>
 
-          return (
-            <div
-              key={field.id}
-              className="grid grid-cols-[auto_3fr_2fr_1fr_1fr_1fr_auto] gap-4 items-center bg-white/5 p-3 rounded-lg border border-white/5 hover:border-white/10 transition-colors group"
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {categorias.map((categoria) => (
+            <button
+              key={categoria}
+              type="button"
+              onClick={() => setCategoriaActiva(categoria)}
+              className={`shrink-0 rounded-2xl border px-5 py-3 text-sm font-bold transition ${
+                categoriaActiva === categoria
+                  ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                  : "border-white/10 bg-white/5 text-gray-300 hover:border-white/20 hover:bg-white/10"
+              }`}
             >
-              {/* 0. Imagen de Variante */}
-              <div className="flex items-center justify-center">
-                {imagenVariante ? (
+              {categoria}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+          {productosFiltrados.map((producto) => {
+            const image = getProductoImage(producto);
+            const stockDisponible = producto.variantes.reduce((sum, variant) => sum + getStockDisponible(variant), 0);
+            const disabled = stockDisponible <= 0;
+
+            return (
+              <button
+                key={producto._id}
+                type="button"
+                onClick={() => setProductoActivoId((current) => current === producto._id ? null : producto._id)}
+                className={`group relative min-h-72 overflow-hidden rounded-2xl border text-left shadow-xl transition ${
+                  productoActivoId === producto._id
+                    ? "border-blue-400 ring-2 ring-blue-400/40"
+                    : "border-white/10 hover:border-white/20"
+                } ${disabled ? "opacity-55" : ""}`}
+              >
+                {image ? (
                   <CloudinaryImage
-                    src={imagenVariante}
-                    alt={varianteLabel}
-                    width={64}
-                    height={64}
-                    className="w-16 h-16 object-cover rounded-lg border border-white/20 shadow-md"
+                    src={image}
+                    alt={producto.nombre}
+                    width={500}
+                    height={620}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-16 h-16 bg-gray-800/50 border border-white/10 rounded-lg flex items-center justify-center text-gray-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
+                  <div className="absolute inset-0 bg-slate-800" />
                 )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/10" />
+                <div className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-3xl font-light text-white shadow-lg">
+                  +
+                </div>
+                <div className="absolute inset-x-0 bottom-0 space-y-1 p-5">
+                  <p className="line-clamp-1 text-lg font-bold text-white drop-shadow">{producto.nombre}</p>
+                  <p className="line-clamp-1 text-sm text-white/80">{producto.modelo}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-2xl font-bold text-white drop-shadow">{formatMoney(producto.precioVenta)}</p>
+                    <p className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+                      Stock {stockDisponible}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {productosFiltrados.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-gray-400">
+            No hay productos que coincidan con la busqueda.
+          </div>
+        )}
+
+        {productoActivo && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-white">{productoActivo.nombre}</h3>
+                <p className="text-sm text-gray-400">{productoActivo.modelo}</p>
               </div>
-
-              {/* 1. Producto */}
-              <select
-                {...register(`items.${index}.productoId` as const)}
-                className="input-chroma w-full text-sm bg-gray-800/50 rounded-md border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 py-1.5"
-                onChange={(e) => {
-                  const pid = e.target.value;
-                  setValue(`items.${index}.productoId`, pid);
-                  setValue(`items.${index}.varianteId`, undefined);
-                  setValue(`items.${index}.color`, "");
-                  setValue(`items.${index}.colorSecundario`, "");
-                  setValue(`items.${index}.talla`, "");
-                  setValue(`items.${index}.cantidad`, 1);
-                }}
+              <button
+                type="button"
+                onClick={() => setProductoActivoId(null)}
+                className="rounded-full border border-white/10 px-3 py-1 text-sm text-gray-300 hover:bg-white/10"
               >
-                <option value="">Seleccionar producto...</option>
-                {productos.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.nombre} - {p.modelo}
-                  </option>
-                ))}
-              </select>
+                Cerrar
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {productoActivo.variantes.map((variant, index) => {
+                const image = getVarianteImagenPrincipal(variant) || getProductoImage(productoActivo);
+                const stockDisponible = getStockDisponible(variant);
+                const disabled = stockDisponible <= 0;
 
-              {/* 2. Variante */}
-              <div className="relative">
-                <select
-                  className="input-chroma w-full text-sm bg-gray-800/50 rounded-md border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 py-1.5 disabled:opacity-50"
-                  disabled={!currentItem.productoId}
-                  value={selectedVariantValue}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) return;
-                    const variante = productoSeleccionado?.variantes.find(
-                      (v) => buildVariantOptionValue(v) === val
-                    );
+                return (
+                  <button
+                    key={`${getVariantKey(variant)}-${index}`}
+                    type="button"
+                    onClick={() => addVariant(productoActivo, variant)}
+                    disabled={disabled}
+                    className="flex gap-3 rounded-xl border border-white/10 bg-slate-950/40 p-3 text-left transition hover:border-blue-400/60 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {image ? (
+                      <CloudinaryImage
+                        src={image}
+                        alt={`${productoActivo.nombre} ${variant.color} ${variant.talla}`}
+                        width={96}
+                        height={96}
+                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="h-20 w-20 shrink-0 rounded-lg bg-slate-800" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-white">
+                        {variant.color}{variant.colorSecundario ? ` / ${variant.colorSecundario}` : ""}
+                      </p>
+                      <p className="text-sm text-gray-400">Talla {variant.talla}</p>
+                      <p className="mt-2 text-sm font-semibold text-cyan-300">Stock {stockDisponible}</p>
+                    </div>
+                    <span className="self-center rounded-full bg-blue-600 px-3 py-1 text-lg leading-none text-white">+</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
-                    if (variante) {
-                      setValue(`items.${index}.varianteId`, variante.varianteId);
-                      setValue(`items.${index}.color`, variante.color);
-                      setValue(`items.${index}.colorSecundario`, variante.colorSecundario || "");
-                      setValue(`items.${index}.talla`, variante.talla);
-                      // Reset cantidad si excede stock
-                      const disponible = variante.stockDisponible ?? variante.stock;
-                      if (currentItem.cantidad > disponible) {
-                        setValue(`items.${index}.cantidad`, disponible);
-                      }
-                    }
-                  }}
-                >
-                  <option value="">Variante...</option>
-                  {productoSeleccionado?.variantes.map((v, optionIndex) => (
-                    <option
-                      key={`${buildVariantOptionValue(v)}-${optionIndex}`}
-                      value={buildVariantOptionValue(v)}
-                      disabled={(v.stockDisponible ?? v.stock) <= 0}
-                    >
-                      {formatVariantLabel(v)} ({v.stockDisponible ?? v.stock})
-                    </option>
-                  ))}
-                </select>
-                {/* Campos ocultos */}
+      <aside className="space-y-4 rounded-2xl border border-white/10 bg-slate-950/70 p-4 shadow-2xl xl:sticky xl:top-6 xl:self-start">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-white">Lista de venta</h3>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-sm text-gray-300">{fields.length}</span>
+        </div>
+
+        <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1 xl:max-h-[48vh]">
+          {fields.length === 0 && (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-6 text-center text-sm text-gray-400">
+              Todavia no agregaste productos.
+            </div>
+          )}
+
+          {fields.map((field, index) => {
+            const item = watchedItems[index];
+            const producto = productos.find((p) => p._id === item?.productoId);
+            const variant = producto?.variantes.find((v) => matchesVariant(v, item));
+            const image = variant ? getVarianteImagenPrincipal(variant) || (producto ? getProductoImage(producto) : undefined) : undefined;
+            const stockDisponible = variant ? getStockDisponible(variant) : 0;
+            const precio = producto?.precioVenta ?? 0;
+            const cantidad = item?.cantidad || 1;
+
+            return (
+              <div key={field.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="flex gap-3">
+                  {image ? (
+                    <CloudinaryImage
+                      src={image}
+                      alt={producto?.nombre || "Producto"}
+                      width={88}
+                      height={88}
+                      className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 shrink-0 rounded-lg bg-slate-800" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="line-clamp-1 font-semibold text-white">{producto?.nombre || "Producto"}</p>
+                        <p className="line-clamp-1 text-xs text-gray-400">{producto?.modelo || "-"}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="rounded-full px-2 py-1 text-sm text-red-300 hover:bg-red-500/10"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-300">
+                      {item.color}{item.colorSecundario ? ` / ${item.colorSecundario}` : ""} · Talla {item.talla}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="flex h-9 items-center overflow-hidden rounded-lg border border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(index, cantidad - 1)}
+                          className="h-full px-3 text-lg text-gray-300 hover:bg-white/10"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          {...register(`items.${index}.cantidad`, { valueAsNumber: true, min: 1 })}
+                          min={1}
+                          max={stockDisponible}
+                          onChange={(event) => updateQuantity(index, Number(event.target.value) || 1)}
+                          className="h-full w-12 border-x border-white/10 bg-transparent text-center text-sm text-white outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(index, cantidad + 1)}
+                          disabled={cantidad >= stockDisponible}
+                          className="h-full px-3 text-lg text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Stock {stockDisponible}</p>
+                        <p className="font-bold text-cyan-300">{formatMoney(precio * cantidad)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <input type="hidden" {...register(`items.${index}.productoId`)} />
                 <input type="hidden" {...register(`items.${index}.varianteId`)} />
                 <input type="hidden" {...register(`items.${index}.color`)} />
                 <input type="hidden" {...register(`items.${index}.colorSecundario`)} />
                 <input type="hidden" {...register(`items.${index}.talla`)} />
               </div>
-
-              {/* 3. Cantidad con Clamping */}
-              <div className="relative">
-                <input
-                  type="number"
-                  {...register(`items.${index}.cantidad`, {
-                    valueAsNumber: true,
-                    min: 1
-                  })}
-                  onChange={(e) => {
-                    let val = parseInt(e.target.value);
-                    const max = stockDisponible;
-
-                    if (isNaN(val) || val < 1) val = 1;
-
-                    // 🔒 VALIDACIÓN ESTRICTA: No permitir superar el stock
-                    if (val > max && max > 0) {
-                      val = max;
-                    }
-
-                    // Forzamos el valor en el input y en el formulario
-                    e.target.value = val.toString();
-                    setValue(`items.${index}.cantidad`, val);
-                  }}
-                  className="input-chroma w-full text-center font-mono font-medium bg-gray-800/50 rounded-md border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 py-1.5"
-                  min={1}
-                  disabled={!stockDisponible}
-                />
-                {stockDisponible > 0 && (
-                  <div className="absolute -top-3 right-0 bg-cyan-900/80 text-cyan-200 text-[10px] px-1.5 py-0.5 rounded border border-cyan-800 shadow-sm pointer-events-none">
-                    Max: {stockDisponible}
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Precio */}
-              <div className="text-right text-gray-400 text-sm font-mono">
-                {precio > 0 ? `Bs ${precio}` : '-'}
-              </div>
-
-              {/* 5. Subtotal */}
-              <div className="text-right text-cyan-400 font-bold text-sm font-mono">
-                {subtotalItem > 0 ? `Bs ${subtotalItem.toFixed(2)}` : '-'}
-              </div>
-
-              {/* 6. Eliminar */}
-              <button
-                type="button"
-                className="text-gray-500 hover:text-red-400 hover:bg-red-400/10 p-2 rounded-full transition-all flex items-center justify-center"
-                onClick={() => remove(index)}
-                title="Quitar item"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          );
-        })}
-
-        {fields.length === 0 && (
-          <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-xl text-gray-500 bg-white/5">
-            <p className="mb-2">No hay productos en la venta</p>
-            <button
-              type="button"
-              onClick={agregarItem}
-              className="text-cyan-400 hover:text-cyan-300 font-medium hover:underline focus:outline-none"
-            >
-              Comenzar agregando uno
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="pt-4 border-t border-white/10">
-        <button
-          type="button"
-          className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors px-2 py-1 rounded hover:bg-cyan-900/10"
-          onClick={agregarItem}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Agregar otro producto
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end bg-black/20 p-5 rounded-xl border border-white/5">
-        <div className="space-y-4">
-          {/* Método de Pago */}
-          <div className="space-y-2">
-            <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Método de Pago</label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className={`cursor-pointer border rounded-lg p-3 text-center transition-all flex items-center justify-center gap-2 ${watch("metodoPago") === "EFECTIVO"
-                ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-                : "bg-white/5 border-white/10 hover:border-white/20 text-gray-400"
-                }`}>
-                <input type="radio" {...register("metodoPago")} value="EFECTIVO" className="hidden" />
-                <span>💵</span> <span className="font-medium">Efectivo</span>
-              </label>
-              <label className={`cursor-pointer border rounded-lg p-3 text-center transition-all flex items-center justify-center gap-2 ${watch("metodoPago") === "QR"
-                ? "bg-purple-500/20 border-purple-500 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
-                : "bg-white/5 border-white/10 hover:border-white/20 text-gray-400"
-                }`}>
-                <input type="radio" {...register("metodoPago")} value="QR" className="hidden" />
-                <span>📱</span> <span className="font-medium">QR</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Descuento */}
-          <div className="space-y-2">
-            <label className="text-xs text-gray-400 font-medium uppercase tracking-wider flex items-center gap-2">
-              <span>🏷️</span> Descuento
-            </label>
-            <div className="flex gap-2 items-stretch">
-              {/* Toggle Bs / % */}
-              <div className="flex rounded-lg overflow-hidden border border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTipoDescuento("BS");
-                    setValorDescuento(0);
-                  }}
-                  className={`px-3 py-2 text-sm font-semibold transition-all ${
-                    tipoDescuento === "BS"
-                      ? "bg-amber-500/20 text-amber-300 border-r border-amber-500/40"
-                      : "bg-white/5 text-gray-500 hover:text-gray-300 border-r border-white/10"
-                  }`}
-                >
-                  Bs
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTipoDescuento("PORCENTAJE");
-                    setValorDescuento(0);
-                  }}
-                  className={`px-3 py-2 text-sm font-semibold transition-all ${
-                    tipoDescuento === "PORCENTAJE"
-                      ? "bg-amber-500/20 text-amber-300"
-                      : "bg-white/5 text-gray-500 hover:text-gray-300"
-                  }`}
-                >
-                  %
-                </button>
-              </div>
-
-              {/* Input de descuento */}
-              <div className="relative flex-1">
-                <input
-                  type="number"
-                  min={0}
-                  max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
-                  step="0.01"
-                  value={valorDescuento || ""}
-                  onChange={(e) => handleDescuentoChange(parseFloat(e.target.value) || 0)}
-                  placeholder={tipoDescuento === "BS" ? "0.00" : "0"}
-                  className="input-chroma w-full bg-gray-800/50 rounded-lg border-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 py-2 px-3 text-white placeholder-gray-600 font-mono"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
-                  {tipoDescuento === "PORCENTAJE" ? "%" : "Bs"}
-                </span>
-              </div>
-            </div>
-
-            {/* Vista previa del descuento */}
-            {montoDescuento > 0 && (
-              <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-                <span className="text-xs text-amber-300/70">Ahorro</span>
-                <span className="text-sm font-bold text-amber-400 font-mono">
-                  −Bs {montoDescuento.toFixed(2)}
-                  {tipoDescuento === "PORCENTAJE" && valorDescuento > 0 && (
-                    <span className="text-amber-500/70 text-xs ml-1">({valorDescuento}%)</span>
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
+            );
+          })}
         </div>
 
-        {/* Resumen y botón */}
-        <div className="space-y-4">
-          <div className="space-y-2 pb-3 border-b border-white/10">
-            {/* Subtotal */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">Subtotal</span>
-              <span className="text-sm text-gray-400 font-mono">Bs {subtotal.toFixed(2)}</span>
+        <div className="space-y-4 border-t border-white/10 pt-4">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Metodo de pago</label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-semibold transition ${metodoPago === "EFECTIVO" ? "border-cyan-500 bg-cyan-500/20 text-cyan-200" : "border-white/10 bg-white/5 text-gray-400 hover:bg-white/10"}`}>
+                <input type="radio" {...register("metodoPago")} value="EFECTIVO" className="hidden" />
+                Efectivo
+              </label>
+              <label className={`cursor-pointer rounded-xl border p-3 text-center text-sm font-semibold transition ${metodoPago === "QR" ? "border-cyan-500 bg-cyan-500/20 text-cyan-200" : "border-white/10 bg-white/5 text-gray-400 hover:bg-white/10"}`}>
+                <input type="radio" {...register("metodoPago")} value="QR" className="hidden" />
+                QR
+              </label>
             </div>
+          </div>
 
-            {/* Descuento */}
-            {montoDescuento > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-amber-400/80 flex items-center gap-1">
-                  <span>🏷️</span> Descuento
-                </span>
-                <span className="text-sm text-amber-400 font-mono font-semibold">
-                  −Bs {montoDescuento.toFixed(2)}
-                </span>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Descuento</label>
+            <div className="flex gap-2">
+              <div className="flex overflow-hidden rounded-xl border border-white/10">
+                <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-sm font-bold ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>Bs</button>
+                <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-sm font-bold ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>%</button>
               </div>
-            )}
+              <input
+                type="number"
+                min={0}
+                max={tipoDescuento === "PORCENTAJE" ? 100 : subtotal}
+                step="0.01"
+                value={valorDescuento || ""}
+                onChange={(event) => handleDescuentoChange(Number(event.target.value) || 0)}
+                placeholder="0.00"
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-amber-400/60"
+              />
+            </div>
+          </div>
 
-            {/* Total */}
-            <div className="flex justify-between items-end pt-1">
-              <span className="text-gray-400 font-medium">Total a Pagar</span>
-              <span className="text-3xl font-bold text-white tracking-tight">
-                <span className="text-2xl text-cyan-500 mr-1">Bs</span>
-                {total.toFixed(2)}
-              </span>
+          <div className="space-y-2 rounded-xl bg-white/5 p-4">
+            <div className="flex justify-between text-sm text-gray-400">
+              <span>Subtotal</span>
+              <span>{formatMoney(subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-sm text-amber-300">
+              <span>Descuento</span>
+              <span>-{formatMoney(montoDescuento)}</span>
+            </div>
+            <div className="flex items-end justify-between border-t border-white/10 pt-3">
+              <span className="font-semibold text-gray-300">Total</span>
+              <span className="text-3xl font-bold text-white">{formatMoney(total)}</span>
             </div>
           </div>
 
           <button
             type="button"
-            className="btn-primary w-full h-12 text-lg shadow-lg shadow-cyan-500/10 hover:shadow-cyan-500/20 transform hover:-translate-y-0.5 transition-all"
+            className="btn-primary w-full py-3 text-base"
             onClick={handleSubmit(onSubmit)}
             disabled={isSubmitting || fields.length === 0}
           >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Procesando...
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-2">
-                ✅ Confirmar Venta
-              </span>
-            )}
+            {isSubmitting ? "Procesando..." : "Confirmar venta"}
           </button>
         </div>
-      </div>
-
-
+      </aside>
     </div>
   );
 }
