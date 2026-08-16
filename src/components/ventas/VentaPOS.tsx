@@ -24,6 +24,19 @@ const getVariantKey = (variant: Pick<VentaVariant, "varianteId" | "color" | "col
 const getItemKey = (item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>) =>
   item.varianteId || [item.color || "", item.colorSecundario || "", item.talla || ""].join("|");
 
+const matchesVariant = (
+  variant: VentaVariant,
+  item: Partial<Pick<VentaFormItem, "varianteId" | "color" | "colorSecundario" | "talla">>
+) => {
+  if (item.varianteId && variant.varianteId) return variant.varianteId === item.varianteId;
+
+  return (
+    variant.color === item.color &&
+    variant.talla === item.talla &&
+    (variant.colorSecundario || "") === (item.colorSecundario || "")
+  );
+};
+
 const getProductoImage = (producto: Producto) => {
   const variantWithImage = producto.variantes.find((variant) => getVarianteImagenPrincipal(variant));
   return variantWithImage ? getVarianteImagenPrincipal(variantWithImage) : undefined;
@@ -57,7 +70,7 @@ export default function VentaPOS({
     mode: "onChange",
   });
 
-  const { fields, append } = useFieldArray({ control, name: "items" });
+  const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const [search, setSearch] = useState("");
   const [categoriaActiva, setCategoriaActiva] = useState("TODO");
   const [productoActivo, setProductoActivo] = useState<Producto | null>(null);
@@ -135,6 +148,16 @@ export default function VentaPOS({
     toast.success("Variante adicionada correctamente");
   };
 
+  const updateQuantity = (index: number, quantity: number) => {
+    const item = watchedItems[index];
+    const producto = productos.find((p) => p._id === item?.productoId);
+    const variant = producto?.variantes.find((v) => matchesVariant(v, item));
+    const stockDisponible = variant ? getStockDisponible(variant) : 0;
+    const nextQuantity = Math.max(1, Math.min(quantity, stockDisponible || 1));
+
+    setValue(`items.${index}.cantidad`, nextQuantity, { shouldValidate: true });
+  };
+
   const onSubmit = async (data: VentaFormSubmitValues) => {
     try {
       if (data.items.length === 0) {
@@ -168,7 +191,7 @@ export default function VentaPOS({
   };
 
   return (
-    <div className="surface-card-strong flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
+    <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
       <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           Seleccione los productos.
@@ -320,6 +343,7 @@ export default function VentaPOS({
                       );
                     });
                     const image = variant ? getVarianteImagenPrincipal(variant) || (producto ? getProductoImage(producto) : undefined) : undefined;
+                    const stockDisponible = variant ? getStockDisponible(variant) : 0;
                     const cantidad = item?.cantidad || 1;
                     const precio = producto?.precioVenta ?? 0;
 
@@ -348,6 +372,42 @@ export default function VentaPOS({
                             <p className="text-[11px] text-gray-400 sm:text-xs">Cant. {cantidad}</p>
                             <p className="font-bold text-cyan-300">{formatMoney(precio * cantidad)}</p>
                           </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/10 sm:text-xs"
+                          >
+                            Quitar
+                          </button>
+                          <div className="flex h-8 items-center overflow-hidden rounded-lg border border-white/10">
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(index, cantidad - 1)}
+                              disabled={cantidad <= 1}
+                              className="h-full px-3 text-sm text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              {...register(`items.${index}.cantidad`, { valueAsNumber: true, min: 1 })}
+                              min={1}
+                              max={stockDisponible}
+                              onChange={(event) => updateQuantity(index, Number(event.target.value) || 1)}
+                              className="h-full w-10 border-x border-white/10 bg-transparent text-center text-xs outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(index, cantidad + 1)}
+                              disabled={cantidad >= stockDisponible}
+                              className="h-full px-3 text-sm text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="text-[10px] text-gray-500 sm:text-xs">Stock {stockDisponible}</span>
                         </div>
                       </div>
                     );
