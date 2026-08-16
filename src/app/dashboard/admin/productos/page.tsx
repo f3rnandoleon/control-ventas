@@ -349,14 +349,14 @@ export default function AdminProductosPage() {
       )}
       {generalImageOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-6xl rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl sm:p-6">
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-white">Imagen general de variantes</h2>
               <p className="mt-1 text-sm text-gray-400">Elige categorias, productos y tallas que quieres incluir.</p>
             </div>
-            <div className="grid gap-6 lg:grid-cols-[240px_1fr_280px]">
+            <div className="grid gap-6 xl:grid-cols-[240px_1fr_280px]">
               <section>
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="font-medium text-white">Categorias</h3>
                   <div className="flex gap-2">
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralCategorias(categoriasParaImagenGeneral)}>Todas</button>
@@ -378,14 +378,14 @@ export default function AdminProductosPage() {
                 </div>
               </section>
               <section>
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="font-medium text-white">Productos</h3>
                   <div className="flex gap-2">
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductNames(gruposProductosParaImagenGeneral.map((group) => group.nombre))}>Todos</button>
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductNames([])}>Limpiar</button>
                   </div>
                 </div>
-                <div className="grid max-h-96 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+                <div className="grid max-h-96 gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-1">
                   {gruposProductosParaImagenGeneral.map((grupo) => (
                     <label key={grupo.nombre} className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
                       <input
@@ -396,7 +396,7 @@ export default function AdminProductosPage() {
                       />
                       <span>
                         <span className="block font-medium text-white">{grupo.nombre}</span>
-                        <span className="block text-gray-400">{grupo.modelos.length} modelos: {grupo.modelos.join(", ")}</span>
+                        <span className="block text-gray-400">{grupo.modelos.length} {grupo.modelos.length === 1 ? "modelo" : "modelos"}</span>
                       </span>
                     </label>
                   ))}
@@ -406,14 +406,14 @@ export default function AdminProductosPage() {
                 </div>
               </section>
               <section>
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="font-medium text-white">Tallas</h3>
                   <div className="flex gap-2">
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralTallas(tallasParaImagenGeneral)}>Todas</button>
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralTallas([])}>Limpiar</button>
                   </div>
                 </div>
-                <div className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-1">
+                <div className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-2">
                   {tallasParaImagenGeneral.map((talla) => (
                     <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
                       <input
@@ -428,7 +428,7 @@ export default function AdminProductosPage() {
                 </div>
               </section>
             </div>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className="btn-secondary" onClick={() => setGeneralImageOpen(false)}>Cancelar</button>
               <button type="button" className="btn-primary" disabled={downloadingImageId === "GENERAL"} onClick={() => void handleDownloadGeneralVariantsImage()}>
                 {downloadingImageId === "GENERAL" ? "Generando..." : "Descargar imagen"}
