@@ -9,8 +9,8 @@ import ProductoModal from "@/components/productos/ProductoModal";
 import VariantesManager from "@/components/productos/VariantesManager";
 import ProductoFilters, { EMPTY_PRODUCT_FILTERS, type ProductoFilterValues } from "@/components/productos/ProductoFilters";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
-import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
-import { getEstadoStock, getStockProducto } from "@/utils/stock";
+import { getVarianteImagenPrincipal, getVarianteSegundaImagen } from "@/utils/varianteImagen";
+import { getEstadoStock, getStockDisponibleVariante, getStockProducto } from "@/utils/stock";
 import { generarReporteStockPDF } from "@/utils/reportes/generarReporteStock";
 import { generarReporteProductoPDF } from "@/utils/reportes/generarReporteProducto";
 import { generarImagenVariantesDisponibles } from "@/utils/reportes/generarImagenVariantes";
@@ -25,6 +25,8 @@ export default function AdminProductosPage() {
   const [editing, setEditing] = useState<Producto | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
+  const [imageProduct, setImageProduct] = useState<Producto | null>(null);
+  const [selectedTallas, setSelectedTallas] = useState<string[]>([]);
 
   const loadProductos = async () => {
     setLoading(true);
@@ -65,6 +67,18 @@ export default function AdminProductosPage() {
     return true;
   }), [productos, search, filters]);
 
+  const imageProductTallas = useMemo(() => {
+    if (!imageProduct) return [];
+    const tallas = new Set<string>();
+    imageProduct.variantes.forEach((variante) => {
+      if (getVarianteSegundaImagen(variante) && getStockDisponibleVariante(variante) > 0) {
+        const talla = variante.talla.trim();
+        if (talla) tallas.add(talla);
+      }
+    });
+    return [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+  }, [imageProduct]);
+
   const handleSave = async (data: Partial<Producto>) => {
     try {
       if (editing) await updateProducto(editing._id, data); else await createProducto(data);
@@ -79,11 +93,43 @@ export default function AdminProductosPage() {
     catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo eliminar el producto"); }
   };
 
-  const handleDownloadVariantsImage = async (producto: Producto) => {
+  const openTallaSelector = (producto: Producto) => {
+    const tallas = new Set<string>();
+    producto.variantes.forEach((variante) => {
+      if (getVarianteSegundaImagen(variante) && getStockDisponibleVariante(variante) > 0) {
+        const talla = variante.talla.trim();
+        if (talla) tallas.add(talla);
+      }
+    });
+    const availableTallas = [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+    if (availableTallas.length === 0) {
+      toast.error("No hay variantes disponibles con segunda imagen");
+      return;
+    }
+    setImageProduct(producto);
+    setSelectedTallas(availableTallas);
+  };
+
+  const toggleSelectedTalla = (talla: string) => {
+    setSelectedTallas((current) =>
+      current.includes(talla)
+        ? current.filter((value) => value !== talla)
+        : [...current, talla]
+    );
+  };
+
+  const handleDownloadVariantsImage = async () => {
+    if (!imageProduct) return;
+    if (selectedTallas.length === 0) {
+      toast.error("Selecciona al menos una talla");
+      return;
+    }
+    const producto = imageProduct;
     setDownloadingImageId(producto._id);
     try {
-      await generarImagenVariantesDisponibles(producto);
+      await generarImagenVariantesDisponibles(producto, { tallas: selectedTallas });
       toast.success("Imagen de variantes descargada");
+      setImageProduct(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo descargar la imagen");
     } finally {
@@ -120,7 +166,7 @@ export default function AdminProductosPage() {
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}>Editar</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}>Variantes</button>
                   <button className="btn-link mr-3" onClick={() => generarReporteProductoPDF(producto)}>Reporte</button>
-                  <button className="btn-link mr-3" disabled={downloadingImageId === producto._id} onClick={() => void handleDownloadVariantsImage(producto)}>{downloadingImageId === producto._id ? "Generando..." : "Imagen variantes"}</button>
+                  <button className="btn-link mr-3" disabled={downloadingImageId === producto._id} onClick={() => openTallaSelector(producto)}>{downloadingImageId === producto._id ? "Generando..." : "Imagen variantes"}</button>
                   <button className="btn-danger" onClick={() => void handleDelete(producto)}>Eliminar</button>
                 </td>
               </tr>;
@@ -134,6 +180,39 @@ export default function AdminProductosPage() {
         {view === "PRODUCTO" && <ProductoForm initialData={editing || undefined} onSubmit={handleSave} />}
         {view === "VARIANTES" && editing && <VariantesManager producto={editing} onUpdated={loadProductos} />}
       </ProductoModal>
+      {imageProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-white">Elegir tallas</h2>
+              <p className="mt-1 text-sm text-gray-400">{imageProduct.nombre} - {imageProduct.modelo}</p>
+            </div>
+            <div className="mb-4 flex gap-3">
+              <button type="button" className="btn-secondary" onClick={() => setSelectedTallas(imageProductTallas)}>Todas</button>
+              <button type="button" className="btn-secondary" onClick={() => setSelectedTallas([])}>Limpiar</button>
+            </div>
+            <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto pr-1">
+              {imageProductTallas.map((talla) => (
+                <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedTallas.includes(talla)}
+                    onChange={() => toggleSelectedTalla(talla)}
+                    className="h-4 w-4"
+                  />
+                  <span>Talla {talla}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" className="btn-secondary" onClick={() => setImageProduct(null)}>Cancelar</button>
+              <button type="button" className="btn-primary" disabled={selectedTallas.length === 0 || downloadingImageId === imageProduct._id} onClick={() => void handleDownloadVariantsImage()}>
+                {downloadingImageId === imageProduct._id ? "Generando..." : "Descargar imagen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

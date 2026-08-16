@@ -11,11 +11,15 @@ type VarianteDisponible = {
 };
 
 const CARD_WIDTH = 260;
-const CARD_HEIGHT = 340;
+const CARD_HEIGHT = 390;
 const GAP = 24;
 const PADDING = 32;
 const HEADER_HEIGHT = 110;
-const IMAGE_HEIGHT = 230;
+const IMAGE_HEIGHT = 325;
+
+type GenerarImagenVariantesOptions = {
+  tallas?: string[];
+};
 
 function slugifyFilename(value: string) {
   return value
@@ -118,11 +122,16 @@ function drawCoverImage(
   );
 }
 
-export async function generarImagenVariantesDisponibles(producto: Producto) {
+export async function generarImagenVariantesDisponibles(
+  producto: Producto,
+  options: GenerarImagenVariantesOptions = {}
+) {
+  const tallasSeleccionadas = new Set(options.tallas?.map((talla) => talla.trim()));
   const variantes = producto.variantes
     .map((variante): VarianteDisponible | null => {
       const imagen = getVarianteSegundaImagen(variante);
       const stockDisponible = getStockDisponibleVariante(variante);
+      if (tallasSeleccionadas.size > 0 && !tallasSeleccionadas.has(variante.talla.trim())) return null;
       if (!imagen || stockDisponible <= 0) return null;
       return { variante, imagen, stockDisponible };
     })
@@ -154,7 +163,7 @@ export async function generarImagenVariantesDisponibles(producto: Producto) {
   wrapText(ctx, producto.nombre, PADDING, 46, width - PADDING * 2, 38, 1);
   ctx.font = "400 18px Arial, sans-serif";
   ctx.fillStyle = "#475569";
-  ctx.fillText(`Variantes disponibles - ${new Date().toLocaleDateString("es-BO")}`, PADDING, 82);
+  ctx.fillText(`Modelo: ${producto.modelo || "Sin modelo"}`, PADDING, 82);
 
   const loadedImages = await Promise.all(
     variantes.map(async (item) => {
@@ -196,14 +205,16 @@ export async function generarImagenVariantesDisponibles(producto: Producto) {
 
     ctx.fillStyle = "#0f172a";
     ctx.font = "700 18px Arial, sans-serif";
-    wrapText(ctx, `${item.variante.color} / ${item.variante.talla}`, x + 16, y + 262, CARD_WIDTH - 32, 22, 2);
+    const colorLabel = item.variante.colorSecundario
+      ? `${item.variante.color} con ${item.variante.colorSecundario}`
+      : item.variante.color;
+    wrapText(ctx, colorLabel, x + 16, y + 352, CARD_WIDTH - 32, 22, 1);
     ctx.fillStyle = "#475569";
     ctx.font = "400 14px Arial, sans-serif";
-    const secondaryColor = item.variante.colorSecundario ? `Color 2: ${item.variante.colorSecundario}` : producto.modelo;
-    wrapText(ctx, secondaryColor, x + 16, y + 302, CARD_WIDTH - 32, 18, 1);
+    ctx.fillText(`Talla: ${item.variante.talla}`, x + 16, y + 374);
     ctx.fillStyle = "#0369a1";
-    ctx.font = "700 18px Arial, sans-serif";
-    ctx.fillText(`Stock: ${item.stockDisponible}`, x + 16, y + 326);
+    ctx.font = "700 16px Arial, sans-serif";
+    ctx.fillText(`Disponible: ${item.stockDisponible}`, x + 136, y + 374);
   });
 
   const dataUrl = canvas.toDataURL("image/png");
