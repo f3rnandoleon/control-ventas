@@ -13,7 +13,7 @@ import { getVarianteImagenPrincipal, getVarianteSegundaImagen } from "@/utils/va
 import { getEstadoStock, getStockDisponibleVariante, getStockProducto } from "@/utils/stock";
 import { generarReporteStockPDF } from "@/utils/reportes/generarReporteStock";
 import { generarReporteProductoPDF } from "@/utils/reportes/generarReporteProducto";
-import { generarImagenVariantesDisponibles } from "@/utils/reportes/generarImagenVariantes";
+import { generarImagenGeneralVariantesDisponibles, generarImagenVariantesDisponibles } from "@/utils/reportes/generarImagenVariantes";
 
 export default function AdminProductosPage() {
   type ModalView = "PRODUCTO" | "VARIANTES";
@@ -27,6 +27,9 @@ export default function AdminProductosPage() {
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const [imageProduct, setImageProduct] = useState<Producto | null>(null);
   const [selectedTallas, setSelectedTallas] = useState<string[]>([]);
+  const [generalImageOpen, setGeneralImageOpen] = useState(false);
+  const [selectedGeneralProductIds, setSelectedGeneralProductIds] = useState<string[]>([]);
+  const [selectedGeneralTallas, setSelectedGeneralTallas] = useState<string[]>([]);
 
   const loadProductos = async () => {
     setLoading(true);
@@ -79,6 +82,23 @@ export default function AdminProductosPage() {
     return [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   }, [imageProduct]);
 
+  const productosParaImagenGeneral = useMemo(() => productos.filter((producto) =>
+    producto.variantes.some((variante) => getVarianteSegundaImagen(variante) && getStockDisponibleVariante(variante) > 0)
+  ), [productos]);
+
+  const tallasParaImagenGeneral = useMemo(() => {
+    const tallas = new Set<string>();
+    productosParaImagenGeneral.forEach((producto) => {
+      producto.variantes.forEach((variante) => {
+        if (getVarianteSegundaImagen(variante) && getStockDisponibleVariante(variante) > 0) {
+          const talla = variante.talla.trim();
+          if (talla) tallas.add(talla);
+        }
+      });
+    });
+    return [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+  }, [productosParaImagenGeneral]);
+
   const handleSave = async (data: Partial<Producto>) => {
     try {
       if (editing) await updateProducto(editing._id, data); else await createProducto(data);
@@ -118,6 +138,32 @@ export default function AdminProductosPage() {
     );
   };
 
+  const openGeneralImageSelector = () => {
+    if (productosParaImagenGeneral.length === 0) {
+      toast.error("No hay productos con variantes disponibles y segunda imagen");
+      return;
+    }
+    setSelectedGeneralProductIds(productosParaImagenGeneral.map((producto) => producto._id));
+    setSelectedGeneralTallas(tallasParaImagenGeneral);
+    setGeneralImageOpen(true);
+  };
+
+  const toggleGeneralProduct = (productoId: string) => {
+    setSelectedGeneralProductIds((current) =>
+      current.includes(productoId)
+        ? current.filter((value) => value !== productoId)
+        : [...current, productoId]
+    );
+  };
+
+  const toggleGeneralTalla = (talla: string) => {
+    setSelectedGeneralTallas((current) =>
+      current.includes(talla)
+        ? current.filter((value) => value !== talla)
+        : [...current, talla]
+    );
+  };
+
   const handleDownloadVariantsImage = async () => {
     if (!imageProduct) return;
     if (selectedTallas.length === 0) {
@@ -137,12 +183,37 @@ export default function AdminProductosPage() {
     }
   };
 
+  const handleDownloadGeneralVariantsImage = async () => {
+    if (selectedGeneralProductIds.length === 0) {
+      toast.error("Selecciona al menos un producto");
+      return;
+    }
+    if (selectedGeneralTallas.length === 0) {
+      toast.error("Selecciona al menos una talla");
+      return;
+    }
+    setDownloadingImageId("GENERAL");
+    try {
+      await generarImagenGeneralVariantesDisponibles(productos, {
+        productoIds: selectedGeneralProductIds,
+        tallas: selectedGeneralTallas,
+      });
+      toast.success("Imagen general descargada");
+      setGeneralImageOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo descargar la imagen general");
+    } finally {
+      setDownloadingImageId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div><h1 className="text-2xl font-bold">Productos</h1><p className="mt-1 text-sm text-gray-400">{filteredProductos.length} de {productos.length} productos visibles</p></div>
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" disabled={!filteredProductos.length} onClick={() => generarReporteStockPDF(filteredProductos)}>Generar reporte</button>
+          <button className="btn-secondary" disabled={!productosParaImagenGeneral.length || downloadingImageId === "GENERAL"} onClick={openGeneralImageSelector}>{downloadingImageId === "GENERAL" ? "Generando..." : "Imagen general"}</button>
           <button className="btn-primary" onClick={() => { setEditing(null); setView("PRODUCTO"); setModalOpen(true); }}>+ Nuevo producto</button>
         </div>
       </div>
@@ -208,6 +279,71 @@ export default function AdminProductosPage() {
               <button type="button" className="btn-secondary" onClick={() => setImageProduct(null)}>Cancelar</button>
               <button type="button" className="btn-primary" disabled={selectedTallas.length === 0 || downloadingImageId === imageProduct._id} onClick={() => void handleDownloadVariantsImage()}>
                 {downloadingImageId === imageProduct._id ? "Generando..." : "Descargar imagen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {generalImageOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-white">Imagen general de variantes</h2>
+              <p className="mt-1 text-sm text-gray-400">Elige los productos y tallas que quieres incluir.</p>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-medium text-white">Productos</h3>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductIds(productosParaImagenGeneral.map((producto) => producto._id))}>Todos</button>
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductIds([])}>Limpiar</button>
+                  </div>
+                </div>
+                <div className="grid max-h-96 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+                  {productosParaImagenGeneral.map((producto) => (
+                    <label key={producto._id} className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedGeneralProductIds.includes(producto._id)}
+                        onChange={() => toggleGeneralProduct(producto._id)}
+                        className="mt-1 h-4 w-4"
+                      />
+                      <span>
+                        <span className="block font-medium text-white">{producto.nombre}</span>
+                        <span className="block text-gray-400">{producto.modelo}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-medium text-white">Tallas</h3>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralTallas(tallasParaImagenGeneral)}>Todas</button>
+                    <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralTallas([])}>Limpiar</button>
+                  </div>
+                </div>
+                <div className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-1">
+                  {tallasParaImagenGeneral.map((talla) => (
+                    <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedGeneralTallas.includes(talla)}
+                        onChange={() => toggleGeneralTalla(talla)}
+                        className="h-4 w-4"
+                      />
+                      <span>Talla {talla}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" className="btn-secondary" onClick={() => setGeneralImageOpen(false)}>Cancelar</button>
+              <button type="button" className="btn-primary" disabled={downloadingImageId === "GENERAL"} onClick={() => void handleDownloadGeneralVariantsImage()}>
+                {downloadingImageId === "GENERAL" ? "Generando..." : "Descargar imagen"}
               </button>
             </div>
           </div>
