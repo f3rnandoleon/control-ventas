@@ -26,6 +26,13 @@ export async function getVentas(): Promise<Pedido[]> {
   return res.json();
 }
 
+export async function getMisVentas(): Promise<Pedido[]> {
+  const res = await fetch("/api/pos/my-sales");
+
+  if (!res.ok) throw new Error("Error al obtener tus ventas");
+  return res.json();
+}
+
 export type SalesFilters = {
   page: number; limit: number; from?: string; to?: string;
   customer?: string; seller?: string; paymentMethod?: "EFECTIVO" | "QR";

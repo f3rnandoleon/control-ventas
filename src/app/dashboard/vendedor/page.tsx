@@ -44,10 +44,10 @@ export default function VendedorDashboardPage() {
 
       <div className="flex gap-4">
         <Link
-          href="/dashboard/vendedor/ventas"
+          href="/dashboard/vendedor/ventas?vista=nueva"
           className="btn-primary"
         >
-          Registrar Pedido
+          Registrar venta
         </Link>
         <Link
           href="/dashboard/vendedor/productos"

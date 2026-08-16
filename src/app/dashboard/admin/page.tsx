@@ -9,6 +9,7 @@ import StockCritico from "@/components/dashboard/StockCritico";
 import { ProductoInventario } from "@/types/inventario";
 import { getProductosInventario } from "@/services/inventario.service";
 import { Pedido } from "@/types/pedido";
+import Link from "next/link";
 
 
 export default function AdminDashboardPage() {
@@ -56,7 +57,15 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <Link
+          href="/dashboard/admin/ventas?vista=nueva"
+          className="btn-primary w-full text-center lg:w-auto"
+        >
+          Registrar venta
+        </Link>
+      </div>
 
       <DashboardStats
         ventasHoy={ventasHoy}
