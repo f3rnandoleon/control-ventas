@@ -26,7 +26,7 @@ export const COLOR_OPTIONS = [
   ["Arena", "#C2B280"], ["Ámbar", "#FFBF00"],
 ] .map(([value, hex]) => ({ value, label: value, hex })) as ColorOption[];
 
-export const TALLA_OPTIONS = ["S", "M", "L", "XL"] as const;
+export const TALLA_OPTIONS = ["S", "M", "L", "XL","XXL"] as const;
 
 export const getVariantSelectOptions = (
   currentValue: string,

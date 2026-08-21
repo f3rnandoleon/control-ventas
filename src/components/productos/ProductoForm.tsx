@@ -99,6 +99,7 @@ export default function ProductoForm({
           <option value="Chompas">Chompas</option>
           <option value="Poleras">Poleras</option>
           <option value="Ponchos">Ponchos</option>
+          <option value="Ruanas">Ruanas</option>
           <option value="Otra">Otra...</option>
         </select>
 
