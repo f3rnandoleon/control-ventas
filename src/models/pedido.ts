@@ -59,7 +59,7 @@ const pedidoSchema = new Schema(
     },
     canal: {
       type: String,
-      enum: ["WEB", "APP_QR", "TIENDA"],
+      enum: ["WEB", "APP_QR", "TIENDA", "WHATSAPP"],
       required: true,
     },
     estadoPedido: {
@@ -195,6 +195,11 @@ const pedidoSchema = new Schema(
       required: true,
       min: 0,
     },
+    costoEnvio: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     descuento: {
       type: Number,
       default: 0,
@@ -209,6 +214,14 @@ const pedidoSchema = new Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+    idempotencyKey: {
+      type: String,
+      default: undefined,
+      index: {
+        unique: true,
+        sparse: true,
+      },
     },
     notas: {
       type: String,

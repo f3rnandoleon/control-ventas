@@ -8,11 +8,28 @@ type DeliveryOptionsDocument = DeliveryOptionsInput & {
   _id: { toString(): string };
 };
 
-function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsInput {
+export type ShippingPolicy = {
+  nationalFlatFee: number;
+  currency: string;
+  estimatedTime: string | null;
+};
+
+export type DeliveryOptionsResponse = DeliveryOptionsInput & {
+  shippingPolicy: ShippingPolicy;
+};
+
+const NATIONAL_SHIPPING_POLICY: ShippingPolicy = {
+  nationalFlatFee: 10,
+  currency: "BOB",
+  estimatedTime: null,
+};
+
+function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse {
   return {
     pickupPoints: document.pickupPoints,
     pickupSchedules: document.pickupSchedules,
     shippingCompanies: document.shippingCompanies,
+    shippingPolicy: NATIONAL_SHIPPING_POLICY,
   };
 }
 
@@ -33,7 +50,7 @@ function summarize(options: DeliveryOptionsInput) {
   };
 }
 
-export async function getDeliveryOptions(): Promise<DeliveryOptionsInput> {
+export async function getDeliveryOptions(): Promise<DeliveryOptionsResponse> {
   await connectDB();
   const document = await deliveryOptionsRepository.findDefault();
 

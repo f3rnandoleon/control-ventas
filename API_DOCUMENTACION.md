@@ -1341,3 +1341,172 @@ Los contratos publicos mas importantes hoy son:
 - opciones de entrega persistidas en MongoDB
 
 Los dominios de `reportes`, `ops`, `auditoria`, `usuarios` y `admin/**` deben tratarse como contratos internos de negocio y operacion.
+
+---
+
+## Variables de Entorno
+
+Variables requeridas en el archivo `.env.local` / servidor de producción:
+
+- `MONGODB_URL`: Cadena de conexión a MongoDB.
+- `JWT_SECRET`: Secreto para firma de tokens JWT.
+- `NEXTAUTH_SECRET`: Secreto para sesiones de NextAuth.
+- `NEXT_PUBLIC_APP_URL`: URL pública del backend/frontend.
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`: Credenciales de Cloudinary para imágenes y comprobantes.
+- `WHATSAPP_INTEGRATION_API_KEY`: Clave de API privada de integración para el agente WhatsApp (usada en cabecera `Authorization: Bearer <WHATSAPP_INTEGRATION_API_KEY>`).
+
+---
+
+## Integración WhatsApp (`/api/integrations/whatsapp/*`)
+
+Familia de endpoints aislada para el bot/agente de ventas WhatsApp de la tienda Fit Andes.
+
+### Autenticación Requerida
+
+Todas las rutas bajo `/api/integrations/whatsapp/*` están protegidas por la cabecera:
+
+```http
+Authorization: Bearer <WHATSAPP_INTEGRATION_API_KEY>
+```
+
+---
+
+### 1. Mejoras en Catálogo Público (`GET /api/productos/publicos`)
+
+Soporta parámetros de consulta opcionales:
+- `q`: Búsqueda por texto (nombre, modelo, SKU, descripción, color, talla).
+- `categoria`: Nombre de la categoría.
+- `color`: Nombre del color.
+- `talla`: Código de talla.
+- `soloDisponible=true`: Filtra solo variantes con stock disponible (`stock - stockReservado > 0`).
+- `page`: Número de página (activa respuesta paginada `{ data, total, page, limit, totalPages }`).
+- `limit`: Cantidad por página (default 20, max 100).
+
+---
+
+### 2. Crear Pedido WhatsApp (`POST /api/integrations/whatsapp/orders`)
+
+**Body esperado:**
+
+```json
+{
+  "idempotencyKey": "wamid-del-mensaje-o-id-unico",
+  "customer": {
+    "phone": "59167113105",
+    "name": "Fernando Leon"
+  },
+  "items": [
+    {
+      "productoId": "650000000000000000000001",
+      "varianteId": "650000000000000000000002",
+      "cantidad": 1
+    }
+  ],
+  "paymentMethod": "QR",
+  "delivery": {
+    "method": "SHIPPING_NATIONAL",
+    "scheduledFor": "2026-09-10T17:00:00-04:00",
+    "department": "La Paz",
+    "city": "El Alto",
+    "shippingCompanyId": "empresa-1",
+    "branch": "Sucursal Central",
+    "recipientName": "Fernando Leon",
+    "recipientCi": "1234567 LP",
+    "phone": "59167113105"
+  },
+  "notes": "Entregar en la tarde"
+}
+```
+
+**Respuesta (201 Created):**
+
+```json
+{
+  "numeroPedido": "P-LP3K8F2A-3F9B",
+  "pedidoId": "650000000000000000000010",
+  "pagoId": "650000000000000000000011",
+  "subtotal": 120,
+  "costoEnvio": 10,
+  "descuento": 0,
+  "total": 130,
+  "estado": "PENDING_PAYMENT",
+  "vencimientoReserva": "2026-09-11T03:59:59.999Z",
+  "paymentInstructions": {
+    "method": "QR",
+    "bank": "BancoSol",
+    "accountHolder": "Fernando Leon Andrade Gutierrez",
+    "qrImageUrl": "https://res.cloudinary.com/dq1jeikev/image/upload/v1777964054/comprobante_xvdhuf.jpg",
+    "amount": 130,
+    "message": "Realiza el pago por QR y envía aquí la captura de tu comprobante."
+  },
+  "notification": {
+    "to": "59167113105",
+    "type": "NEW_ORDER",
+    "text": "Resumen del pedido para atención humana..."
+  }
+}
+```
+
+---
+
+### 3. Subir Comprobante de Pago (`POST /api/integrations/whatsapp/payments/:paymentId/proof`)
+
+Acepta `multipart/form-data` con el campo `file` (imagen de comprobante).
+
+**Respuesta (200 OK):**
+
+```json
+{
+  "message": "Comprobante registrado exitosamente.",
+  "paymentId": "650000000000000000000011",
+  "urlComprobante": "https://res.cloudinary.com/dq1jeikev/image/upload/v123456/comprobante.jpg",
+  "notification": {
+    "to": "59167113105",
+    "type": "PAYMENT_PROOF_UPLOADED",
+    "text": "Nuevo comprobante de pago recibido..."
+  }
+}
+```
+
+---
+
+### 4. Consultar Estado de Pedido (`GET /api/integrations/whatsapp/orders/:numeroPedido?phone=591XXXXXXXX`)
+
+**Respuesta (200 OK):**
+
+```json
+{
+  "numeroPedido": "P-LP3K8F2A-3F9B",
+  "createdAt": "2026-09-08T17:00:00.000Z",
+  "estadoPedido": "PENDING_PAYMENT",
+  "estadoPago": "PENDING",
+  "estadoEntrega": "PENDING",
+  "estadoReservaStock": "RESERVED",
+  "vencimientoReserva": "2026-09-11T03:59:59.999Z",
+  "subtotal": 120,
+  "costoEnvio": 10,
+  "descuento": 0,
+  "total": 130,
+  "items": [
+    {
+      "nombre": "Polera Fit Andes",
+      "color": "Negro",
+      "talla": "M",
+      "cantidad": 1,
+      "precioUnitario": 120,
+      "totalLinea": 120
+    }
+  ],
+  "entrega": {
+    "metodo": "SHIPPING_NATIONAL",
+    "nombreDestinatario": "Fernando Leon",
+    "telefono": "59167113105",
+    "departamento": "La Paz",
+    "ciudad": "El Alto",
+    "empresaEnvio": "Empresa Express",
+    "sucursal": "Sucursal Central",
+    "programadoPara": "2026-09-10T17:00:00-04:00"
+  }
+}
+```
+

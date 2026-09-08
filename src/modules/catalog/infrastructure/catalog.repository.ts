@@ -5,9 +5,12 @@ export const catalogRepository = {
     return Producto.find().sort({ createdAt: -1 }).lean();
   },
 
-  listPublic(projection: Record<string, 0 | 1>) {
+  listPublic(
+    projection: Record<string, 0 | 1>,
+    queryFilter: Record<string, unknown> = {}
+  ) {
     return Producto.find(
-      { estado: { $ne: "INACTIVO" } },
+      { estado: { $ne: "INACTIVO" }, ...queryFilter },
       projection
     ).sort({ createdAt: -1 });
   },

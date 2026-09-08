@@ -276,10 +276,125 @@ export async function deleteCatalogProduct(id: string) {
   await catalogRepository.deleteById(id);
 }
 
-export async function getPublicCatalog() {
+export type PublicCatalogFilters = {
+  q?: string;
+  categoria?: string;
+  color?: string;
+  talla?: string;
+  soloDisponible?: boolean;
+  page?: number;
+  limit?: number;
+};
+
+export async function getPublicCatalog(filters: PublicCatalogFilters = {}) {
   await connectDB();
-  const productos = await catalogRepository.listPublic(PUBLIC_PRODUCT_PROJECTION);
-  return productos.map((producto) => withVariantAvailability(producto.toObject()));
+
+  const queryFilter: Record<string, unknown> = {};
+
+  if (filters.categoria?.trim()) {
+    const safeCat = filters.categoria.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    queryFilter.categoria = {
+      $regex: new RegExp(`^${safeCat}$`, "i"),
+    };
+  }
+
+  if (filters.q?.trim()) {
+    const safeQ = filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(safeQ, "i");
+    queryFilter.$or = [
+      { nombre: regex },
+      { modelo: regex },
+      { sku: regex },
+      { descripcion: regex },
+      { "variantes.color": regex },
+      { "variantes.talla": regex },
+    ];
+  }
+
+  if (filters.color?.trim()) {
+    const safeColor = filters.color.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const colorRegex = new RegExp(safeColor, "i");
+    const existingOr = (queryFilter.$or as Record<string, unknown>[]) || [];
+    queryFilter.$or = [
+      ...existingOr,
+      { "variantes.color": colorRegex },
+      { "variantes.colorSecundario": colorRegex },
+    ];
+  }
+
+  if (filters.talla?.trim()) {
+    const safeTalla = filters.talla.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    queryFilter["variantes.talla"] = new RegExp(`^${safeTalla}$`, "i");
+  }
+
+  const productos = await catalogRepository.listPublic(
+    PUBLIC_PRODUCT_PROJECTION,
+    queryFilter
+  );
+
+  let procesados = productos.map((producto) =>
+    withVariantAvailability(producto.toObject())
+  );
+
+  if (filters.color?.trim() || filters.talla?.trim() || filters.soloDisponible) {
+    const colorNorm = filters.color?.trim().toLowerCase();
+    const tallaNorm = filters.talla?.trim().toLowerCase();
+
+    procesados = procesados
+      .map((producto) => {
+        const variantesFiltradas = (producto.variantes || []).filter(
+          (v: Record<string, unknown>) => {
+            if (colorNorm) {
+              const colorVal = typeof v.color === "string" ? v.color.toLowerCase() : "";
+              const colorSecVal = typeof v.colorSecundario === "string" ? v.colorSecundario.toLowerCase() : "";
+              if (colorVal !== colorNorm && colorSecVal !== colorNorm) {
+                return false;
+              }
+            }
+
+            if (tallaNorm) {
+              const tallaVal = typeof v.talla === "string" ? v.talla.toLowerCase() : "";
+              if (tallaVal !== tallaNorm) {
+                return false;
+              }
+            }
+
+            if (filters.soloDisponible) {
+              const stockDisp = typeof v.stockDisponible === "number" ? v.stockDisponible : 0;
+              if (stockDisp <= 0) {
+                return false;
+              }
+            }
+
+            return true;
+          }
+        );
+
+        return {
+          ...producto,
+          variantes: variantesFiltradas,
+        };
+      })
+      .filter((producto) => producto.variantes.length > 0);
+  }
+
+  if (filters.page && filters.page >= 1) {
+    const limit = Math.max(1, Math.min(filters.limit || 20, 100));
+    const page = filters.page;
+    const total = procesados.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const data = procesados.slice((page - 1) * limit, page * limit);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  return procesados;
 }
 
 export async function getPublicCatalogProductById(id: string) {

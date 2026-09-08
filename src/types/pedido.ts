@@ -1,4 +1,4 @@
-export type CanalPedido = "WEB" | "APP_QR" | "TIENDA";
+export type CanalPedido = "WEB" | "APP_QR" | "TIENDA" | "WHATSAPP";
 export type EstadoPedido =
   | "PENDING_PAYMENT"
   | "CONFIRMED"
@@ -54,9 +54,11 @@ export interface Pedido {
   estadoReservaStock: EstadoReservaStock;
   metodoPago: "EFECTIVO" | "QR";
   subtotal: number;
+  costoEnvio?: number;
   descuento: number;
   total: number;
   gananciaTotal: number;
+  idempotencyKey?: string | null;
   items: PedidoItem[];
   snapshotEntrega?: {
     metodo: "WHATSAPP" | "PICKUP_POINT" | "SHIPPING_NATIONAL";
