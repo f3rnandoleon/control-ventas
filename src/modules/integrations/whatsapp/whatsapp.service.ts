@@ -16,6 +16,94 @@ const BANK_SOL_QR_IMAGE =
   "https://res.cloudinary.com/dq1jeikev/image/upload/v1777964054/comprobante_xvdhuf.jpg";
 const HUMAN_ATTENTION_NUMBER = "59167113105";
 
+interface WhatsAppOrderItem {
+  cantidad: number;
+  totalLinea?: number;
+  precioUnitario?: number;
+  variante?: {
+    color?: string;
+    talla?: string;
+  };
+  productoSnapshot?: {
+    nombre?: string;
+    modelo?: string;
+    imagen?: string;
+  };
+}
+
+interface WhatsAppOrderPedidoDoc {
+  _id: { toString(): string } | string;
+  numeroPedido: string;
+  subtotal: number;
+  costoEnvio?: number;
+  descuento?: number;
+  total: number;
+  estadoPedido: string;
+  reservaExpiraEn?: Date | string | null;
+  items?: WhatsAppOrderItem[];
+  snapshotCliente?: {
+    nombreCompleto?: string;
+    telefono?: string;
+  } | null;
+  snapshotEntrega?: {
+    metodo?: string;
+  } | null;
+}
+
+interface WhatsAppOrderPagoDoc {
+  _id?: { toString(): string } | string;
+}
+
+interface WhatsAppVariante {
+  _id?: { toString(): string } | string;
+  varianteId?: string;
+  color: string;
+  colorSecundario?: string;
+  talla: string;
+  stock?: number;
+  stockReservado?: number;
+  codigoBarra?: string;
+  qrCode?: string;
+  imagenes?: string[];
+  imagen?: string;
+}
+
+interface WhatsAppProductoDoc {
+  _id: { toString(): string } | string;
+  nombre: string;
+  modelo?: string;
+  sku?: string;
+  estado?: string;
+  precioVenta: number;
+  precioCosto?: number;
+  imagen?: string;
+  variantes?: WhatsAppVariante[];
+  save(options?: { session?: unknown }): Promise<unknown>;
+}
+
+interface PickupPointItem {
+  id: string;
+  name: string;
+}
+
+interface PickupScheduleItem {
+  id: string;
+  day: string;
+  start: string;
+  end: string;
+}
+
+interface ShippingCompanyItem {
+  id: string;
+  name: string;
+}
+
+interface DeliveryOptionsDoc {
+  pickupPoints?: PickupPointItem[];
+  pickupSchedules?: PickupScheduleItem[];
+  shippingCompanies?: ShippingCompanyItem[];
+}
+
 export function verifyWhatsAppApiKey(request: Request): boolean {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -53,7 +141,10 @@ export function getEndOfDayInLaPaz(dateInput: string | Date): Date {
   return new Date(Date.UTC(year, month, day + 1, 3, 59, 59, 999));
 }
 
-export function buildWhatsAppOrderResponse(pedido: any, pago: any) {
+export function buildWhatsAppOrderResponse(
+  pedido: WhatsAppOrderPedidoDoc,
+  pago: WhatsAppOrderPagoDoc | null
+) {
   const paymentInstructions = {
     method: "QR",
     bank: "BancoSol",
@@ -65,7 +156,7 @@ export function buildWhatsAppOrderResponse(pedido: any, pago: any) {
 
   const itemsSummary = (pedido.items || [])
     .map(
-      (i: any) =>
+      (i: WhatsAppOrderItem) =>
         `- ${i.cantidad}x ${i.productoSnapshot?.nombre || "Producto"} (${i.variante?.color} / ${i.variante?.talla}): Bs ${i.totalLinea?.toFixed(2)}`
     )
     .join("\n");
@@ -89,8 +180,8 @@ export function buildWhatsAppOrderResponse(pedido: any, pago: any) {
 
   return {
     numeroPedido: pedido.numeroPedido,
-    pedidoId: pedido._id.toString(),
-    pagoId: pago?._id?.toString() || null,
+    pedidoId: String(pedido._id),
+    pagoId: pago?._id ? String(pago._id) : null,
     subtotal: pedido.subtotal,
     costoEnvio: pedido.costoEnvio || 0,
     descuento: pedido.descuento || 0,
@@ -113,7 +204,10 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
   const existingOrder = await Pedido.findOne({ idempotencyKey: input.idempotencyKey });
   if (existingOrder) {
     const existingPayment = await TransaccionPago.findOne({ pedidoId: existingOrder._id });
-    return buildWhatsAppOrderResponse(existingOrder, existingPayment);
+    return buildWhatsAppOrderResponse(
+      existingOrder as unknown as WhatsAppOrderPedidoDoc,
+      existingPayment as unknown as WhatsAppOrderPagoDoc | null
+    );
   }
 
   // 2. Customer Lookup by phone
@@ -126,8 +220,8 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
 
   // 3. Items & Stock Validation
   const itemsProcesados: Array<{
-    producto: any;
-    variante: any;
+    producto: WhatsAppProductoDoc;
+    variante: WhatsAppVariante;
     cantidad: number;
     precioUnitario: number;
     totalLinea: number;
@@ -139,16 +233,18 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
   let gananciaTotal = 0;
 
   for (const itemInput of input.items) {
-    const producto = await catalogRepository.findById(itemInput.productoId);
-    if (!producto || (producto as any).estado === "INACTIVO") {
+    const producto = (await catalogRepository.findById(
+      itemInput.productoId
+    )) as unknown as WhatsAppProductoDoc | null;
+    if (!producto || producto.estado === "INACTIVO") {
       throw new AppError(`Producto no disponible (${itemInput.productoId})`, 400);
     }
 
-    const variantes = (producto as any).variantes || [];
+    const variantes = producto.variantes || [];
     const variante = variantes.find(
-      (v: any) =>
+      (v: WhatsAppVariante) =>
         (v.varianteId && v.varianteId === itemInput.varianteId) ||
-        v._id?.toString() === itemInput.varianteId
+        (v._id && String(v._id) === itemInput.varianteId)
     );
 
     if (!variante) {
@@ -191,7 +287,7 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
   const costoEnvio = input.delivery.method === "SHIPPING_NATIONAL" ? 10 : 0;
   const total = subtotal + costoEnvio;
 
-  const deliveryOptions = (await deliveryOptionsRepository.findDefault()) as any;
+  const deliveryOptions = (await deliveryOptionsRepository.findDefault()) as unknown as DeliveryOptionsDoc | null;
 
   const snapshotEntrega: Record<string, unknown> = {
     metodo: input.delivery.method,
@@ -202,10 +298,10 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
 
   if (input.delivery.method === "PICKUP_POINT") {
     const pickupPoint = deliveryOptions?.pickupPoints?.find(
-      (p: any) => p.id === input.delivery.pickupPointId
+      (p: PickupPointItem) => p.id === input.delivery.pickupPointId
     );
     const pickupSchedule = deliveryOptions?.pickupSchedules?.find(
-      (s: any) => s.id === input.delivery.pickupScheduleId
+      (s: PickupScheduleItem) => s.id === input.delivery.pickupScheduleId
     );
 
     snapshotEntrega.puntoRecojo = pickupPoint
@@ -216,7 +312,7 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
       : input.delivery.pickupScheduleId || null;
   } else {
     const company = deliveryOptions?.shippingCompanies?.find(
-      (c: any) => c.id === input.delivery.shippingCompanyId
+      (c: ShippingCompanyItem) => c.id === input.delivery.shippingCompanyId
     );
 
     snapshotEntrega.departamento = input.delivery.department;
@@ -265,7 +361,7 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
         productoId: itemProc.producto._id,
         variante: {
           varianteId:
-            itemProc.variante.varianteId || itemProc.variante._id?.toString(),
+            itemProc.variante.varianteId || (itemProc.variante._id ? String(itemProc.variante._id) : undefined),
           color: itemProc.variante.color,
           colorSecundario: itemProc.variante.colorSecundario,
           talla: itemProc.variante.talla,
@@ -314,7 +410,10 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
     return { pedido: nuevoPedido, pago: nuevaTransaccion };
   });
 
-  return buildWhatsAppOrderResponse(pedido, pago);
+  return buildWhatsAppOrderResponse(
+    pedido as unknown as WhatsAppOrderPedidoDoc,
+    pago as unknown as WhatsAppOrderPagoDoc | null
+  );
 }
 
 export async function uploadWhatsAppPaymentProof(paymentId: string, file: File) {
@@ -379,7 +478,7 @@ export async function getWhatsAppOrderStatus(numeroPedido: string, phone: string
     throw new AppError("Pedido no encontrado o teléfono no coincide", 403);
   }
 
-  const itemsSanitizados = (pedido.items || []).map((item: any) => ({
+  const itemsSanitizados = (pedido.items || []).map((item: WhatsAppOrderItem) => ({
     nombre: item.productoSnapshot?.nombre,
     modelo: item.productoSnapshot?.modelo,
     color: item.variante?.color,
@@ -416,3 +515,4 @@ export async function getWhatsAppOrderStatus(numeroPedido: string, phone: string
     },
   };
 }
+
