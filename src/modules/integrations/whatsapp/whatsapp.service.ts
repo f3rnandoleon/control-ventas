@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto, { createHash, randomUUID } from "crypto";
 import { connectDB } from "@/libs/mongodb";
 import Pedido from "@/models/pedido";
 import TransaccionPago from "@/models/transaccionPago";
@@ -10,6 +10,7 @@ import { runInTransaction } from "@/shared/db/runTransaction";
 import { AppError } from "@/shared/errors/AppError";
 import { generateOrderedId } from "@/utils/generarId";
 import { uploadFileToCloudinary } from "@/libs/cloudinary";
+import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 import type { CreateWhatsAppOrderInput } from "@/schemas/whatsapp-integration.schema";
 
 const BANK_SOL_QR_IMAGE =
@@ -139,6 +140,10 @@ export function getEndOfDayInLaPaz(dateInput: string | Date): Date {
 
   // UTC-4 La Paz end of day (23:59:59.999) = YYYY-MM-(DD+1) T 03:59:59.999 UTC
   return new Date(Date.UTC(year, month, day + 1, 3, 59, 59, 999));
+}
+
+export function hashReviewToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 export function buildWhatsAppOrderResponse(
@@ -410,6 +415,40 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
     return { pedido: nuevoPedido, pago: nuevaTransaccion };
   });
 
+  // Notificación Telegram de nuevo pedido reservado (similar al flujo web)
+  try {
+    const pedidoEscapado = escapeTelegramMd(pedido.numeroPedido);
+    const montoEscapado = escapeTelegramMd(`Bs ${pedido.total.toFixed(2)}`);
+    const clienteEscapado = escapeTelegramMd(
+      pedido.snapshotCliente?.nombreCompleto || "Cliente WhatsApp"
+    );
+    const telefonoEscapado = escapeTelegramMd(
+      pedido.snapshotCliente?.telefono || input.customer.phone
+    );
+    const metodoPagoEscapado = escapeTelegramMd(pedido.metodoPago);
+    const metodoEntregaEscapado = escapeTelegramMd(
+      pedido.snapshotEntrega?.metodo === "SHIPPING_NATIONAL"
+        ? "Envío Nacional"
+        : "Recojo en Punto"
+    );
+
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "https://control-ventas-azure.vercel.app";
+    const adminLink = `${appUrl}/dashboard/admin/pedidos`;
+
+    await sendTelegramMessage(
+      `🆕 *NUEVO PEDIDO DESDE WHATSAPP*\n\n` +
+      `📦 Pedido: \`${pedidoEscapado}\`\n` +
+      `👤 Cliente: *${clienteEscapado}* \\(${telefonoEscapado}\\)\n` +
+      `💰 Total: *${montoEscapado}*\n\n` +
+      `💳 Pago: *${metodoPagoEscapado}*\n` +
+      `🚚 Entrega: *${metodoEntregaEscapado}*\n\n` +
+      `📋 [Ver detalle del pedido](${adminLink})`
+    );
+  } catch (tgError) {
+    console.error("[Telegram] Error al enviar notificación de pedido WhatsApp:", tgError);
+  }
+
   return buildWhatsAppOrderResponse(
     pedido as unknown as WhatsAppOrderPedidoDoc,
     pago as unknown as WhatsAppOrderPagoDoc | null
@@ -433,8 +472,30 @@ export async function uploadWhatsAppPaymentProof(paymentId: string, file: File) 
     "control-ventas/comprobantes"
   );
 
+  const tokenRevision = randomUUID();
   pago.urlComprobante = comprobanteUrl;
+  pago.tokenRevision = undefined;
+  pago.tokenRevisionHash = hashReviewToken(tokenRevision);
+  pago.tokenRevisionPurpose = "PAYMENT_PROOF_REVIEW";
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 48);
+  pago.tokenRevisionExpiresAt = expiresAt;
+  pago.tokenRevisionUsedAt = null;
+  pago.tokenRevisionUsedBy = null;
+  pago.tokenRevisionUsado = false;
   await pago.save();
+
+  if (pedido.estadoReservaStock === "RESERVED") {
+    const extendedDate = new Date();
+    extendedDate.setHours(extendedDate.getHours() + 48);
+    pedido.reservaExpiraEn = extendedDate;
+    await pedido.save();
+  }
+
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://control-ventas-azure.vercel.app";
+  const verifyLink = `${appUrl}/verificar/pago/${tokenRevision}`;
 
   const clienteTel =
     pedido.snapshotCliente?.telefono ||
@@ -451,10 +512,32 @@ export async function uploadWhatsAppPaymentProof(paymentId: string, file: File) 
     `*Monto:* Bs ${pago.monto.toFixed(2)}\n` +
     `*Comprobante:* ${comprobanteUrl}`;
 
+  try {
+    const montoEscapado = escapeTelegramMd(`Bs ${pago.monto?.toFixed(2) ?? "0.00"}`);
+    const pagoEscapado = escapeTelegramMd(pago.numeroPago ?? paymentId);
+    const pedidoEscapado = escapeTelegramMd(pedido.numeroPedido);
+    const clienteEscapado = escapeTelegramMd(clienteNombre);
+    const linkEscapado = escapeTelegramMd(verifyLink);
+
+    await sendTelegramMessage(
+      `🔔 *NUEVO COMPROBANTE WHATSAPP POR VERIFICAR*\n\n` +
+      `📦 Pedido: \`${pedidoEscapado}\`\n` +
+      `💳 Pago: \`${pagoEscapado}\`\n` +
+      `👤 Cliente: *${clienteEscapado}*\n` +
+      `💰 Monto: *${montoEscapado}*\n\n` +
+      `📋 [Ver comprobante y procesar](${linkEscapado})\n\n` +
+      `_Este link es de un solo uso\\._`
+    );
+  } catch (tgError) {
+    console.error("[Telegram] Error al enviar notificación de comprobante WhatsApp:", tgError);
+  }
+
   return {
-    message: "Comprobante registrado exitosamente.",
+    message: "Comprobante registrado exitosamente. El administrador fue notificado para su verificación.",
     paymentId: pago._id.toString(),
     urlComprobante: comprobanteUrl,
+    tokenRevision,
+    verifyUrl: verifyLink,
     notification: {
       to: HUMAN_ATTENTION_NUMBER,
       type: "PAYMENT_PROOF_UPLOADED",
