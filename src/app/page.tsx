@@ -71,6 +71,16 @@ export default async function Home() {
           </article>
         </section>
       </div>
+
+      <footer className="mx-auto mt-20 max-w-6xl border-t border-sky-100/80 pt-8 text-center sm:flex sm:items-center sm:justify-between text-xs text-slate-500">
+        <p>© {new Date().getFullYear()} Fit Andes - Control Ventas. Todos los derechos reservados.</p>
+        <div className="mt-4 sm:mt-0 flex flex-wrap justify-center gap-4 font-medium text-sky-700">
+          <Link href="/politica-devolucion" className="hover:underline">Devoluciones</Link>
+          <Link href="/politica-privacidad" className="hover:underline">Privacidad</Link>
+          <Link href="/terminos-condiciones" className="hover:underline">Términos</Link>
+          <Link href="/politica-cookies" className="hover:underline">Cookies</Link>
+        </div>
+      </footer>
     </main>
   );
 }

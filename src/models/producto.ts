@@ -66,6 +66,26 @@ const productoSchema = new Schema(
       min: 0,
     },
 
+    costoOrigen: {
+      moneda: {
+        type: String,
+        enum: ["PEN", "BOB", "USD"],
+        default: "BOB",
+      },
+      montoOriginal: {
+        type: Number,
+        min: 0,
+      },
+      tipoCambioAplicado: {
+        type: Number,
+        min: 0.01,
+      },
+      fechaRegistro: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+
     descuento: {
       type: Number,
       default: 0,

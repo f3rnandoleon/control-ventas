@@ -27,5 +27,11 @@ export interface Producto {
   stockReservadoTotal?: number;
   stockDisponible?: number;
   stockMinimo?: number;
+  costoOrigen?: {
+    moneda: "PEN" | "BOB" | "USD";
+    montoOriginal: number;
+    tipoCambioAplicado: number;
+    fechaRegistro?: string | Date;
+  };
   estado?: "ACTIVO" | "INACTIVO" | "AGOTADO";
 }

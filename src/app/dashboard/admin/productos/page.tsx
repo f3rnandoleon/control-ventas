@@ -294,8 +294,17 @@ export default function AdminProductosPage() {
               const imagen = producto.variantes.map(getVarianteImagenPrincipal).find(Boolean);
               return <tr key={producto._id} className="border-b border-white/5 transition hover:bg-white/5">
                 <td className="px-4 py-3">{imagen ? <CloudinaryImage src={imagen} alt={producto.nombre} width={40} height={40} className="h-10 w-10 rounded-lg object-cover" /> : <div className="surface-placeholder flex h-10 w-10 items-center justify-center rounded-lg" aria-label="Sin imagen">▧</div>}</td>
-                <td className="px-4 py-4 font-medium text-white">{producto.nombre}</td><td>{producto.modelo}</td>
-                <td>Bs {producto.precioVenta}</td><td>Bs {producto.precioCosto}</td>
+                <td className="px-4 py-4 font-medium text-white">{producto.nombre}</td>
+                <td>{producto.modelo}</td>
+                <td>Bs {producto.precioVenta}</td>
+                <td>
+                  <div className="font-semibold">Bs {producto.precioCosto}</div>
+                  {producto.costoOrigen && producto.costoOrigen.moneda === "PEN" && (
+                    <div className="text-[11px] text-sky-400 font-normal">
+                      S/ {producto.costoOrigen.montoOriginal} (TC: {producto.costoOrigen.tipoCambioAplicado})
+                    </div>
+                  )}
+                </td>
                 <td className="whitespace-nowrap px-6 text-right">
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}>Editar</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}>Variantes</button>

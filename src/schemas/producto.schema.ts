@@ -87,6 +87,15 @@ export const createProductoSchema = z.object({
 
     precioCosto: positiveNumberSchema,
 
+    costoOrigen: z
+        .object({
+            moneda: z.enum(["PEN", "BOB", "USD"]).default("BOB"),
+            montoOriginal: positiveNumberSchema,
+            tipoCambioAplicado: positiveNumberSchema,
+            fechaRegistro: z.union([z.string(), z.date()]).optional(),
+        })
+        .optional(),
+
     categoria: z.string().optional().default("Chompas"),
 
     variantes: z
@@ -118,6 +127,15 @@ export const updateProductoSchema = z.object({
     precioVenta: positiveNumberSchema.optional(),
 
     precioCosto: positiveNumberSchema.optional(),
+
+    costoOrigen: z
+        .object({
+            moneda: z.enum(["PEN", "BOB", "USD"]).default("BOB"),
+            montoOriginal: positiveNumberSchema,
+            tipoCambioAplicado: positiveNumberSchema,
+            fechaRegistro: z.union([z.string(), z.date()]).optional(),
+        })
+        .optional(),
 
     categoria: z.string().optional(),
 

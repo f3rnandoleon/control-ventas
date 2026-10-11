@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Producto } from "@/types/producto";
-import {
-  createProductoSchema,
-} from "@/schemas/producto.schema";
+import { createProductoSchema } from "@/schemas/producto.schema";
+import { getAjustesAdmin } from "@/services/ajustes.service";
 
 type ProductoFormValues = z.input<typeof createProductoSchema>;
 type ProductoFormSubmitValues = z.output<typeof createProductoSchema>;
@@ -19,10 +18,33 @@ export default function ProductoForm({
   initialData?: Partial<Producto>;
   onSubmit: (data: Partial<Producto>) => void;
 }) {
+  // Modalidad de moneda de costo: "PEN" (Soles) o "BOB" (Bolivianos)
+  const initialMoneda: "PEN" | "BOB" =
+    initialData?.costoOrigen?.moneda === "BOB" ? "BOB" : "PEN";
+  const [monedaCosto, setMonedaCosto] = useState<"PEN" | "BOB">(initialMoneda);
+
+  // Tipo de cambio oficial y tipo de cambio editable para este producto
+  const [oficialTC, setOficialTC] = useState<number>(2.1);
+  const [tipoCambio, setTipoCambio] = useState<number>(
+    initialData?.costoOrigen?.tipoCambioAplicado || 2.1
+  );
+
+  // Monto en Soles (si aplica)
+  const [costoPEN, setCostoPEN] = useState<number>(() => {
+    if (initialData?.costoOrigen?.moneda === "PEN") {
+      return initialData.costoOrigen.montoOriginal;
+    }
+    if (initialData?.precioCosto && initialData.precioCosto > 0) {
+      return Math.round((initialData.precioCosto / 2.1) * 100) / 100;
+    }
+    return 0;
+  });
+
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductoFormValues, unknown, ProductoFormSubmitValues>({
     resolver: zodResolver(createProductoSchema),
@@ -35,6 +57,36 @@ export default function ProductoForm({
     },
   });
 
+  const precioVentaWatched = watch("precioVenta") || 0;
+  const precioCostoWatched = watch("precioCosto") || 0;
+
+  // Cargar el tipo de cambio oficial de Ajustes
+  useEffect(() => {
+    async function fetchTC() {
+      try {
+        const ajustes = await getAjustesAdmin();
+        if (ajustes?.finanzas?.tipoCambioPEN_BOB) {
+          const tc = ajustes.finanzas.tipoCambioPEN_BOB;
+          setOficialTC(tc);
+          if (!initialData?.costoOrigen?.tipoCambioAplicado) {
+            setTipoCambio(tc);
+          }
+        }
+      } catch (err) {
+        console.warn("No se pudo obtener el TC de ajustes, usando default 2.10", err);
+      }
+    }
+    fetchTC();
+  }, [initialData]);
+
+  // Si está en modalidad PEN, sincronizar el precioCosto en BOB al cambiar costoPEN o tipoCambio
+  useEffect(() => {
+    if (monedaCosto === "PEN") {
+      const bob = Math.round(costoPEN * tipoCambio * 100) / 100;
+      setValue("precioCosto", bob, { shouldValidate: true });
+    }
+  }, [costoPEN, tipoCambio, monedaCosto, setValue]);
+
   const [categoriaSelect, setCategoriaSelect] = useState(() => {
     const isKnown = ["Chompas", "Poleras", "Ponchos"].includes(
       initialData?.categoria || "Chompas"
@@ -42,18 +94,41 @@ export default function ProductoForm({
     return isKnown ? initialData?.categoria || "Chompas" : "Otra";
   });
 
+  const gananciaEstimada = precioVentaWatched - precioCostoWatched;
+  const margenPorcentaje =
+    precioVentaWatched > 0
+      ? Math.round((gananciaEstimada / precioVentaWatched) * 100)
+      : 0;
+
   return (
     <form
       onSubmit={handleSubmit((data) => {
+        // Adjuntar el snapshot inmutable de costo de origen
+        const costoOrigenSnapshot =
+          monedaCosto === "PEN"
+            ? {
+                moneda: "PEN" as const,
+                montoOriginal: costoPEN,
+                tipoCambioAplicado: tipoCambio,
+                fechaRegistro: new Date(),
+              }
+            : {
+                moneda: "BOB" as const,
+                montoOriginal: data.precioCosto,
+                tipoCambioAplicado: 1,
+                fechaRegistro: new Date(),
+              };
+
+        const payload: Partial<Producto> = {
+          ...data,
+          costoOrigen: costoOrigenSnapshot,
+        };
+
         if (initialData?._id) {
-          // Si estamos editando un producto, evitamos enviar el array de variantes
-          // (que viene vacío por defecto en el form) para no sobreescribir las existentes.
-          const payload = { ...data };
-          delete (payload as Partial<Producto>).variantes;
-          onSubmit(payload as Partial<Producto>);
-        } else {
-          onSubmit(data as Partial<Producto>);
+          delete payload.variantes;
         }
+
+        onSubmit(payload);
       })}
       className="space-y-5"
     >
@@ -83,8 +158,7 @@ export default function ProductoForm({
 
       <div>
         <label className="label">Categoría</label>
-        
-        <select 
+        <select
           className="input w-full mb-2"
           value={categoriaSelect}
           onChange={(e) => {
@@ -110,7 +184,111 @@ export default function ProductoForm({
         />
 
         {errors.categoria && (
-          <p className="mt-1 text-xs text-red-400">{errors.categoria?.message as string}</p>
+          <p className="mt-1 text-xs text-red-400">
+            {errors.categoria?.message as string}
+          </p>
+        )}
+      </div>
+
+      {/* SECCIÓN FINANCIERA: COSTO & PRECIO DE VENTA */}
+      <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-sky-900 uppercase tracking-wider">
+            Definición de Costo de Compra
+          </label>
+          {/* Toggle de Moneda de Compra */}
+          <div className="inline-flex rounded-lg bg-white p-0.5 border border-sky-200 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setMonedaCosto("PEN")}
+              className={`px-3 py-1 rounded-md transition ${
+                monedaCosto === "PEN"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-sky-700"
+              }`}
+            >
+              🇵🇪 Soles (PEN)
+            </button>
+            <button
+              type="button"
+              onClick={() => setMonedaCosto("BOB")}
+              className={`px-3 py-1 rounded-md transition ${
+                monedaCosto === "BOB"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-sky-700"
+              }`}
+            >
+              🇧🇴 Bolivianos (Bs)
+            </button>
+          </div>
+        </div>
+
+        {monedaCosto === "PEN" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-700">
+                Costo en Soles (S/.)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={costoPEN || ""}
+                onChange={(e) => setCostoPEN(parseFloat(e.target.value) || 0)}
+                className="input w-full mt-1 bg-white"
+                placeholder="Ej: 35.00"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-700">
+                  Tipo de cambio (Bs/S/.)
+                </label>
+                {tipoCambio !== oficialTC && (
+                  <button
+                    type="button"
+                    onClick={() => setTipoCambio(oficialTC)}
+                    className="text-[10px] text-sky-600 underline font-semibold"
+                  >
+                    Usar oficial ({oficialTC})
+                  </button>
+                )}
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={tipoCambio || ""}
+                onChange={(e) => setTipoCambio(parseFloat(e.target.value) || 0)}
+                className="input w-full mt-1 bg-white font-medium text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-700">
+                Costo Resultante (Bs)
+              </label>
+              <div className="mt-1 flex h-10 items-center justify-between rounded-xl bg-white px-3 font-bold text-sky-800 border border-slate-200">
+                <span>Bs {precioCostoWatched.toFixed(2)}</span>
+                <span className="text-[11px] font-normal text-slate-400">Congelado</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <label className="label">Precio costo directo (Bs)</label>
+            <input
+              {...register("precioCosto", { valueAsNumber: true })}
+              type="number"
+              className="input w-full bg-white"
+              step="0.01"
+            />
+          </div>
+        )}
+
+        {errors.precioCosto && (
+          <p className="text-xs text-red-500">{errors.precioCosto.message}</p>
         )}
       </div>
 
@@ -120,7 +298,7 @@ export default function ProductoForm({
           <input
             {...register("precioVenta", { valueAsNumber: true })}
             type="number"
-            className="input w-full"
+            className="input w-full font-bold text-slate-900"
             step="0.01"
           />
           {errors.precioVenta && (
@@ -131,31 +309,36 @@ export default function ProductoForm({
         </div>
 
         <div>
-          <label className="label">Precio costo (Bs)</label>
-          <input
-            {...register("precioCosto", { valueAsNumber: true })}
-            type="number"
-            className="input w-full"
-            step="0.01"
-          />
-          {errors.precioCosto && (
-            <p className="mt-1 text-xs text-red-400">
-              {errors.precioCosto.message}
-            </p>
-          )}
-        </div>
-
-        <div>
           <label className="label">SKU</label>
           <input
             className="input w-full cursor-not-allowed text-gray-400"
-            value={initialData?.sku || "Generado automaticamente"}
+            value={initialData?.sku || "Generado automáticamente"}
             disabled
           />
         </div>
       </div>
 
-      <button type="submit" className="btn-primary">
+      {/* Indicador de Margen y Ganancia Proyectada */}
+      {precioVentaWatched > 0 && precioCostoWatched > 0 && (
+        <div
+          className={`rounded-xl p-3 text-xs flex items-center justify-between border ${
+            gananciaEstimada > 0
+              ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+              : "bg-red-50/80 border-red-200 text-red-900"
+          }`}
+        >
+          <span>
+            {gananciaEstimada > 0 ? "📈 Margen Proyectado:" : "⚠️ Alerta de Margen:"}{" "}
+            <strong>{margenPorcentaje}%</strong>
+          </span>
+          <span>
+            Ganancia por prenda:{" "}
+            <strong>Bs {gananciaEstimada.toFixed(2)}</strong>
+          </span>
+        </div>
+      )}
+
+      <button type="submit" className="btn-primary w-full justify-center">
         {initialData?._id ? "Actualizar producto" : "Guardar producto"}
       </button>
     </form>
