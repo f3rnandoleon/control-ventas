@@ -21,6 +21,7 @@ const compraItemSchema = new Schema(
       colorSecundario: { type: String },
       talla: { type: String, required: true },
       codigoBarra: { type: String },
+      imagen: { type: String },
     },
     cantidad: {
       type: Number,

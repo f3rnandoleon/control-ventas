@@ -22,6 +22,7 @@ export interface CompraItem {
     colorSecundario?: string;
     talla: string;
     codigoBarra?: string;
+    imagen?: string;
   };
   cantidad: number;
   costoUnitarioOrigen: number;

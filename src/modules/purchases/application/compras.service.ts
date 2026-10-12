@@ -9,6 +9,7 @@ import { recordAuditEventSafe } from "@/modules/audit/application/audit.service"
 import type { CrearCompraInput } from "@/types/compra";
 import type { Variante } from "@/types/producto";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
+import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 
 export async function registrarCompra(
   input: CrearCompraInput,
@@ -135,6 +136,7 @@ export async function registrarCompra(
         colorSecundario: variante.colorSecundario,
         talla: variante.talla,
         codigoBarra: variante.codigoBarra,
+        imagen: getVarianteImagenPrincipal(variante),
       },
       cantidad,
       costoUnitarioOrigen,

@@ -8,6 +8,8 @@ import { getProductosInventario } from "@/services/inventario.service";
 import type { ProductoInventario } from "@/types/inventario";
 import type { Variante } from "@/types/producto";
 import { calcularCostoPromedioPonderado, formatMoney } from "@/utils/pricing";
+import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 interface FormItem {
   productoId: string;
@@ -17,6 +19,7 @@ interface FormItem {
   talla: string;
   cantidad: number;
   costoUnitarioOrigen: number;
+  imagen?: string;
 }
 
 export default function NuevaCompraForm() {
@@ -126,6 +129,7 @@ export default function NuevaCompraForm() {
       costoNuevoBOB,
       nuevoStock: stockPrevio + itemCantidad,
       nuevoCPP,
+      imagen: getVarianteImagenPrincipal(activeVariante),
     };
   }, [
     activeProducto,
@@ -162,6 +166,8 @@ export default function NuevaCompraForm() {
       return;
     }
 
+    const imagen = getVarianteImagenPrincipal(activeVariante);
+
     setItems([
       ...items,
       {
@@ -172,6 +178,7 @@ export default function NuevaCompraForm() {
         talla: activeVariante.talla,
         cantidad: itemCantidad,
         costoUnitarioOrigen: itemCostoOrigen,
+        imagen,
       },
     ]);
 
@@ -450,37 +457,58 @@ export default function NuevaCompraForm() {
               </div>
             </div>
 
-            {/* PREVIEW EN TIEMPO REAL DEL CPP PARA ESTE ÍTEM */}
+            {/* PREVIEW EN TIEMPO REAL DEL CPP PARA ESTE ÍTEM CON IMAGEN */}
             {previewCPPItem && (
-              <div className="rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 to-slate-900/50 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
-                    Simulación de Costo Promedio Ponderado (CPP)
-                  </span>
-                  <p className="text-xs text-gray-300">
-                    Stock actual:{" "}
-                    <span className="font-semibold text-white">
-                      {previewCPPItem.stockPrevio} u.
-                    </span>{" "}
-                    a{" "}
-                    <span className="font-semibold text-white">
-                      {formatMoney(previewCPPItem.costoPrevioBOB)}
-                    </span>{" "}
-                    | Nueva entrada:{" "}
-                    <span className="font-semibold text-cyan-300">
-                      +{itemCantidad} u.
-                    </span>{" "}
-                    a{" "}
-                    <span className="font-semibold text-cyan-300">
-                      {formatMoney(previewCPPItem.costoNuevoBOB)}
-                    </span>
-                  </p>
+              <div className="rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 to-slate-900/50 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  {previewCPPItem.imagen ? (
+                    <CloudinaryImage
+                      src={previewCPPItem.imagen}
+                      alt={`${activeVariante?.color} - ${activeVariante?.talla}`}
+                      width={64}
+                      height={64}
+                      className="w-16 h-16 rounded-xl object-cover border border-cyan-500/40 shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-gray-800 border border-white/10 flex items-center justify-center text-2xl shrink-0">
+                      👕
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+                        Previsualización
+                      </span>
+                      <span className="text-xs font-semibold text-white">
+                        {activeProducto?.nombre} ({activeVariante?.color} - Talla {activeVariante?.talla})
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-300">
+                      Stock actual:{" "}
+                      <span className="font-semibold text-white">
+                        {previewCPPItem.stockPrevio} u.
+                      </span>{" "}
+                      a{" "}
+                      <span className="font-semibold text-white">
+                        {formatMoney(previewCPPItem.costoPrevioBOB)}
+                      </span>{" "}
+                      | Nueva entrada:{" "}
+                      <span className="font-semibold text-cyan-300">
+                        +{itemCantidad} u.
+                      </span>{" "}
+                      a{" "}
+                      <span className="font-semibold text-cyan-300">
+                        {formatMoney(previewCPPItem.costoNuevoBOB)}
+                      </span>
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 self-end md:self-center">
                   <div className="text-right">
                     <span className="text-[10px] text-gray-400 block">
-                      Nuevo Costo Promedio Resultante:
+                      Nuevo Costo Promedio (CPP):
                     </span>
                     <span className="text-base font-extrabold text-cyan-300">
                       {formatMoney(previewCPPItem.nuevoCPP)}
@@ -528,6 +556,7 @@ export default function NuevaCompraForm() {
               <table className="w-full text-xs text-gray-300">
                 <thead className="bg-white/5 border-b border-white/10 text-gray-400 uppercase text-[10px]">
                   <tr>
+                    <th className="px-3 py-3 text-center">Imagen</th>
                     <th className="px-4 py-3 text-left">Producto / Modelo</th>
                     <th className="px-4 py-3 text-left">Variante</th>
                     <th className="px-4 py-3 text-center">Cantidad</th>
@@ -548,6 +577,21 @@ export default function NuevaCompraForm() {
 
                     return (
                       <tr key={idx} className="hover:bg-white/[0.02]">
+                        <td className="px-3 py-2.5 text-center">
+                          {it.imagen ? (
+                            <CloudinaryImage
+                              src={it.imagen}
+                              alt={`${it.color} - ${it.talla}`}
+                              width={44}
+                              height={44}
+                              className="w-11 h-11 rounded-lg object-cover border border-white/20 mx-auto"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-lg bg-gray-800 border border-white/10 flex items-center justify-center text-base mx-auto">
+                              👕
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 font-semibold text-white">
                           {prod?.nombre || "Producto"}
                           {prod?.modelo && (

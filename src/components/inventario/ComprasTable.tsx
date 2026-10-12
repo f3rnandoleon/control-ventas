@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Compra, CompraItem } from "@/types/compra";
 import { formatMoney } from "@/utils/pricing";
+import CloudinaryImage from "@/components/ui/CloudinaryImage";
 
 export default function ComprasTable({
   compras,
@@ -205,6 +206,7 @@ export default function ComprasTable({
                   <table className="w-full text-xs text-gray-300">
                     <thead className="bg-white/5 border-b border-white/10 text-gray-400">
                       <tr>
+                        <th className="px-3.5 py-2.5 text-center">Imagen</th>
                         <th className="px-3.5 py-2.5 text-left">Producto / Modelo</th>
                         <th className="px-3.5 py-2.5 text-left">Variante</th>
                         <th className="px-3.5 py-2.5 text-center">Cant.</th>
@@ -221,6 +223,21 @@ export default function ComprasTable({
                     <tbody className="divide-y divide-white/5">
                       {selectedCompra.items.map((item: CompraItem, idx: number) => (
                         <tr key={idx} className="hover:bg-white/[0.02]">
+                          <td className="px-3 py-2.5 text-center">
+                            {item.varianteSnapshot.imagen ? (
+                              <CloudinaryImage
+                                src={item.varianteSnapshot.imagen}
+                                alt={`${item.varianteSnapshot.color} - ${item.varianteSnapshot.talla}`}
+                                width={44}
+                                height={44}
+                                className="w-11 h-11 rounded-lg object-cover border border-white/20 mx-auto"
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-base mx-auto">
+                                👕
+                              </div>
+                            )}
+                          </td>
                           <td className="px-3.5 py-3 font-medium text-white">
                             <div>{item.productoSnapshot.nombre}</div>
                             {item.productoSnapshot.modelo && (
