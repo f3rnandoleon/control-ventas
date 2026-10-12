@@ -52,6 +52,33 @@ const inventarioSchema = new Schema(
       type: String, // ej: ID de venta, factura, nota
     },
 
+    // Campos contables / Kardex valorado
+    costoUnitario: {
+      type: Number,
+      min: 0,
+    },
+
+    valorTotalOperacion: {
+      type: Number,
+      min: 0,
+    },
+
+    costoPromedioResultante: {
+      type: Number,
+      min: 0,
+    },
+
+    saldoValorado: {
+      type: Number,
+      min: 0,
+    },
+
+    compraId: {
+      type: Types.ObjectId,
+      ref: "Compra",
+      required: false,
+    },
+
     usuario: {
       type: Types.ObjectId,
       ref: "User",

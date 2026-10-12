@@ -163,34 +163,39 @@ export default function InventarioTable({
 
       <div className="bg-white/5 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(0,180,255,0.15)] overflow-x-auto">
         <table className="w-full text-sm text-gray-300">
-          <thead className="text-gray-400 border-b border-white/10">
+          <thead className="text-gray-400 border-b border-white/10 text-xs uppercase">
             <tr>
-              <th className="px-6 py-4">Fecha</th>
-              <th>Producto</th>
-              <th>Variante</th>
-              <th>Tipo</th>
-              <th>Cantidad</th>
-              <th>Stock</th>
-              <th>Usuario</th>
+              <th className="px-5 py-3.5 text-left">Fecha</th>
+              <th className="px-4 py-3.5 text-left">Documento / Ref</th>
+              <th className="px-4 py-3.5 text-left">Producto</th>
+              <th className="px-4 py-3.5 text-left">Variante</th>
+              <th className="px-4 py-3.5 text-center">Tipo</th>
+              <th className="px-4 py-3.5 text-center">Cantidad</th>
+              <th className="px-4 py-3.5 text-center">Stock</th>
+              <th className="px-4 py-3.5 text-right">Costo Unit.</th>
+              <th className="px-4 py-3.5 text-left">Usuario</th>
             </tr>
           </thead>
 
-          <tbody>
+          <tbody className="divide-y divide-white/5">
             {itemsFiltrados.map((item) => (
               <tr
                 key={item._id}
-                className="border-b border-white/5 hover:bg-white/5"
+                className="hover:bg-white/5 transition-colors"
               >
-                <td className="px-6 py-3">
+                <td className="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
                   {new Date(item.createdAt).toLocaleString()}
                 </td>
-                <td>{getProductoNombre(item)}</td>
-                <td>
+                <td className="px-4 py-3 font-mono text-xs text-cyan-300">
+                  {item.referencia || "-"}
+                </td>
+                <td className="px-4 py-3 font-medium text-white">{getProductoNombre(item)}</td>
+                <td className="px-4 py-3 text-xs">
                   {item.variante.color} / {item.variante.talla}
                 </td>
-                <td>
+                <td className="px-4 py-3 text-center">
                   <span
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                    className={`px-2 py-0.5 rounded text-xs font-semibold ${
                       item.tipo === "ENTRADA"
                         ? "bg-green-500/20 text-green-400"
                         : item.tipo === "SALIDA"
@@ -201,18 +206,23 @@ export default function InventarioTable({
                     {item.tipo}
                   </span>
                 </td>
-                <td>{item.cantidad}</td>
-                <td>
+                <td className="px-4 py-3 text-center font-bold">{item.cantidad}</td>
+                <td className="px-4 py-3 text-center font-mono text-xs">
                   {item.stockAnterior} -&gt;{" "}
-                  <span className="text-cyan-400">{item.stockActual}</span>
+                  <span className="text-cyan-400 font-bold">{item.stockActual}</span>
                 </td>
-                <td>{item.usuario?.nombreCompleto || "-"}</td>
+                <td className="px-4 py-3 text-right font-mono text-xs text-emerald-400">
+                  {item.costoUnitario !== undefined && item.costoUnitario > 0
+                    ? `Bs ${item.costoUnitario.toFixed(2)}`
+                    : "-"}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-400">{item.usuario?.nombreCompleto || "-"}</td>
               </tr>
             ))}
 
             {itemsFiltrados.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-gray-400">
+                <td colSpan={9} className="py-6 text-center text-gray-400">
                   {hayFiltrosActivos
                     ? "No hay movimientos que coincidan con los filtros"
                     : "No hay movimientos de inventario"}

@@ -100,3 +100,36 @@ export function formatProductPriceDisplay(
 
   return `${formatMoney(precioMinimo)} - ${formatMoney(precioMaximo)}`;
 }
+
+/**
+ * Calcula el Costo Promedio Ponderado (CPP) para inventario:
+ * (stockActual * costoActual + cantidadNueva * costoNuevo) / (stockActual + cantidadNueva)
+ * Si el stock previo es <= 0, el nuevo costo es directamente costoNuevo.
+ */
+export function calcularCostoPromedioPonderado(
+  stockActual: number,
+  costoActual: number,
+  cantidadNueva: number,
+  costoNuevo: number
+): number {
+  const stockPrevio = Math.max(0, Number(stockActual || 0));
+  const cantidadEntrada = Number(cantidadNueva || 0);
+  const costoEntrada = Number(costoNuevo || 0);
+  const costoPrevio = Number(costoActual || 0);
+
+  if (cantidadEntrada <= 0) {
+    return Number(costoPrevio.toFixed(2));
+  }
+
+  if (stockPrevio <= 0) {
+    return Number(costoEntrada.toFixed(2));
+  }
+
+  const valorTotalActual = stockPrevio * costoPrevio;
+  const valorTotalEntrada = cantidadEntrada * costoEntrada;
+  const stockTotalFinal = stockPrevio + cantidadEntrada;
+
+  if (stockTotalFinal <= 0) return 0;
+
+  return Number(((valorTotalActual + valorTotalEntrada) / stockTotalFinal).toFixed(2));
+}

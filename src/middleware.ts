@@ -20,10 +20,11 @@ const protectedApiRoutes = [
   "/api/inventario",
   "/api/reportes",
   "/api/usuarios",
+  "/api/compras",
 ];
 
 const adminApiRoutes = ["/api/admin", "/api/reportes", "/api/usuarios", "/api/uploads"];
-const staffApiRoutes = ["/api/productos", "/api/inventario"];
+const staffApiRoutes = ["/api/productos", "/api/inventario", "/api/compras"];
 
 function getDashboardHomeByRole(role?: string) {
   if (role === "ADMIN") return "/dashboard/admin";

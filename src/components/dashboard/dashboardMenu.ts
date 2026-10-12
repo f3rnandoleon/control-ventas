@@ -28,6 +28,8 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
         { label: "Resumen", href: "/dashboard/admin/inventario/resumen" },
         { label: "Stock actual", href: "/dashboard/admin/inventario/stock" },
         { label: "Movimientos", href: "/dashboard/admin/inventario/movimientos" },
+        { label: "Reabastecimiento", href: "/dashboard/admin/inventario/compras", keywords: ["compras", "proveedor", "entrada"] },
+        { label: "Tarjetas Valoradas", href: "/dashboard/admin/inventario/kardex", keywords: ["kardex", "valorado", "inversion"] },
       ],
     },
     { label: "Pedidos", href: "/dashboard/admin/pedidos", keywords: ["reserva", "comprobante"] },

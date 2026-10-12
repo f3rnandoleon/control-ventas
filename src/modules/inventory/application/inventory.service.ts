@@ -43,6 +43,11 @@ type RecordInventoryMovementInput = {
   motivo?: string;
   referencia?: string;
   userId: string | mongoose.Types.ObjectId;
+  costoUnitario?: number;
+  valorTotalOperacion?: number;
+  costoPromedioResultante?: number;
+  saldoValorado?: number;
+  compraId?: mongoose.Types.ObjectId | string;
 };
 
 type AdjustInventoryInput = VariantLookup & {
@@ -110,6 +115,11 @@ export async function recordInventoryMovement({
   motivo,
   referencia,
   userId,
+  costoUnitario,
+  valorTotalOperacion,
+  costoPromedioResultante,
+  saldoValorado,
+  compraId,
 }: RecordInventoryMovementInput, session?: ClientSession) {
   const validUserId = mongoose.Types.ObjectId.isValid(userId.toString())
     ? userId
@@ -135,6 +145,11 @@ export async function recordInventoryMovement({
     stockActual,
     motivo,
     referencia,
+    costoUnitario,
+    valorTotalOperacion,
+    costoPromedioResultante,
+    saldoValorado,
+    compraId,
     usuario: validUserId as mongoose.Types.ObjectId | undefined,
   }, session);
 }
@@ -215,6 +230,14 @@ export async function consumeReservedStockForOrder({
   producto.totalVendidos += cantidad;
   await producto.save(session ? { session } : undefined);
 
+  const costoUnitario = Number(
+    variante.precioCosto !== undefined && variante.precioCosto !== null && Number(variante.precioCosto) > 0
+      ? variante.precioCosto
+      : (producto as unknown as { precioCosto?: number }).precioCosto || 0
+  );
+  const valorTotalOperacion = Number((cantidad * costoUnitario).toFixed(2));
+  const saldoValorado = Number((stockActual * costoUnitario).toFixed(2));
+
   const movimiento = await recordInventoryMovement({
     producto,
     variante,
@@ -225,6 +248,10 @@ export async function consumeReservedStockForOrder({
     motivo,
     referencia,
     userId,
+    costoUnitario,
+    valorTotalOperacion,
+    costoPromedioResultante: costoUnitario,
+    saldoValorado,
   }, session);
 
   return {
