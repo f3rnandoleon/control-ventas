@@ -136,4 +136,5 @@ compraSchema.index({ creadoPor: 1 });
 
 const Compra = models.Compra || model("Compra", compraSchema);
 
+
 export default Compra;
