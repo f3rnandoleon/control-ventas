@@ -156,11 +156,13 @@ export async function registrarCompra(
       nuevoCostoPromedioBOB,
     });
 
+    const varianteIdFinal = (variante.varianteId || itemInput.varianteId) as string;
+
     await increaseStockInBranch(
       {
         sucursalId: sucursalDestinoId,
         productoId: producto._id,
-        varianteId: variante.varianteId,
+        varianteId: varianteIdFinal,
         cantidad,
       },
       session
