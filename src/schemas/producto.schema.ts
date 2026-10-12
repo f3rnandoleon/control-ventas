@@ -3,7 +3,6 @@ import {
     nonEmptyStringSchema,
     positiveNumberSchema,
     nonNegativeIntegerSchema,
-    nonNegativeNumberSchema,
 } from "./common.schema";
 
 const optionalObjectIdSchema = z.preprocess(

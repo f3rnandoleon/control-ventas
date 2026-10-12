@@ -22,7 +22,7 @@ export interface ProductPriceRangeResult {
  */
 export function getVariantPricing(
   producto: { precioVenta: number; precioCosto?: number | null },
-  variante?: { precioVenta?: number | null; precioCosto?: number | null } | Record<string, any> | null
+  variante?: { precioVenta?: number | null; precioCosto?: number | null } | Record<string, unknown> | null
 ): VariantPricingResult {
   const v = variante as { precioVenta?: number | null; precioCosto?: number | null } | null | undefined;
   const precioVenta =
