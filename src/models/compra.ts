@@ -131,7 +131,6 @@ const compraSchema = new Schema(
   }
 );
 
-compraSchema.index({ numeroCompra: 1 }, { unique: true });
 compraSchema.index({ fecha: -1 });
 compraSchema.index({ creadoPor: 1 });
 
