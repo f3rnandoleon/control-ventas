@@ -10,6 +10,10 @@ import type { CrearCompraInput } from "@/types/compra";
 import type { Variante } from "@/types/producto";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import {
+  getDefaultWarehouseId,
+  increaseStockInBranch,
+} from "@/modules/inventory/application/branch-stock.service";
 
 export async function registrarCompra(
   input: CrearCompraInput,
@@ -31,6 +35,10 @@ export async function registrarCompra(
   if (tipoCambio <= 0) {
     throw new AppError("El tipo de cambio debe ser mayor a 0", 400);
   }
+
+  const sucursalDestinoId = input.sucursalDestinoId
+    ? new mongoose.Types.ObjectId(input.sucursalDestinoId)
+    : await getDefaultWarehouseId(session);
 
   const numeroCompra = await comprasRepository.generateNextNumeroCompra();
 
@@ -148,8 +156,19 @@ export async function registrarCompra(
       nuevoCostoPromedioBOB,
     });
 
+    await increaseStockInBranch(
+      {
+        sucursalId: sucursalDestinoId,
+        productoId: producto._id,
+        varianteId: variante.varianteId,
+        cantidad,
+      },
+      session
+    );
+
     inventoryMovementsToCreate.push({
       productoId: producto._id,
+      sucursalId: sucursalDestinoId,
       productoSnapshot: {
         nombre: producto.nombre,
         modelo: producto.modelo,
@@ -187,6 +206,7 @@ export async function registrarCompra(
   const compra = await comprasRepository.create(
     {
       numeroCompra,
+      sucursalDestinoId,
       fecha: input.fecha ? new Date(input.fecha) : new Date(),
       proveedor: input.proveedor,
       comprobanteReferencia: input.comprobanteReferencia,

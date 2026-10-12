@@ -27,11 +27,19 @@ function assertStaff(actor: SalesActor): asserts actor is StaffActor {
   }
 }
 
-export async function scanVariantForPos(code: string) {
+import { getAvailableStockInBranch } from "@/modules/inventory/application/branch-stock.service";
+
+export async function scanVariantForPos(code: string, sucursalId?: string) {
   const producto = await findCatalogProductByCode(code);
+
+  let stockSucursal = producto.variante.stockDisponible;
+  if (sucursalId && mongoose.Types.ObjectId.isValid(sucursalId)) {
+    stockSucursal = await getAvailableStockInBranch(sucursalId, producto.variante.varianteId);
+  }
 
   return {
     ...producto,
+    stockSucursal,
     scanSource:
       producto.variante.codigoBarra === code
         ? "BARCODE"
@@ -46,11 +54,12 @@ export async function createPosSale(
   input: CreatePosSaleInput
 ) {
   assertStaff(actor);
-  const { delivery, ...saleData } = input;
+  const { delivery, sucursalId, ...saleData } = input;
 
   return crearVentaDirecta(actor, {
     ...saleData,
     canal: resolvePosSaleChannel(delivery),
+    sucursalId,
   });
 }
 

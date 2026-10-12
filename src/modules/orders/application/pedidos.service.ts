@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
+import User from "@/models/user";
+import { getDefaultWarehouseId } from "@/modules/inventory/application/branch-stock.service";
 
 import { getValidatedCartForCheckout, clearCartByUserId } from "@/modules/cart/application/cart.service";
 import {
@@ -311,9 +313,12 @@ export async function crearPedidoDesdeCarrito(
 
     const gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
 
+    const defaultWarehouseId = await getDefaultWarehouseId(session);
+
     const pedido = await pedidosRepository.create({
       numeroPedido: createPedidoNumber(),
       canal: "WEB",
+      sucursalId: defaultWarehouseId,
       estadoPedido: "PENDING_PAYMENT",
       estadoPago: "PENDING",
       estadoEntrega,
@@ -358,6 +363,7 @@ export async function crearPedidoDesdeCarrito(
           metodoEntrega,
           total: pedido.total,
           items: pedido.items.length,
+          sucursalId: defaultWarehouseId.toString(),
         },
       },
       session
@@ -365,8 +371,6 @@ export async function crearPedidoDesdeCarrito(
 
     return pedido;
   });
-
-
 
   return pedido;
 }
@@ -378,6 +382,19 @@ export async function crearVentaDirecta(
   await connectDB();
 
   return runInTransaction(async (session) => {
+    // Determinar sucursal: payload -> usuario asignado -> almacén por defecto
+    let targetSucursalId: mongoose.Types.ObjectId;
+    if (payload.sucursalId && mongoose.Types.ObjectId.isValid(payload.sucursalId)) {
+      targetSucursalId = new mongoose.Types.ObjectId(payload.sucursalId);
+    } else {
+      const user = await User.findById(actor.id).session(session);
+      if (user?.sucursalAsignadaId) {
+        targetSucursalId = user.sucursalAsignadaId as mongoose.Types.ObjectId;
+      } else {
+        targetSucursalId = await getDefaultWarehouseId(session);
+      }
+    }
+
     let subtotal = 0;
     let gananciaTotal = 0;
     const itemsProcesados = [];
@@ -403,6 +420,7 @@ export async function crearVentaDirecta(
         variante,
         cantidad: item.cantidad,
         userId: actor.id,
+        sucursalId: targetSucursalId,
         motivo: `Venta directa ${payload.canal}`,
         referencia: "VENTA_DIRECTA"
       }, session);
@@ -446,6 +464,7 @@ export async function crearVentaDirecta(
     const pedido = await pedidosRepository.create({
       numeroPedido: createPedidoNumber(),
       canal: payload.canal,
+      sucursalId: targetSucursalId,
       estadoPedido: "DELIVERED",
       estadoPago: "PAID",
       estadoEntrega: "NOT_APPLICABLE",
@@ -467,7 +486,7 @@ export async function crearVentaDirecta(
       idActor: actor.id,
       rolActor: actor.rol,
       estado: "SUCCESS",
-      metadata: { total: pedido.total, canal: pedido.canal }
+      metadata: { total: pedido.total, canal: pedido.canal, sucursalId: targetSucursalId.toString() }
     }, session);
 
     return pedido;

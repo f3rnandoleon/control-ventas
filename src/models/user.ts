@@ -1,4 +1,4 @@
-import { Schema, model, models } from "mongoose";
+import { Schema, model, models, Types } from "mongoose";
 
 export const authProviderValues = ["credentials", "google"] as const;
 export type AuthProvider = (typeof authProviderValues)[number];
@@ -36,6 +36,12 @@ const usuarioSchema = new Schema(
       type: String,
       enum: ["ADMIN", "VENDEDOR", "CLIENTE"],
       default: "CLIENTE",
+    },
+
+    sucursalAsignadaId: {
+      type: Types.ObjectId,
+      ref: "Sucursal",
+      default: null,
     },
 
     estaActivo: {

@@ -122,7 +122,8 @@ export async function getKardexConsolidado(): Promise<KardexConsolidadoResumen> 
 
 export async function getKardexPorProducto(
   productoId: string,
-  varianteId?: string
+  varianteId?: string,
+  sucursalId?: string
 ) {
   assertObjectId(productoId, "ID de producto inválido");
   await connectDB();
@@ -136,9 +137,13 @@ export async function getKardexPorProducto(
   if (varianteId) {
     query["variante.varianteId"] = varianteId;
   }
+  if (sucursalId) {
+    query["sucursalId"] = sucursalId;
+  }
 
   const movimientos = await Inventario.find(query)
     .populate("usuario", "nombreCompleto email")
+    .populate("sucursalId", "nombre codigo tipo")
     .sort({ createdAt: 1 })
     .lean();
 
@@ -161,7 +166,12 @@ export async function getKardexPorProducto(
         : runningCostoPromedio
     );
 
-    if (mov.tipo === "ENTRADA" || mov.tipo === "DEVOLUCION") {
+    const esEntrada =
+      mov.tipo === "ENTRADA" ||
+      mov.tipo === "DEVOLUCION" ||
+      mov.tipo === "TRASPASO_ENTRADA";
+
+    if (esEntrada) {
       entradaCantidad = cantidad;
       debe = Number((entradaCantidad * costoUnitarioMov).toFixed(2));
       
@@ -175,7 +185,7 @@ export async function getKardexPorProducto(
           ? Number((runningSaldoValorado / runningSaldoFisico).toFixed(2))
           : costoUnitarioMov;
     } else {
-      // SALIDA o AJUSTE negativo
+      // SALIDA, TRASPASO_SALIDA o AJUSTE negativo
       salidaCantidad = cantidad;
       haber = Number((salidaCantidad * runningCostoPromedio).toFixed(2));
       
@@ -187,10 +197,16 @@ export async function getKardexPorProducto(
       }
     }
 
+    const sucursalNombre =
+      mov.sucursalId && typeof mov.sucursalId === "object"
+        ? (mov.sucursalId as { nombre?: string }).nombre
+        : undefined;
+
     kardexMovimientos.push({
       _id: String(mov._id),
       fecha: mov.createdAt ? new Date(mov.createdAt).toISOString() : new Date().toISOString(),
       tipo: mov.tipo,
+      sucursal: sucursalNombre,
       referencia: mov.referencia || "-",
       motivo: mov.motivo || "-",
       usuario: mov.usuario && typeof mov.usuario === "object" ? (mov.usuario as { nombreCompleto?: string }).nombreCompleto || "Sistema" : "Sistema",

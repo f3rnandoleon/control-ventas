@@ -7,6 +7,12 @@ export interface Usuario {
   nombreCompleto: string;
   email: string;
   rol: UserRole;
+  sucursalAsignadaId?: string | null;
+  sucursalAsignada?: {
+    _id: string;
+    nombre: string;
+    codigo: string;
+  } | null;
   estaActivo: boolean;
   createdAt: string;
 }
@@ -22,6 +28,7 @@ export type CreateUsuarioDTO = {
   nombreCompleto: string;
   email: string;
   rol: UserRole;
+  sucursalAsignadaId?: string | null;
   estaActivo?: boolean;
   password: string;
 };
@@ -30,6 +37,7 @@ export type UpdateUsuarioDTO = {
   nombreCompleto?: string;
   email?: string;
   rol?: UserRole;
+  sucursalAsignadaId?: string | null;
   estaActivo?: boolean;
   password?: string;
 };

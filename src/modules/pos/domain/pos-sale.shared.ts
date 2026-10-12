@@ -111,6 +111,7 @@ export const createPosSaleSchemaShared = z.object({
     .default(0)
     .optional(),
   delivery: posSaleDeliverySchema.optional(),
+  sucursalId: z.string().trim().optional(),
 });
 
 export type CreatePosSaleInputShared = z.infer<typeof createPosSaleSchemaShared>;

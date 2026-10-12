@@ -14,8 +14,9 @@ export async function GET(
     const { productoId } = await params;
     const { searchParams } = new URL(request.url);
     const varianteId = searchParams.get("varianteId") || undefined;
+    const sucursalId = searchParams.get("sucursalId") || undefined;
 
-    const kardexDetalle = await getKardexPorProducto(productoId, varianteId);
+    const kardexDetalle = await getKardexPorProducto(productoId, varianteId, sucursalId);
     return NextResponse.json(kardexDetalle);
   } catch (error) {
     return handleRouteError(error, {

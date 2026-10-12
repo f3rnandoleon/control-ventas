@@ -121,6 +121,12 @@ const compraSchema = new Schema(
       type: String,
       trim: true,
     },
+    sucursalDestinoId: {
+      type: Types.ObjectId,
+      ref: "Sucursal",
+      required: false,
+      index: true,
+    },
     creadoPor: {
       type: Types.ObjectId,
       ref: "User",

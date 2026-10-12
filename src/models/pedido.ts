@@ -118,6 +118,12 @@ const pedidoSchema = new Schema(
       ref: "User",
       default: null,
     },
+    sucursalId: {
+      type: Types.ObjectId,
+      ref: "Sucursal",
+      default: null,
+      index: true,
+    },
     snapshotCliente: {
       usuarioId: { type: Types.ObjectId, ref: "User" },
       nombreCompleto: { type: String },
@@ -239,6 +245,7 @@ const pedidoSchema = new Schema(
 
 pedidoSchema.index({ cliente: 1, createdAt: -1 });
 pedidoSchema.index({ vendedor: 1, createdAt: -1 });
+pedidoSchema.index({ sucursalId: 1, createdAt: -1 });
 pedidoSchema.index({ canal: 1, createdAt: -1 });
 pedidoSchema.index({ estadoPedido: 1, createdAt: -1 });
 pedidoSchema.index({ estadoPago: 1, createdAt: -1 });

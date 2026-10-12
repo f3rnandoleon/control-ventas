@@ -17,13 +17,25 @@ export interface InventarioItem {
     codigoBarra?: string;
   };
 
+  sucursalId?: {
+    _id: string;
+    nombre: string;
+    codigo: string;
+  } | string | null;
+
   productoSnapshot?: {
     nombre?: string;
     modelo?: string;
     sku?: string;
   };
 
-  tipo: "ENTRADA" | "SALIDA" | "AJUSTE" | "DEVOLUCION";
+  tipo:
+    | "ENTRADA"
+    | "SALIDA"
+    | "AJUSTE"
+    | "DEVOLUCION"
+    | "TRASPASO_SALIDA"
+    | "TRASPASO_ENTRADA";
   cantidad: number;
 
   stockAnterior: number;
@@ -94,7 +106,14 @@ export interface KardexConsolidadoResumen {
 export interface KardexMovimiento {
   _id: string;
   fecha: string;
-  tipo: "ENTRADA" | "SALIDA" | "AJUSTE" | "DEVOLUCION";
+  tipo:
+    | "ENTRADA"
+    | "SALIDA"
+    | "AJUSTE"
+    | "DEVOLUCION"
+    | "TRASPASO_SALIDA"
+    | "TRASPASO_ENTRADA";
+  sucursal?: string;
   referencia?: string;
   motivo?: string;
   usuario?: string;

@@ -107,6 +107,7 @@ export const createPedidoSchema = z.object({
     .nonnegative("El descuento no puede ser negativo")
     .default(0)
     .optional(),
+  sucursalId: optionalObjectIdSchema,
 });
 
 export type CreatePedidoInput = z.infer<typeof createPedidoSchema>;

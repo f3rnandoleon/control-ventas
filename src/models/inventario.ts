@@ -8,6 +8,13 @@ const inventarioSchema = new Schema(
       required: true,
     },
 
+    sucursalId: {
+      type: Types.ObjectId,
+      ref: "Sucursal",
+      required: false,
+      index: true,
+    },
+
     variante: {
       varianteId: { type: String, index: true },
       color: { type: String, required: true },
@@ -24,7 +31,14 @@ const inventarioSchema = new Schema(
 
     tipo: {
       type: String,
-      enum: ["ENTRADA", "SALIDA", "AJUSTE", "DEVOLUCION"],
+      enum: [
+        "ENTRADA",
+        "SALIDA",
+        "AJUSTE",
+        "DEVOLUCION",
+        "TRASPASO_SALIDA",
+        "TRASPASO_ENTRADA",
+      ],
       required: true,
     },
 
@@ -91,6 +105,7 @@ const inventarioSchema = new Schema(
 );
 
 inventarioSchema.index({ productoId: 1, createdAt: -1 });
+inventarioSchema.index({ sucursalId: 1, createdAt: -1 });
 inventarioSchema.index({ "variante.varianteId": 1, createdAt: -1 });
 inventarioSchema.index({ referencia: 1, createdAt: -1 });
 

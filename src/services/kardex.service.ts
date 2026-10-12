@@ -41,11 +41,15 @@ export async function getKardexConsolidado(): Promise<KardexConsolidadoResumen> 
 
 export async function getKardexProducto(
   productoId: string,
-  varianteId?: string
+  varianteId?: string,
+  sucursalId?: string
 ): Promise<KardexProductoDetalleResponse> {
-  const url = varianteId
-    ? `/api/inventario/kardex/${productoId}?varianteId=${encodeURIComponent(varianteId)}`
-    : `/api/inventario/kardex/${productoId}`;
+  const params = new URLSearchParams();
+  if (varianteId) params.set("varianteId", varianteId);
+  if (sucursalId) params.set("sucursalId", sucursalId);
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  const url = `/api/inventario/kardex/${productoId}${queryString}`;
 
   const res = await fetch(url);
 

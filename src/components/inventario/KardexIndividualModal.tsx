@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getKardexProducto, KardexProductoDetalleResponse } from "@/services/kardex.service";
+import { getSucursales } from "@/services/sucursales.service";
+import type { Sucursal } from "@/types/sucursal";
 import { formatMoney } from "@/utils/pricing";
 
 export default function KardexIndividualModal({
@@ -14,6 +16,12 @@ export default function KardexIndividualModal({
   const [data, setData] = useState<KardexProductoDetalleResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVarianteId, setSelectedVarianteId] = useState<string>("");
+  const [selectedSucursalId, setSelectedSucursalId] = useState<string>("");
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+
+  useEffect(() => {
+    getSucursales().then(setSucursales).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -21,7 +29,8 @@ export default function KardexIndividualModal({
       try {
         const res = await getKardexProducto(
           productoId,
-          selectedVarianteId || undefined
+          selectedVarianteId || undefined,
+          selectedSucursalId || undefined
         );
         setData(res);
       } catch (err) {
@@ -31,7 +40,7 @@ export default function KardexIndividualModal({
       }
     };
     load();
-  }, [productoId, selectedVarianteId]);
+  }, [productoId, selectedVarianteId, selectedSucursalId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -59,7 +68,7 @@ export default function KardexIndividualModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl font-bold p-1 leading-none"
+            className="text-gray-400 hover:text-white text-2xl font-bold p-1 leading-none cursor-pointer"
           >
             &times;
           </button>
@@ -68,23 +77,43 @@ export default function KardexIndividualModal({
         {/* BODY */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
           {/* BARRA DE FILTRO Y KPIS ACTUALES */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-gray-400">
-                Filtrar por variante:
-              </label>
-              <select
-                value={selectedVarianteId}
-                onChange={(e) => setSelectedVarianteId(e.target.value)}
-                className="rounded-xl bg-gray-800 border border-white/10 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
-              >
-                <option value="">Todas las variantes del producto</option>
-                {data?.producto.variantes.map((v) => (
-                  <option key={v.varianteId} value={v.varianteId}>
-                    {v.color} - Talla {v.talla} (Stock actual: {v.stock} u.)
-                  </option>
-                ))}
-              </select>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-gray-400">
+                  Variante:
+                </label>
+                <select
+                  value={selectedVarianteId}
+                  onChange={(e) => setSelectedVarianteId(e.target.value)}
+                  className="rounded-xl bg-gray-800 border border-white/10 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">Todas las variantes</option>
+                  {data?.producto.variantes.map((v) => (
+                    <option key={v.varianteId} value={v.varianteId}>
+                      {v.color} - Talla {v.talla} (Stock: {v.stock} u.)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-gray-400">
+                  Sucursal:
+                </label>
+                <select
+                  value={selectedSucursalId}
+                  onChange={(e) => setSelectedSucursalId(e.target.value)}
+                  className="rounded-xl bg-gray-800 border border-white/10 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">Todas las ubicaciones</option>
+                  {sucursales.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.nombre} ({s.codigo})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* KPIS DE SALDO ACTUAL */}
@@ -128,6 +157,7 @@ export default function KardexIndividualModal({
                   <thead className="bg-white/5 border-b border-white/10 text-gray-400">
                     <tr className="border-b border-white/10 text-[11px]">
                       <th rowSpan={2} className="px-3 py-2 text-left">Fecha</th>
+                      <th rowSpan={2} className="px-3 py-2 text-left">Ubicación</th>
                       <th rowSpan={2} className="px-3 py-2 text-left">Documento / Ref</th>
                       <th rowSpan={2} className="px-3 py-2 text-left">Tipo</th>
                       <th rowSpan={2} className="px-3 py-2 text-left">Variante</th>
@@ -166,12 +196,26 @@ export default function KardexIndividualModal({
                         minute: "2-digit",
                       });
 
-                      const isEntrada = m.tipo === "ENTRADA" || m.tipo === "DEVOLUCION";
+                      const isEntrada =
+                        m.tipo === "ENTRADA" ||
+                        m.tipo === "DEVOLUCION" ||
+                        m.tipo === "TRASPASO_ENTRADA";
+                      const isTraspaso =
+                        m.tipo === "TRASPASO_ENTRADA" || m.tipo === "TRASPASO_SALIDA";
 
                       return (
                         <tr key={m._id} className="hover:bg-white/[0.02]">
                           <td className="px-3 py-2.5 whitespace-nowrap text-gray-400 font-mono text-[11px]">
                             {fechaStr}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap text-xs text-gray-300">
+                            {m.sucursal ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-white/10 font-medium text-gray-200">
+                                {m.sucursal}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 font-medium text-gray-200">
                             <div>{m.referencia}</div>
@@ -184,9 +228,11 @@ export default function KardexIndividualModal({
                           <td className="px-3 py-2.5">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                isEntrada
-                                  ? "bg-cyan-500/20 text-cyan-300"
-                                  : "bg-amber-500/20 text-amber-300"
+                                isTraspaso
+                                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                  : isEntrada
+                                    ? "bg-cyan-500/20 text-cyan-300"
+                                    : "bg-amber-500/20 text-amber-300"
                               }`}
                             >
                               {m.tipo}
