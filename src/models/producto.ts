@@ -1,5 +1,16 @@
 import { Schema, model, models, Types } from "mongoose";
 
+const medidasSchema = new Schema(
+  {
+    anchoPecho: { type: Number, min: 0 },
+    anchoHombros: { type: Number, min: 0 },
+    largoTotal: { type: Number, min: 0 },
+    largoMangaAxila: { type: Number, min: 0 },
+    largoMangaHombro: { type: Number, min: 0 },
+  },
+  { _id: false }
+);
+
 const varianteSchema = new Schema(
   {
     varianteId: {
@@ -15,6 +26,9 @@ const varianteSchema = new Schema(
     imagenes: { type: [String], default: [] },
     codigoBarra: { type: String },
     qrCode: { type: String },
+    precioVenta: { type: Number, min: 0 },
+    precioCosto: { type: Number, min: 0 },
+    medidas: { type: medidasSchema, default: undefined },
   },
   { _id: false }
 );

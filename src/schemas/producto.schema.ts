@@ -3,6 +3,7 @@ import {
     nonEmptyStringSchema,
     positiveNumberSchema,
     nonNegativeIntegerSchema,
+    nonNegativeNumberSchema,
 } from "./common.schema";
 
 const optionalObjectIdSchema = z.preprocess(
@@ -40,6 +41,19 @@ const varianteImageValueSchema = z.preprocess(
 // ============================================
 
 /**
+ * Schema para medidas de prenda (en centímetros)
+ */
+export const medidasPrendaSchema = z
+    .object({
+        anchoPecho: positiveNumberSchema.optional(),
+        anchoHombros: positiveNumberSchema.optional(),
+        largoTotal: positiveNumberSchema.optional(),
+        largoMangaAxila: positiveNumberSchema.optional(),
+        largoMangaHombro: positiveNumberSchema.optional(),
+    })
+    .optional();
+
+/**
  * Schema para variante de producto
  */
 export const varianteSchema = z.object({
@@ -69,7 +83,24 @@ export const varianteSchema = z.object({
     codigoBarra: z.string().optional(),
 
     qrCode: z.string().optional(),
-});
+
+    precioVenta: positiveNumberSchema.optional(),
+
+    precioCosto: positiveNumberSchema.optional(),
+
+    medidas: medidasPrendaSchema,
+}).refine(
+    (data) => {
+        if (data.precioVenta !== undefined && data.precioCosto !== undefined) {
+            return data.precioVenta >= data.precioCosto;
+        }
+        return true;
+    },
+    {
+        message: "El precio de venta de la variante debe ser mayor o igual al precio de costo",
+        path: ["precioVenta"],
+    }
+);
 
 /**
  * Schema para crear un producto

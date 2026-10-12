@@ -1,3 +1,11 @@
+export interface MedidasPrenda {
+  anchoPecho?: number;       // Ancho de pecho (axila a axila) en cm
+  anchoHombros?: number;     // Ancho de hombros en cm
+  largoTotal?: number;       // Largo total en cm
+  largoMangaAxila?: number;  // Largo de manga (axila a manga) en cm
+  largoMangaHombro?: number; // Largo de manga (hombro a manga) en cm
+}
+
 export interface Variante {
   varianteId?: string;
   color: string;
@@ -11,6 +19,9 @@ export interface Variante {
   descripcion?: string;
   codigoBarra?: string;
   qrCode?: string;
+  precioVenta?: number;      // Opcional: sobreescribe Producto.precioVenta si se define
+  precioCosto?: number;      // Opcional: sobreescribe Producto.precioCosto si se define
+  medidas?: MedidasPrenda;   // Opcional: medidas en cm
 }
 
 export interface Producto {

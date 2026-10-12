@@ -11,6 +11,7 @@ import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import { AppError } from "@/shared/errors/AppError";
 import { cartRepository } from "@/modules/cart/infrastructure/cart.repository";
 import { getAvailableStockForVariant } from "@/modules/inventory/application/inventory.service";
+import { getVariantPricing } from "@/utils/pricing";
 
 function assertObjectId(value: string, message: string) {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -92,10 +93,13 @@ export async function addCartItemByUserId(
     throw new AppError("Stock insuficiente para agregar al carrito", 400);
   }
 
+  const pricing = getVariantPricing(producto, variante);
+  const precioUnitario = pricing.precioVenta;
+
   if (existingItem) {
     existingItem.cantidad = nextQuantity;
-    existingItem.precioUnitario = producto.precioVenta;
-    existingItem.subtotal = nextQuantity * producto.precioVenta;
+    existingItem.precioUnitario = precioUnitario;
+    existingItem.subtotal = nextQuantity * precioUnitario;
     existingItem.productoSnapshot = {
       nombre: producto.nombre,
       modelo: producto.modelo,
@@ -119,9 +123,9 @@ export async function addCartItemByUserId(
         sku: producto.sku,
         imagen: getVarianteImagenPrincipal(variante),
       },
-      precioUnitario: producto.precioVenta,
+      precioUnitario,
       cantidad: input.cantidad,
-      subtotal: input.cantidad * producto.precioVenta,
+      subtotal: input.cantidad * precioUnitario,
     });
   }
 
@@ -171,9 +175,12 @@ export async function updateCartItemByUserId(
     throw new AppError("Stock insuficiente para actualizar el carrito", 400);
   }
 
+  const pricing = getVariantPricing(producto, variante);
+  const precioUnitario = pricing.precioVenta;
+
   item.cantidad = input.cantidad;
-  item.precioUnitario = producto.precioVenta;
-  item.subtotal = input.cantidad * producto.precioVenta;
+  item.precioUnitario = precioUnitario;
+  item.subtotal = input.cantidad * precioUnitario;
   item.productoSnapshot = {
     nombre: producto.nombre,
     modelo: producto.modelo,
@@ -267,12 +274,15 @@ export async function getValidatedCartForCheckout(
       );
     }
 
+    const pricing = getVariantPricing(producto, variante);
+    const precioUnitario = pricing.precioVenta;
+
     validatedItems.push({
       producto,
       variante,
       cartItem: item,
-      precioUnitario: producto.precioVenta,
-      subtotal: producto.precioVenta * item.cantidad,
+      precioUnitario,
+      subtotal: precioUnitario * item.cantidad,
     });
   }
 

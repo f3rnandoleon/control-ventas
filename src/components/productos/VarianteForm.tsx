@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useState } from "react";
 import { toast } from "sonner";
-import { Variante } from "@/types/producto";
+import { Variante, MedidasPrenda } from "@/types/producto";
 import { uploadVarianteImages } from "@/services/upload.service";
 import { getVarianteImagenes } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
@@ -19,6 +19,10 @@ type VarianteTallaForm = {
   stock: number;
   codigoBarra?: string;
   qrCode?: string;
+  precioVenta?: number | "";
+  precioCosto?: number | "";
+  medidas?: MedidasPrenda;
+  showMedidas?: boolean;
 };
 
 type VarianteSharedForm = {
@@ -31,6 +35,10 @@ type VarianteSharedForm = {
 const createEmptySizeRow = (): VarianteTallaForm => ({
   talla: "",
   stock: 0,
+  precioVenta: "",
+  precioCosto: "",
+  medidas: {},
+  showMedidas: false,
 });
 
 const normalizeVariantKey = (
@@ -44,12 +52,16 @@ export default function VarianteForm({
   initialData,
   initialVariantes,
   existingVariantes = [],
+  precioBaseVenta,
+  precioBaseCosto,
   onSave,
   onCancel,
 }: {
   initialData?: Variante;
   initialVariantes?: Variante[];
   existingVariantes?: Variante[];
+  precioBaseVenta?: number;
+  precioBaseCosto?: number;
   onSave: (data: Variante[]) => void;
   onCancel: () => void;
 }) {
@@ -88,6 +100,21 @@ export default function VarianteForm({
         stock: variante.stock || 0,
         codigoBarra: variante.codigoBarra || "",
         qrCode: variante.qrCode || "",
+        precioVenta:
+          variante.precioVenta !== undefined && variante.precioVenta !== null
+            ? variante.precioVenta
+            : "",
+        precioCosto:
+          variante.precioCosto !== undefined && variante.precioCosto !== null
+            ? variante.precioCosto
+            : "",
+        medidas: variante.medidas || {},
+        showMedidas: Boolean(
+          variante.medidas &&
+            Object.values(variante.medidas).some(
+              (v) => typeof v === "number" && v > 0
+            )
+        ),
       }));
     }
 
@@ -156,12 +183,36 @@ export default function VarianteForm({
   const updateSizeRow = (
     index: number,
     field: keyof VarianteTallaForm,
-    value: string | number
+    value: unknown
   ) => {
     setSizeRows((prev) =>
       prev.map((row, rowIndex) =>
         rowIndex === index ? { ...row, [field]: value } : row
       )
+    );
+  };
+
+  const updateMedidaField = (
+    index: number,
+    medidaKey: keyof MedidasPrenda,
+    value: string
+  ) => {
+    const numValue = value === "" ? undefined : Number(value);
+    setSizeRows((prev) =>
+      prev.map((row, rowIndex) => {
+        if (rowIndex !== index) return row;
+        const currentMedidas = row.medidas || {};
+        return {
+          ...row,
+          medidas: {
+            ...currentMedidas,
+            [medidaKey]:
+              numValue !== undefined && !Number.isNaN(numValue)
+                ? numValue
+                : undefined,
+          },
+        };
+      })
     );
   };
 
@@ -171,6 +222,11 @@ export default function VarianteForm({
 
   const removeSizeRow = (index: number) => {
     setSizeRows((prev) => prev.filter((_, rowIndex) => rowIndex !== index));
+  };
+
+  const hasAnyMedida = (medidas?: MedidasPrenda) => {
+    if (!medidas) return false;
+    return Object.values(medidas).some((v) => typeof v === "number" && v > 0);
   };
 
   const handleSave = () => {
@@ -184,11 +240,46 @@ export default function VarianteForm({
       return;
     }
 
-    const sanitizedRows = sizeRows.map((row) => ({
-      ...row,
-      talla: row.talla.trim(),
-      stock: Number(row.stock),
-    }));
+    const sanitizedRows = sizeRows.map((row) => {
+      // Limpiar y estructurar medidas
+      const cleanMedidas: MedidasPrenda = {};
+      if (row.medidas?.anchoPecho && Number(row.medidas.anchoPecho) > 0)
+        cleanMedidas.anchoPecho = Number(row.medidas.anchoPecho);
+      if (row.medidas?.anchoHombros && Number(row.medidas.anchoHombros) > 0)
+        cleanMedidas.anchoHombros = Number(row.medidas.anchoHombros);
+      if (row.medidas?.largoTotal && Number(row.medidas.largoTotal) > 0)
+        cleanMedidas.largoTotal = Number(row.medidas.largoTotal);
+      if (row.medidas?.largoMangaAxila && Number(row.medidas.largoMangaAxila) > 0)
+        cleanMedidas.largoMangaAxila = Number(row.medidas.largoMangaAxila);
+      if (row.medidas?.largoMangaHombro && Number(row.medidas.largoMangaHombro) > 0)
+        cleanMedidas.largoMangaHombro = Number(row.medidas.largoMangaHombro);
+
+      const hasMedidas = Object.keys(cleanMedidas).length > 0;
+
+      const pVentaNum =
+        row.precioVenta === "" || row.precioVenta === undefined || row.precioVenta === null
+          ? undefined
+          : Number(row.precioVenta);
+      const pCostoNum =
+        row.precioCosto === "" || row.precioCosto === undefined || row.precioCosto === null
+          ? undefined
+          : Number(row.precioCosto);
+
+      return {
+        ...row,
+        talla: row.talla.trim(),
+        stock: Number(row.stock),
+        precioVenta:
+          pVentaNum !== undefined && !Number.isNaN(pVentaNum) && pVentaNum > 0
+            ? pVentaNum
+            : undefined,
+        precioCosto:
+          pCostoNum !== undefined && !Number.isNaN(pCostoNum) && pCostoNum > 0
+            ? pCostoNum
+            : undefined,
+        medidas: hasMedidas ? cleanMedidas : undefined,
+      };
+    });
 
     if (sanitizedRows.some((row) => !row.talla)) {
       toast.error("Cada fila debe tener una talla");
@@ -205,6 +296,19 @@ export default function VarianteForm({
     ) {
       toast.error("La cantidad debe ser un numero entero mayor o igual a 0");
       return;
+    }
+
+    for (const row of sanitizedRows) {
+      if (
+        row.precioVenta !== undefined &&
+        row.precioCosto !== undefined &&
+        row.precioVenta < row.precioCosto
+      ) {
+        toast.error(
+          `En la talla ${row.talla}, el precio de venta (Bs ${row.precioVenta}) no puede ser menor al costo (Bs ${row.precioCosto})`
+        );
+        return;
+      }
     }
 
     const draftKeys = sanitizedRows.map((row) =>
@@ -260,6 +364,9 @@ export default function VarianteForm({
         imagenes,
         codigoBarra: row.codigoBarra || undefined,
         qrCode: row.qrCode || undefined,
+        precioVenta: row.precioVenta,
+        precioCosto: row.precioCosto,
+        medidas: row.medidas,
       }))
     );
   };
@@ -291,18 +398,17 @@ export default function VarianteForm({
       </div>
 
       <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-medium text-white">Tallas y cantidades</p>
+            <p className="text-sm font-medium text-white">Tallas, Stock, Precios y Medidas</p>
             <p className="text-xs text-gray-400">
-              Reutiliza el mismo color, descripcion e imagenes para varias
-              tallas.
+              Reutiliza el mismo color e imágenes. El precio y costo son opcionales por talla (si se dejan vacíos, heredan los del producto).
             </p>
           </div>
 
           <button
             type="button"
-            className="btn-link"
+            className="btn-link text-sm"
             onClick={addSizeRow}
           >
             + Agregar talla
@@ -310,49 +416,264 @@ export default function VarianteForm({
         </div>
 
         <div className="space-y-3">
-          {sizeRows.map((row, index) => (
-            <div
-              key={`${index}-${row.codigoBarra || "new"}`}
-              className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-black/10 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-            >
-              <select
-                className="input"
-                value={row.talla}
-                onChange={(e) => updateSizeRow(index, "talla", e.target.value)}
+          {sizeRows.map((row, index) => {
+            const rowHasMedidas = hasAnyMedida(row.medidas);
+
+            return (
+              <div
+                key={`${index}-${row.codigoBarra || "new"}`}
+                className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3"
               >
-                <option value="">Selecciona una talla</option>
-                {getVariantSelectOptions(row.talla, TALLA_OPTIONS).map(
-                  (talla) => (
-                    <option key={talla} value={talla}>
-                      {talla}
-                    </option>
-                  )
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-12 md:items-center">
+                  {/* Selector Talla */}
+                  <div className="md:col-span-3">
+                    <select
+                      className="input w-full"
+                      value={row.talla}
+                      onChange={(e) => updateSizeRow(index, "talla", e.target.value)}
+                    >
+                      <option value="">Talla</option>
+                      {getVariantSelectOptions(row.talla, TALLA_OPTIONS).map(
+                        (talla) => (
+                          <option key={talla} value={talla}>
+                            {talla}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Stock */}
+                  <div className="md:col-span-2">
+                    <input
+                      type="number"
+                      className="input w-full"
+                      placeholder="Stock"
+                      title="Stock disponible"
+                      min={0}
+                      step={1}
+                      value={row.stock}
+                      onChange={(e) =>
+                        updateSizeRow(index, "stock", Number(e.target.value))
+                      }
+                    />
+                  </div>
+
+                  {/* Precio Venta Opcional */}
+                  <div className="md:col-span-2">
+                    <input
+                      type="number"
+                      className="input w-full text-xs"
+                      placeholder={
+                        precioBaseVenta
+                          ? `P.V: Bs ${precioBaseVenta}`
+                          : "P. Venta (opc)"
+                      }
+                      title="Precio de venta específico para esta talla (deja vacío para usar precio base)"
+                      min={0}
+                      step="any"
+                      value={row.precioVenta ?? ""}
+                      onChange={(e) =>
+                        updateSizeRow(
+                          index,
+                          "precioVenta",
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+
+                  {/* Precio Costo Opcional */}
+                  <div className="md:col-span-2">
+                    <input
+                      type="number"
+                      className="input w-full text-xs"
+                      placeholder={
+                        precioBaseCosto
+                          ? `Cost: Bs ${precioBaseCosto}`
+                          : "P. Costo (opc)"
+                      }
+                      title="Precio de costo específico para esta talla (deja vacío para usar costo base)"
+                      min={0}
+                      step="any"
+                      value={row.precioCosto ?? ""}
+                      onChange={(e) =>
+                        updateSizeRow(
+                          index,
+                          "precioCosto",
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+
+                  {/* Botón Medidas y Quitar */}
+                  <div className="flex items-center gap-2 md:col-span-3 md:justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSizeRow(index, "showMedidas", !row.showMedidas)
+                      }
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1 ${
+                        rowHasMedidas
+                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30"
+                          : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+                      }`}
+                      title="Configurar medidas de la prenda para esta talla"
+                    >
+                      <span>📏</span>
+                      <span>{rowHasMedidas ? "✓ Medidas" : "Medidas"}</span>
+                    </button>
+
+                    {sizeRows.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn-danger text-xs px-2.5 py-1.5"
+                        onClick={() => removeSizeRow(index)}
+                        title="Quitar talla"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Acordeón Desplegable de Medidas */}
+                {row.showMedidas && (
+                  <div className="rounded-lg border border-cyan-500/20 bg-black/40 p-3 space-y-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-cyan-400">
+                        Medidas en centímetros {row.talla ? `— Talla ${row.talla}` : ""} (opcional)
+                      </p>
+                      <span className="text-[11px] text-gray-400">
+                        Ingresa solo las medidas que apliquen
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 text-xs">
+                      <div>
+                        <label className="text-[11px] text-gray-400 block mb-1">
+                          Pecho (axila-axila)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="input w-full pr-7 py-1 text-xs"
+                            placeholder="Ej: 54"
+                            value={row.medidas?.anchoPecho ?? ""}
+                            onChange={(e) =>
+                              updateMedidaField(index, "anchoPecho", e.target.value)
+                            }
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
+                            cm
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-gray-400 block mb-1">
+                          Ancho hombros
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="input w-full pr-7 py-1 text-xs"
+                            placeholder="Ej: 46"
+                            value={row.medidas?.anchoHombros ?? ""}
+                            onChange={(e) =>
+                              updateMedidaField(index, "anchoHombros", e.target.value)
+                            }
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
+                            cm
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-gray-400 block mb-1">
+                          Largo total
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="input w-full pr-7 py-1 text-xs"
+                            placeholder="Ej: 70"
+                            value={row.medidas?.largoTotal ?? ""}
+                            onChange={(e) =>
+                              updateMedidaField(index, "largoTotal", e.target.value)
+                            }
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
+                            cm
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-gray-400 block mb-1">
+                          Manga (axila-puño)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="input w-full pr-7 py-1 text-xs"
+                            placeholder="Ej: 52"
+                            value={row.medidas?.largoMangaAxila ?? ""}
+                            onChange={(e) =>
+                              updateMedidaField(
+                                index,
+                                "largoMangaAxila",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
+                            cm
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-gray-400 block mb-1">
+                          Manga (hombro-puño)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="input w-full pr-7 py-1 text-xs"
+                            placeholder="Ej: 64"
+                            value={row.medidas?.largoMangaHombro ?? ""}
+                            onChange={(e) =>
+                              updateMedidaField(
+                                index,
+                                "largoMangaHombro",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
+                            cm
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </select>
-              <input
-                type="number"
-                className="input"
-                placeholder="Cantidad / stock"
-                min={0}
-                step={1}
-                value={row.stock}
-                onChange={(e) =>
-                  updateSizeRow(index, "stock", Number(e.target.value))
-                }
-              />
-              {sizeRows.length > 1 ? (
-                <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={() => removeSizeRow(index)}
-                >
-                  Quitar
-                </button>
-              ) : (
-                <div />
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </div>
 

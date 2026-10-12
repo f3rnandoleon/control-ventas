@@ -5,6 +5,7 @@ import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import { getProductos } from "@/services/producto.service";
 import { Producto } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import { formatProductPriceDisplay } from "@/utils/pricing";
 
 export default function VendedorProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -113,7 +114,7 @@ export default function VendedorProductosPage() {
                       Stock total {stockTotal}
                     </span>
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
-                      Venta Bs {producto.precioVenta}
+                      Venta {formatProductPriceDisplay(producto)}
                     </span>
                   </div>
 

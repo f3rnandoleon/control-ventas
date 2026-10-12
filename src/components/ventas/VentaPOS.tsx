@@ -10,6 +10,7 @@ import { createPedidoSchema } from "@/schemas/pedido.schema";
 import { createVenta } from "@/services/pedidos.service";
 import type { Producto } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import { getVariantPricing, formatProductPriceDisplay } from "@/utils/pricing";
 
 type VentaFormValues = z.input<typeof createPedidoSchema>;
 type VentaFormSubmitValues = z.output<typeof createPedidoSchema>;
@@ -99,7 +100,10 @@ export default function VentaPOS({
 
   const subtotal = watchedItems.reduce((sum, item) => {
     const producto = productos.find((p) => p._id === item.productoId);
-    return sum + (producto?.precioVenta ?? 0) * (item.cantidad || 0);
+    if (!producto) return sum;
+    const variant = producto.variantes.find((v) => matchesVariant(v, item));
+    const pricing = getVariantPricing(producto, variant);
+    return sum + pricing.precioVenta * (item.cantidad || 0);
   }, 0);
 
   const montoDescuento =
@@ -262,7 +266,7 @@ export default function VentaPOS({
                   <p className="line-clamp-1 text-sm font-bold !text-white drop-shadow sm:text-base">{producto.nombre}</p>
                   <p className="line-clamp-1 text-[11px] !text-white/80 sm:text-xs">{producto.modelo}</p>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-base font-bold !text-white drop-shadow sm:text-lg">{formatMoney(producto.precioVenta)}</p>
+                    <p className="text-base font-bold !text-white drop-shadow sm:text-lg">{formatProductPriceDisplay(producto)}</p>
                     <p className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold !text-white">
                       Stock {stockDisponible}
                     </p>
@@ -345,7 +349,8 @@ export default function VentaPOS({
                     const image = variant ? getVarianteImagenPrincipal(variant) || (producto ? getProductoImage(producto) : undefined) : undefined;
                     const stockDisponible = variant ? getStockDisponible(variant) : 0;
                     const cantidad = item?.cantidad || 1;
-                    const precio = producto?.precioVenta ?? 0;
+                    const pricing = producto ? getVariantPricing(producto, variant) : { precioVenta: 0 };
+                    const precio = pricing.precioVenta;
 
                     return (
                       <div key={field.id} className="rounded-lg border border-white/10 bg-white/5 p-2">
@@ -486,6 +491,7 @@ export default function VentaPOS({
                   const image = getVarianteImagenPrincipal(variant) || getProductoImage(productoActivo);
                   const stockDisponible = getStockDisponible(variant);
                   const disabled = stockDisponible <= 0;
+                  const variantPricing = getVariantPricing(productoActivo, variant);
 
                   return (
                     <button
@@ -511,7 +517,15 @@ export default function VentaPOS({
                           {variant.color}{variant.colorSecundario ? ` / ${variant.colorSecundario}` : ""}
                         </p>
                         <p className="text-sm text-gray-400">Talla {variant.talla}</p>
-                        <p className="mt-2 text-sm font-semibold text-cyan-300">Stock {stockDisponible}</p>
+                        <p className="mt-1 text-xs font-semibold text-white">
+                          {formatMoney(variantPricing.precioVenta)}
+                          {variantPricing.tienePrecioDiferenciado && (
+                            <span className="ml-1 rounded bg-cyan-500/20 px-1 py-0.5 text-[10px] text-cyan-300 font-normal">
+                              Diferenciado
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-cyan-300">Stock {stockDisponible}</p>
                       </div>
                       <span className="self-center rounded-full bg-blue-600 px-3 py-1 text-lg leading-none text-white">+</span>
                     </button>

@@ -1,7 +1,8 @@
 import { autoTable } from "jspdf-autotable";
 import type { Producto } from "@/types/producto";
 import { ESTADO_STOCK_LABELS, getEstadoStock, getStockProducto } from "@/utils/stock";
-import { createReportDocument, formatMoney, saveReport } from "./pdfHelpers";
+import { createReportDocument, saveReport } from "./pdfHelpers";
+import { formatProductPriceDisplay } from "@/utils/pricing";
 
 export function generarReporteStockPDF(productos: Producto[]) {
   if (productos.length === 0) return;
@@ -12,7 +13,7 @@ export function generarReporteStockPDF(productos: Producto[]) {
     body: productos.map((producto) => {
       const stock = getStockProducto(producto);
       return [producto.nombre, producto.modelo, producto.sku, producto.categoria || "Sin categoría",
-        formatMoney(producto.precioVenta), stock.fisico, stock.reservado, stock.disponible,
+        formatProductPriceDisplay(producto), stock.fisico, stock.reservado, stock.disponible,
         ESTADO_STOCK_LABELS[getEstadoStock(stock.disponible, producto.stockMinimo)]];
     }),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak" },

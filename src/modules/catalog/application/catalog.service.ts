@@ -16,6 +16,7 @@ import {
 } from "@/modules/catalog/domain/variant.utils";
 import { recordInventoryMovement } from "@/modules/inventory/application/inventory.service";
 import type { Variante, Producto } from "@/types/producto";
+import { getVariantPricing } from "@/utils/pricing";
 
 type ProductoPayload = Partial<Producto> & {
   variantes?: Variante[];
@@ -438,11 +439,13 @@ export async function findCatalogProductByCode(code: string) {
     throw new AppError("Stock insuficiente", 400);
   }
 
+  const pricing = getVariantPricing(producto, variante);
+
   return {
     _id: producto._id,
     nombre: producto.nombre,
     modelo: producto.modelo,
-    precioVenta: producto.precioVenta,
+    precioVenta: pricing.precioVenta,
     variante: {
       varianteId: variante.varianteId,
       color: variante.color,
@@ -451,6 +454,9 @@ export async function findCatalogProductByCode(code: string) {
       stock: variante.stock,
       stockReservado: variante.stockReservado || 0,
       stockDisponible,
+      precioVenta: pricing.precioVenta,
+      precioCosto: pricing.precioCosto,
+      medidas: variante.medidas,
       imagen: getVarianteImagenPrincipal(variante),
       imagenes: getVarianteImagenes(variante),
       codigoBarra: variante.codigoBarra,

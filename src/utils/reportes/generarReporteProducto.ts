@@ -2,18 +2,21 @@ import { autoTable } from "jspdf-autotable";
 import type { Producto } from "@/types/producto";
 import { ESTADO_STOCK_LABELS, getEstadoStock, getStockDisponibleVariante, getStockFisicoVariante, getStockReservadoVariante } from "@/utils/stock";
 import { createReportDocument, formatMoney, saveReport } from "./pdfHelpers";
+import { getVariantPricing } from "@/utils/pricing";
 
 export function generarReporteProductoPDF(producto: Producto) {
   const doc = createReportDocument(`Stock del producto: ${producto.nombre}`);
   doc.setFontSize(10);
   doc.text(`Modelo: ${producto.modelo} | SKU: ${producto.sku} | Categoría: ${producto.categoria || "Sin categoría"}`, 14, 29);
-  doc.text(`Precio venta: ${formatMoney(producto.precioVenta)} | Precio costo: ${formatMoney(producto.precioCosto)}`, 14, 35);
+  doc.text(`Precio venta base: ${formatMoney(producto.precioVenta)} | Precio costo base: ${formatMoney(producto.precioCosto)}`, 14, 35);
   autoTable(doc, {
     startY: 41,
-    head: [["Color", "Color secundario", "Talla", "Físico", "Reservado", "Disponible", "Estado"]],
+    head: [["Color", "Color secundario", "Talla", "Precio venta", "Físico", "Reservado", "Disponible", "Estado"]],
     body: producto.variantes.map((variante) => {
       const disponible = getStockDisponibleVariante(variante);
+      const pricing = getVariantPricing(producto, variante);
       return [variante.color, variante.colorSecundario || "—", variante.talla,
+        formatMoney(pricing.precioVenta),
         getStockFisicoVariante(variante), getStockReservadoVariante(variante), disponible,
         ESTADO_STOCK_LABELS[getEstadoStock(disponible, producto.stockMinimo)]];
     }),

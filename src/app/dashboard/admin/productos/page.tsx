@@ -14,6 +14,7 @@ import { getEstadoStock, getStockDisponibleVariante, getStockProducto } from "@/
 import { generarReporteStockPDF } from "@/utils/reportes/generarReporteStock";
 import { generarReporteProductoPDF } from "@/utils/reportes/generarReporteProducto";
 import { generarImagenGeneralVariantesDisponibles, generarImagenVariantesDisponibles } from "@/utils/reportes/generarImagenVariantes";
+import { formatProductPriceDisplay } from "@/utils/pricing";
 
 export default function AdminProductosPage() {
   type ModalView = "PRODUCTO" | "VARIANTES";
@@ -296,7 +297,7 @@ export default function AdminProductosPage() {
                 <td className="px-4 py-3">{imagen ? <CloudinaryImage src={imagen} alt={producto.nombre} width={40} height={40} className="h-10 w-10 rounded-lg object-cover" /> : <div className="surface-placeholder flex h-10 w-10 items-center justify-center rounded-lg" aria-label="Sin imagen">▧</div>}</td>
                 <td className="px-4 py-4 font-medium text-white">{producto.nombre}</td>
                 <td>{producto.modelo}</td>
-                <td>Bs {producto.precioVenta}</td>
+                <td>{formatProductPriceDisplay(producto)}</td>
                 <td>
                   <div className="font-semibold">Bs {producto.precioCosto}</div>
                   {producto.costoOrigen && producto.costoOrigen.moneda === "PEN" && (

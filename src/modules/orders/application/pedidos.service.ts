@@ -28,6 +28,7 @@ import { generateOrderedId } from "@/utils/generarId";
 import { assertObjectId } from "@/utils/validacion";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import type { Variante } from "@/types/producto";
+import { getVariantPricing } from "@/utils/pricing";
 import type { SalesQueryInput } from "@/schemas/sales-query.schema";
 
 function createPedidoNumber() {
@@ -281,7 +282,9 @@ export async function crearPedidoDesdeCarrito(
     const estadoEntrega = metodoEntrega === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
 
     const itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
-      const ganancia = (precioUnitario - producto.precioCosto) * cartItem.cantidad;
+      const pricing = getVariantPricing(producto, variante);
+      const effectivePrecioCosto = pricing.precioCosto;
+      const ganancia = (precioUnitario - effectivePrecioCosto) * cartItem.cantidad;
       return {
         productoId: producto._id,
         variante: {
@@ -301,7 +304,7 @@ export async function crearPedidoDesdeCarrito(
         cantidad: cartItem.cantidad,
         precioUnitario,
         totalLinea: precioUnitario * cartItem.cantidad,
-        precioCosto: producto.precioCosto,
+        precioCosto: effectivePrecioCosto,
         ganancia
       };
     });
@@ -404,9 +407,11 @@ export async function crearVentaDirecta(
         referencia: "VENTA_DIRECTA"
       }, session);
 
-      const precioUnitario = producto.precioVenta;
+      const pricing = getVariantPricing(producto, variante);
+      const precioUnitario = pricing.precioVenta;
+      const precioCosto = pricing.precioCosto;
       const totalLinea = precioUnitario * item.cantidad;
-      const ganancia = (precioUnitario - producto.precioCosto) * item.cantidad;
+      const ganancia = (precioUnitario - precioCosto) * item.cantidad;
 
       subtotal += totalLinea;
       gananciaTotal += ganancia;
@@ -430,7 +435,7 @@ export async function crearVentaDirecta(
         cantidad: item.cantidad,
         precioUnitario,
         totalLinea,
-        precioCosto: producto.precioCosto,
+        precioCosto,
         ganancia
       });
     }

@@ -8,6 +8,7 @@ import VarianteRow from "./VarianteRow";
 import { updateProducto } from "@/services/producto.service";
 import { generarPDFQrs } from "@/utils/generarPDFQrs";
 import { generarPDFCodigosBarras } from "@/utils/generarPDFCodigosBarras";
+import GuiaTallasModal from "./GuiaTallasModal";
 
 type Mode = "LIST" | "ADD" | "EDIT";
 
@@ -27,6 +28,7 @@ export default function VariantesManager({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showGuiaTallas, setShowGuiaTallas] = useState(false);
 
   const saveVariantes = async (variantes: Variante[]) => {
     setLoading(true);
@@ -78,6 +80,8 @@ export default function VariantesManager({
           }
           initialVariantes={mode === "EDIT" ? variantesDelGrupo : undefined}
           existingVariantes={producto.variantes}
+          precioBaseVenta={producto.precioVenta}
+          precioBaseCosto={producto.precioCosto}
           onSave={(data) => {
             if (mode === "EDIT" && editingGroupKey) {
               let inserted = false;
@@ -186,6 +190,14 @@ export default function VariantesManager({
             Generar BarCodes
           </button>
 
+          <button
+            type="button"
+            className="btn-secondary px-4 py-2 cursor-pointer flex items-center gap-1.5"
+            onClick={() => setShowGuiaTallas(true)}
+          >
+            <span>📏</span>
+            <span>Guía de tallas</span>
+          </button>
         </div>
 
       </div>
@@ -206,6 +218,7 @@ export default function VariantesManager({
               <th className="py-3">Color(es)</th>
               <th>Talla</th>
               <th>Stock</th>
+              <th>Precio / Medidas</th>
               <th className="">Acciones</th>
             </tr>
           </thead>
@@ -214,6 +227,8 @@ export default function VariantesManager({
               <VarianteRow
                 key={v.varianteId || `${v.color}-${v.colorSecundario || ""}-${v.talla}`}
                 variante={v}
+                precioBaseVenta={producto.precioVenta}
+                precioBaseCosto={producto.precioCosto}
                 onEdit={() => {
                   setEditingIndex(index);
                   setEditingGroupKey(getVariantGroupKey(v));
@@ -230,6 +245,13 @@ export default function VariantesManager({
           </tbody>
         </table>
       )}
+
+      {/* Modal Guía de Tallas */}
+      <GuiaTallasModal
+        producto={producto}
+        isOpen={showGuiaTallas}
+        onClose={() => setShowGuiaTallas(false)}
+      />
     </div>
   );
 }

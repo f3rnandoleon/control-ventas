@@ -1,404 +1,223 @@
-# Mejoras al Panel de Administración: Productos y Ventas
+# Plan de Implementación: Precios Diferenciados y Medidas por Variante
 
-Plan de implementación revisado y priorizado por consistencia de dominio, mantenibilidad, rendimiento y experiencia de usuario.
-
-## Objetivo y alcance
-
-Mejorar las pantallas administrativas de Productos y Ventas mediante:
-
-- Filtros útiles y consistentes.
-- Miniaturas de productos.
-- Reportes de stock en PDF.
-- Vista previa visual de colores.
-- Paginación y filtros de ventas desde el servidor.
-
-El alcance principal es la aplicación web Next.js. No se modifica el checkout, la autenticación ni el registro de ventas POS. Sí se requieren ajustes acotados en las API de productos y ventas para entregar información correcta y escalable.
+> **Estado del documento:** Propuesta técnica detallada para revisión previa a la codificación.  
+> **Objetivo:** Permitir precio y costo diferenciado por talla/variante y medidas de prenda opcionales, garantizando 100% de retrocompatibilidad, consistencia contable y una interfaz ágil.
 
 ---
 
-## Decisiones de dominio
+## 1. Principios de Arquitectura y Dominio
 
-### Stock
+### 1.1 Precios y Costos: Patrón de Sobreescritura con Fallback (*Inheritance Pattern*)
+- **Precios Base en Producto:** Se mantienen obligatorios `precioVenta` y `precioCosto` en el modelo `Producto`. Sirven como los precios por defecto para todas las variantes.
+- **Sobreescritura Opcional en Variante:** Cada variante en `Producto.variantes` podrá definir de manera opcional `precioVenta?: number` y `precioCosto?: number`.
+  - Si una variante omite estos campos (o son `null`/`0`), **hereda automáticamente** los precios base del producto.
+  - Si una variante define valores positivos, **sobreescribe** el precio y/o costo exclusivamente para esa variante.
+- **Fuente Única de Verdad (*Single Source of Truth*):** Ningún componente ni servicio calculará precios manualmente. Se centralizará en una utilidad `getVariantPricing(producto, variante)` en `src/utils/pricing.ts`.
+- **Integridad Financiera:** Las ventas registradas y pedidos históricos se preservan intactos, ya que el sistema ya utiliza snapshots inmutables en `pedidoItemSchema`.
 
-- No se usará un umbral fijo de `2`.
-- Cada producto conservará su `stockMinimo`; actualmente el modelo usa `5` por defecto.
-- Se distinguirán estos valores:
-  - **Stock físico**: suma de `variante.stock`.
-  - **Stock reservado**: suma de `variante.stockReservado`.
-  - **Stock disponible**: `max(stock físico - stock reservado, 0)`.
-- Los filtros y estados comerciales usarán **stock disponible**:
-  - `stockDisponible === 0` → Sin stock.
-  - `stockDisponible > 0 && stockDisponible <= stockMinimo` → Bajo stock.
-  - `stockDisponible > stockMinimo` → En stock.
-- Los reportes mostrarán stock físico, reservado y disponible para evitar ambigüedad.
-- La regla se implementará una sola vez en una utilidad compartida; no se duplicará en componentes.
+### 1.2 Medidas de Prenda: Subdocumento Tipado Opcional
+En lugar de dispersar campos sueltos en la variante, se agrupan en un subdocumento estructurado `medidas`:
+- `anchoPecho`: Ancho de axila a axila (cm).
+- `anchoHombros`: Ancho de hombro a hombro (cm).
+- `largoTotal`: Largo total de la prenda (cm).
+- `largoMangaAxila`: Largo de manga desde axila a puño (cm).
+- `largoMangaHombro`: Largo de manga desde hombro a puño (cm).
 
-### Reportes
-
-- Solo se exportará PDF; no se requiere Excel.
-- El reporte general exportará los productos que coincidan con los filtros activos.
-- El reporte individual mostrará datos actuales del producto y sus variantes; **no mostrará historial de movimientos**.
-- Para tablas PDF se instalará `jspdf-autotable`. `jspdf` por sí solo no resuelve de forma robusta anchos, textos largos, encabezados repetidos y saltos de página.
-- Se probarán caracteres españoles, textos extensos y documentos de varias páginas.
-
-### Ventas
-
-- La paginación y los filtros se resolverán en servidor/BD, no mediante `slice()` en el navegador.
-- “Cliente” y “Vendedor” serán filtros separados.
-- Las fechas se interpretarán en la zona horaria de negocio `America/La_Paz` y el día final será inclusivo.
-
-### Colores
-
-- Se ampliará el catálogo evitando sinónimos o duplicados como `Verde Oliva`/`Olivo` y `Vino`/`Borgoña`/`Burdeos` sin una decisión explícita.
-- Opciones y hexadecimal vivirán en una única estructura para evitar desincronización.
-- El hexadecimal será una referencia visual, no una representación exacta de la prenda.
+Todas las medidas son numéricas (en centímetros, admiten decimales ej: `54.5`), opcionales y con validación mínima `min: 0`.
 
 ---
 
-## Fase 1: Reglas y utilidades compartidas
+## 2. Mapa de Archivos e Impacto Transversal
 
-### [NEW] `src/utils/stock.ts`
+| Componente / Módulo | Archivo(s) | Naturaleza del Cambio |
+| :--- | :--- | :--- |
+| **Tipos TypeScript** | [`src/types/producto.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/types/producto.ts) | Definir `MedidasPrenda`, extender `Variante` con precios y medidas opcionales. |
+| **Modelos Mongoose** | [`src/models/producto.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/models/producto.ts) | Agregar `medidasSchema`, campos `precioVenta` y `precioCosto` en `varianteSchema`. |
+| **Esquemas Zod** | [`src/schemas/producto.schema.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/schemas/producto.schema.ts) | Validar campos opcionales en variante y regla de consistencia (`precioVenta > precioCosto`). |
+| **Utilidad Central** | [`src/utils/pricing.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/utils/pricing.ts) (NUEVO) | Función canónica `getVariantPricing` y cálculo de rangos de precio de producto. |
+| **Servicio de Pedidos** | [`src/modules/orders/application/pedidos.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/orders/application/pedidos.service.ts) | Calcular `precioUnitario`, `precioCosto` y `ganancia` por variante en ventas POS y pedidos web. |
+| **Servicio de Carrito** | [`src/modules/cart/application/cart.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/cart/application/cart.service.ts) | Asignar el precio de la variante específica en items del carrito. |
+| **Servicio de Catálogo** | [`src/modules/catalog/application/catalog.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/catalog/application/catalog.service.ts) | Entregar rangos de precio (`precioMinimo`, `precioMaximo`) en la ficha de producto. |
+| **Integración WhatsApp**| [`src/modules/integrations/whatsapp/whatsapp.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/integrations/whatsapp/whatsapp.service.ts) | Resolver precio unitario según variante seleccionada. |
+| **Formulario Variantes**| [`src/components/productos/VarianteForm.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/components/productos/VarianteForm.tsx) | Inputs opcionales de precio/costo por fila de talla y acordeón colapsable para medidas. |
+| **Fila de Variante** | [`src/components/productos/VarianteRow.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/components/productos/VarianteRow.tsx) | Badges visuales de precio personalizado y modal/popover para consultar medidas. |
+| **Punto de Venta (POS)**| [`src/components/ventas/VentaPOS.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/components/ventas/VentaPOS.tsx) | Calcular subtotales y totales con el precio de la variante seleccionada. |
+| **Listado Admin** | [`src/app/dashboard/admin/productos/page.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/app/dashboard/admin/productos/page.tsx) | Mostrar rango de precios si las variantes varían (ej: `Bs 100 - Bs 120`). |
 
-- Funciones puras para calcular:
-  - Stock físico por variante y producto.
-  - Stock reservado.
-  - Stock disponible.
-  - Estado `EN_STOCK | BAJO_STOCK | SIN_STOCK` usando `stockMinimo`.
-- Proteger contra valores ausentes o negativos mediante normalización.
-- Reutilizar estas funciones en Productos, reportes y, cuando corresponda, Inventario.
+---
 
-### [MODIFY] `src/types/producto.ts`
+## 3. Plan Paso a Paso de Implementación
 
-- Agregar a `Producto`:
-  - `stockTotal?: number`.
-  - `stockMinimo?: number`.
-  - `estado?: "ACTIVO" | "INACTIVO" | "AGOTADO"`.
-  - Campos calculados opcionales si la API los entrega: `stockReservadoTotal?` y `stockDisponible?`.
-- Mantener `stockReservado?: number` en cada variante.
+### Fase 1: Dominio, Schemas y Utilidad Central
 
-### [MODIFY] `src/services/producto.service.ts`
+#### 1.1 Tipos TypeScript ([`src/types/producto.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/types/producto.ts))
+```typescript
+export interface MedidasPrenda {
+  anchoPecho?: number;       // Axila a axila (cm)
+  anchoHombros?: number;     // Hombro a hombro (cm)
+  largoTotal?: number;       // Largo total (cm)
+  largoMangaAxila?: number;  // Axila a puño/manga (cm)
+  largoMangaHombro?: number; // Hombro a puño/manga (cm)
+}
 
-- Permitir solicitar stock calculado de forma explícita:
-
-```ts
-getProductos({ withStock: true })
+export interface Variante {
+  varianteId?: string;
+  color: string;
+  colorSecundario?: string;
+  talla: string;
+  stock: number;
+  stockReservado?: number;
+  stockDisponible?: number;
+  imagenes?: string[];
+  imagen?: string;
+  descripcion?: string;
+  codigoBarra?: string;
+  qrCode?: string;
+  precioVenta?: number;      // 🆕 Opcional: sobreescribe Producto.precioVenta
+  precioCosto?: number;      // 🆕 Opcional: sobreescribe Producto.precioCosto
+  medidas?: MedidasPrenda;   // 🆕 Opcional: medidas en cm
+}
 ```
 
-- La pantalla administrativa de Productos usará `/api/productos?withStock=true`.
-- Conservar el comportamiento actual para consumidores que no necesiten datos ampliados.
+#### 1.2 Modelo Mongoose ([`src/models/producto.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/models/producto.ts))
+- Definir `medidasSchema` con `_id: false` conteniendo los 5 campos tipo `Number` con `min: 0`.
+- Extender `varianteSchema`:
+  ```typescript
+  precioVenta: { type: Number, min: 0 },
+  precioCosto: { type: Number, min: 0 },
+  medidas: { type: medidasSchema, default: undefined },
+  ```
 
-### [REVIEW/MODIFY] cálculo de `stockTotal`
+#### 1.3 Esquema de Validación Zod ([`src/schemas/producto.schema.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/schemas/producto.schema.ts))
+- Crear `medidasPrendaSchema`:
+  ```typescript
+  export const medidasPrendaSchema = z.object({
+    anchoPecho: positiveNumberSchema.optional(),
+    anchoHombros: positiveNumberSchema.optional(),
+    largoTotal: positiveNumberSchema.optional(),
+    largoMangaAxila: positiveNumberSchema.optional(),
+    largoMangaHombro: positiveNumberSchema.optional(),
+  }).optional();
+  ```
+- Extender `varianteSchema` con `precioVenta: positiveNumberSchema.optional()`, `precioCosto: positiveNumberSchema.optional()`, `medidas: medidasPrendaSchema`.
+- Agregar refinamiento para variantes: si una variante tiene definidos tanto su propio `precioVenta` como su propio `precioCosto`, validar que `precioVenta >= precioCosto`.
 
-Archivos involucrados:
-
-- `src/models/producto.ts`.
-- `src/modules/catalog/application/catalog.service.ts`.
-- `src/modules/catalog/infrastructure/catalog.repository.ts`.
-
-El middleware `pre("save")` no garantiza recalcular `stockTotal` cuando se usa `findByIdAndUpdate()`. Se debe elegir una fuente de verdad:
-
-1. Recomendado: calcular los totales desde variantes al construir la respuesta con `withStock=true` y no confiar en un valor persistido potencialmente obsoleto.
-2. Complementario: recalcular y persistir `stockTotal` dentro de toda operación que modifique variantes.
-
-No se realizará una migración de BD salvo que una auditoría confirme valores históricos incorrectos y se decida corregirlos.
-
-### [MODIFY] `src/constants/variant-options.ts`
-
-- Reemplazar la lista de strings y el mapa separado por una única colección:
-
-```ts
-type ColorOption = {
-  value: string;
-  label: string;
-  hex: string;
-};
-```
-
-- Mantener compatibilidad con colores ya guardados como texto.
-- Normalizar etiquetas, tildes y duplicados antes de añadir nuevos colores.
-- Colores candidatos: Terracota, Lavanda, Salmón, Aguamarina, Menta, Carbón, Marfil, Índigo, Cian, Bronce, Cobre, Hueso, Chocolate, Cereza, Ciruela, Petróleo, Arena y Ámbar.
-- Añadir Olivo o Borgoña solo si sustituyen o se diferencian deliberadamente de opciones existentes.
-
-### [NEW] `src/components/ui/ColorSwatch.tsx`
-
-- Props: `colorName`, `size?: "sm" | "md"`, `shape?: "circle" | "square"`.
-- Mostrar borde visible para colores claros.
-- Incluir `title` y etiqueta accesible; el color no será el único medio de comunicación.
-- Fallback gris con `?` para valores históricos no reconocidos.
-
-### [NEW] `src/components/ui/Pagination.tsx`
-
-- Componente controlado y reutilizable.
-- Props: `currentPage`, `totalPages`, `pageSize`, `pageSizeOptions`, `onPageChange`, `onPageSizeChange`, `totalItems`, `disabled?`.
-- Opciones iniciales: 10, 25 y 50.
-- Soportar páginas vacías, una sola página y estado de carga.
-- Restablecer a página 1 cuando cambien filtros o tamaño de página.
+#### 1.4 Utilidad Canónica de Precios ([`src/utils/pricing.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/utils/pricing.ts))
+Implementar y exportar:
+- `getVariantPricing(producto, variante)`:
+  - Devuelve `{ precioVenta, precioCosto, ganancia, tienePrecioDiferenciado }`.
+- `getProductPriceRange(producto)`:
+  - Calcula el precio mínimo y máximo entre todas las variantes activas del producto.
+  - Devuelve `{ precioMinimo, precioMaximo, tieneRango: precioMinimo !== precioMaximo }`.
+- `formatProductPriceDisplay(producto)`:
+  - Retorna `"Bs 120.00"` si no varía, o `"Bs 100.00 - Bs 120.00"` si varía.
 
 ---
 
-## Fase 2: Reportes PDF
+### Fase 2: Backend y Lógica de Negocio
 
-### [DEPENDENCY] `jspdf-autotable`
+#### 2.1 Módulo de Pedidos ([`src/modules/orders/application/pedidos.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/orders/application/pedidos.service.ts))
+- **En `createVenta` (Venta Directa / POS):**
+  - Reemplazar `const precioUnitario = producto.precioVenta;` por:
+    ```typescript
+    const pricing = getVariantPricing(producto, variante);
+    const precioUnitario = pricing.precioVenta;
+    const precioCosto = pricing.precioCosto;
+    const totalLinea = precioUnitario * item.cantidad;
+    const ganancia = (precioUnitario - precioCosto) * item.cantidad;
+    ```
+- **En `createPedidoFromCart` (Pedidos Web):**
+  - Asegurar que `precioCosto` y `ganancia` utilicen `getVariantPricing(producto, variante)`.
 
-- Instalar una versión compatible con el `jspdf` existente.
-- No instalar `xlsx`.
+#### 2.2 Módulo de Carrito ([`src/modules/cart/application/cart.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/cart/application/cart.service.ts))
+- Al agregar (`addItemToCartByUserId`) o actualizar (`updateCartItemByUserId`):
+  - Obtener `pricing = getVariantPricing(producto, variante)`.
+  - Asignar `precioUnitario = pricing.precioVenta;` y `subtotal = pricing.precioVenta * cantidad;`.
 
-### [NEW] `src/utils/reportes/pdfHelpers.ts`
-
-- Configuración común de documento, fecha, título, moneda y nombre de archivo.
-- Encabezados repetidos y numeración de páginas.
-- Formateo seguro de textos y valores ausentes.
-
-### [NEW] `src/utils/reportes/generarReporteStock.ts`
-
-- `generarReporteStockPDF(productos: Producto[]): void`.
-- Columnas sugeridas: Nombre, Modelo, SKU, Categoría, Precio de venta, Stock físico, Reservado, Disponible y Estado de stock.
-- Usar la regla compartida de `src/utils/stock.ts`.
-- Incluir fecha/hora de generación y aclarar que refleja el estado actual.
-- No generar un documento vacío: el botón se deshabilitará o se mostrará un aviso.
-
-### [NEW] `src/utils/reportes/generarReporteProducto.ts`
-
-- `generarReporteProductoPDF(producto: Producto): void`.
-- Incluir datos generales y tabla de variantes.
-- Columnas: Color principal, Color secundario, Talla, Stock físico, Reservado, Disponible y Estado.
-- No consultar ni afirmar que contiene movimientos de inventario.
+#### 2.3 Módulo de WhatsApp y Catálogo
+- [`whatsapp.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/integrations/whatsapp/whatsapp.service.ts): cotizar y reservar usando el precio exacto de la variante elegida.
+- [`catalog.service.ts`](file:///e:/proyectos/control-ropa/control-ventas/src/modules/catalog/application/catalog.service.ts): incluir rangos de precios en respuestas públicas.
 
 ---
 
-## Fase 3: Página de Productos
+### Fase 3: Interfaz de Administración de Variantes
 
-### [NEW] `src/components/productos/ProductoFilters.tsx`
+#### 3.1 Formulario de Variantes ([`VarianteForm.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/components/productos/VarianteForm.tsx))
+Actualmente, las tallas se administran como filas en `sizeRows`.
+- **Evolución del estado de cada fila:**
+  ```typescript
+  type VarianteTallaForm = {
+    varianteId?: string;
+    talla: string;
+    stock: number;
+    codigoBarra?: string;
+    qrCode?: string;
+    precioVenta?: number | ""; // Vacio = hereda precio base
+    precioCosto?: number | ""; // Vacio = hereda costo base
+    medidas?: MedidasPrenda;
+    showMedidas?: boolean;     // Toggle de UI para acordeón
+  };
+  ```
+- **Diseño visual de cada fila:**
+  1. Selector de Talla.
+  2. Input de Stock.
+  3. Input de `P. Venta (opcional)` con placeholder `Base: Bs {producto.precioVenta}`.
+  4. Input de `P. Costo (opcional)` con placeholder `Base: Bs {producto.precioCosto}`.
+  5. Botón interactivo: **`📏 Medidas`**
+     - Si la fila ya contiene alguna medida rellenada: badge verde `✓ Con medidas`.
+     - Al hacer clic: despliega un mini-panel acordeón debajo de la fila con los 5 campos en centímetros:
+       - *Pecho (axila a axila)* | *Hombros* | *Largo total* | *Manga (axila)* | *Manga (hombro)*.
+  6. Botón para eliminar fila.
 
-- Filtros:
-  - Categoría.
-  - Precio mínimo y máximo sobre `precioVenta`.
-  - Estado de stock disponible.
-- Botón “Limpiar filtros”.
-- Validar que mínimo y máximo sean números no negativos y que mínimo no supere máximo.
-- Categorías derivadas de los productos cargados:
-  - Aplicar `trim()`.
-  - Excluir vacías.
-  - Deduplicar sin distinguir mayúsculas/minúsculas.
-  - Ordenar para una presentación estable.
-
-### [MODIFY] `src/app/dashboard/admin/productos/page.tsx`
-
-- Cargar productos mediante `getProductos({ withStock: true })`.
-- Combinar búsqueda textual con filtros estructurados.
-- Agregar columna “Imagen” como primera columna.
-- Obtener la portada mediante la utilidad existente de imagen principal de variante, contemplando `imagenes` e `imagen` históricos.
-- Mostrar miniatura de 40×40 px con `CloudinaryImage`; usar placeholder reutilizable si no existe imagen.
-- Agregar “Generar reporte” indicando que exporta los resultados filtrados.
-- Deshabilitar el reporte cuando no existan resultados.
-- Agregar “Reporte individual” en las acciones de cada producto.
-- Actualizar `colSpan` de 5 a 6.
-- Mostrar errores de carga, eliminación y generación mediante feedback visible.
-- Conservar funcionamiento en tema claro, oscuro y ancho móvil.
-
-### [MODIFY] `src/components/productos/VarianteForm.tsx`
-
-- Mostrar `ColorSwatch` junto a color principal y secundario.
-- Mantener selects accesibles y layout responsive.
-- Los colores nuevos provendrán automáticamente del catálogo centralizado.
+#### 3.2 Listado de Variantes ([`VarianteRow.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/components/productos/VarianteRow.tsx))
+- Agregar columna o indicador en la tabla:
+  - Si la variante tiene precio personalizado: mostrar `Bs {variante.precioVenta}` con badge `Diferenciado`.
+  - Si tiene medidas: botón/icono `📏 Medidas` que abre un popover/tooltip con las 5 medidas en cm para consulta rápida del vendedor/administrador.
 
 ---
 
-## Fase 4: API de ventas con filtros y paginación
+### Fase 4: Punto de Venta (POS) y Vista de Catálogo
 
-### Contrato propuesto
+#### 4.1 Punto de Venta ([`VentaPOS.tsx`](file:///e:/proyectos/control-ropa/control-ventas/src/components/ventas/VentaPOS.tsx))
+- En el cálculo de `subtotal` (línea 100-103):
+  ```typescript
+  const subtotal = watchedItems.reduce((sum, item) => {
+    const producto = productos.find((p) => p._id === item.productoId);
+    if (!producto) return sum;
+    const variante = producto.variantes.find((v) => matchesVariant(v, item));
+    const pricing = getVariantPricing(producto, variante);
+    return sum + pricing.precioVenta * (item.cantidad || 0);
+  }, 0);
+  ```
+- En el selector de variantes del modal de venta: mostrar el precio al lado de la talla si difiere del base (ej: `Talla XL — Bs 140 (Base Bs 120)`).
 
-```text
-GET /api/pedidos?scope=sales&page=1&limit=25&from=YYYY-MM-DD&to=YYYY-MM-DD&customer=...&seller=...&paymentMethod=EFECTIVO|QR
-```
-
-Respuesta:
-
-```ts
-type PaginatedSalesResponse = {
-  items: Pedido[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
-```
-
-### [NEW] esquema de query de ventas
-
-- Validar con Zod:
-  - `page >= 1`.
-  - `limit` permitido: 10, 25 o 50.
-  - Fechas válidas.
-  - Método de pago permitido.
-  - Longitud máxima de textos de búsqueda.
-- Convertir rango local `America/La_Paz` a límites UTC antes de consultar MongoDB.
-- “Hasta” debe incluir el día completo usando preferentemente un límite exclusivo al inicio del día siguiente.
-
-### [MODIFY] `src/app/api/pedidos/route.ts`
-
-- Leer y validar parámetros cuando `scope=sales`.
-- Mantener autorización actual: administrador ve ventas reconocidas globales; vendedor solo las propias.
-- Devolver respuesta paginada para el scope de ventas.
-- Definir una transición compatible si otros consumidores esperan actualmente un array.
-
-### [MODIFY] `src/modules/orders/infrastructure/pedidos.repository.ts`
-
-- Ampliar `listRecognizedSales()` y `listRecognizedSalesBySeller()` con filtros, `skip`, `limit` y orden estable `createdAt: -1`.
-- Ejecutar `countDocuments()` con exactamente el mismo filtro usado para obtener items.
-- Mantener siempre `buildRecognizedSalesMatch()` para excluir pedidos no reconocidos o cancelados.
-- Escapar el texto de búsquedas antes de construir expresiones regulares.
-- Buscar cliente en `snapshotCliente.nombreCompleto` y/o referencia poblada según el modelo real.
-- Buscar vendedor por su identificador o mediante una estrategia definida; no mezclarlo con el campo Cliente.
-- Evaluar índices de fecha, método de pago y campos usados con frecuencia después de medir consultas reales.
-
-### [MODIFY] `src/modules/orders/application/pedidos.service.ts`
-
-- Recibir filtros validados.
-- Aplicar alcance según el rol autenticado.
-- Retornar `items`, metadatos y total.
-
-### [MODIFY] `src/services/pedidos.service.ts`
-
-- Cambiar `getVentas()` para recibir filtros y devolver `PaginatedSalesResponse`.
-- Serializar únicamente parámetros definidos.
-- Manejar mensajes de error de la API.
+#### 4.2 Componente "Guía de Tallas" para Detalle de Producto
+- Crear un componente reutilizable `GuiaTallasModal.tsx` o tabla incrustada:
+  - Lee las variantes del producto.
+  - Si al menos una variante tiene medidas, renderiza una tabla comparativa automática:
+    | Talla | Pecho (axila-axila) | Hombros | Largo Total | Manga (axila) | Manga (hombro) |
+    | :---: | :---: | :---: | :---: | :---: | :---: |
+    | S | 50 cm | 42 cm | 66 cm | 48 cm | 60 cm |
+    | M | 53 cm | 44 cm | 68 cm | 50 cm | 62 cm |
+    | L | 56 cm | 46 cm | 70 cm | 52 cm | 64 cm |
+    | XL | 60 cm | 48 cm | 73 cm | 53 cm | 66 cm |
 
 ---
 
-## Fase 5: Página de Ventas
+## 4. Retrocompatibilidad y Estrategia de Migración
 
-### [NEW] `src/components/ventas/VentaFilters.tsx`
-
-- Filtros:
-  - Desde.
-  - Hasta.
-  - Cliente.
-  - Vendedor.
-  - Método de pago: Todos, Efectivo y QR.
-- Botón “Limpiar filtros”.
-- Aplicar un debounce breve a búsquedas de texto para no consultar en cada pulsación.
-- No mezclar vendedor y cliente bajo una misma etiqueta.
-
-### [MODIFY] `src/app/dashboard/admin/ventas/page.tsx`
-
-- Separar visualmente “Registrar venta” e “Historial de ventas”.
-- Colocar `VentaFilters` inmediatamente encima del historial, no encima de `VentaPOS`.
-- Mantener en el padre filtros, página, tamaño de página, carga y respuesta paginada.
-- Volver a página 1 al cambiar filtros o tamaño.
-- Recargar la página correspondiente después de registrar una venta.
-- Evitar que una respuesta lenta anterior sobrescriba filtros más recientes.
-- Mostrar errores y estado vacío diferenciando “sin ventas” de “sin coincidencias”.
-
-### [MODIFY] `src/components/ventas/VentaTable.tsx`
-
-- Recibir solamente los items de la página actual y los metadatos de paginación.
-- No ejecutar `slice()`.
-- Integrar `Pagination` debajo de la tabla.
-- Mostrar “Mostrando X–Y de Z ventas”.
-- Soportar cliente o vendedor ausente con textos explícitos, por ejemplo “Venta mostrador” y “Sin vendedor”.
+1. **Sin Migración Destructiva:**
+   - Como los nuevos campos son opcionales en el esquema de MongoDB, los miles de registros existentes en la colección `productos` siguen funcionando de inmediato sin correr scripts obligatorios.
+   - Cualquier variante sin `precioVenta` o `medidas` simplemente asume `precioVenta = producto.precioVenta` mediante el helper `getVariantPricing`.
+2. **Validación de Datos en Escritura:**
+   - Al editar un producto existente en `VarianteForm`, solo se enviarán `precioVenta`, `precioCosto` o `medidas` si el usuario los completó explícitamente.
 
 ---
 
-## Resumen de archivos
+## 5. Criterios de Aceptación y Pruebas Obligatorias
 
-| Acción | Archivo | Fase |
-|---|---|---:|
-| NEW | `src/utils/stock.ts` | 1 |
-| MODIFY | `src/types/producto.ts` | 1 |
-| MODIFY | `src/services/producto.service.ts` | 1 |
-| REVIEW/MODIFY | `src/models/producto.ts` | 1 |
-| REVIEW/MODIFY | `src/modules/catalog/application/catalog.service.ts` | 1 |
-| MODIFY | `src/constants/variant-options.ts` | 1 |
-| NEW | `src/components/ui/ColorSwatch.tsx` | 1 |
-| NEW | `src/components/ui/Pagination.tsx` | 1 |
-| DEPENDENCY | `jspdf-autotable` | 2 |
-| NEW | `src/utils/reportes/pdfHelpers.ts` | 2 |
-| NEW | `src/utils/reportes/generarReporteStock.ts` | 2 |
-| NEW | `src/utils/reportes/generarReporteProducto.ts` | 2 |
-| NEW | `src/components/productos/ProductoFilters.tsx` | 3 |
-| MODIFY | `src/app/dashboard/admin/productos/page.tsx` | 3 |
-| MODIFY | `src/components/productos/VarianteForm.tsx` | 3 |
-| MODIFY | `src/app/api/pedidos/route.ts` | 4 |
-| MODIFY | `src/modules/orders/infrastructure/pedidos.repository.ts` | 4 |
-| MODIFY | `src/modules/orders/application/pedidos.service.ts` | 4 |
-| MODIFY | `src/services/pedidos.service.ts` | 4 |
-| NEW | `src/components/ventas/VentaFilters.tsx` | 5 |
-| MODIFY | `src/app/dashboard/admin/ventas/page.tsx` | 5 |
-| MODIFY | `src/components/ventas/VentaTable.tsx` | 5 |
-
----
-
-## Cambios de backend y base de datos
-
-### Backend requerido
-
-- Productos: solicitar y calcular stock ampliado con `withStock=true`.
-- Ventas: añadir filtros, conteo y paginación server-side.
-- Mantener las reglas actuales de autorización y ventas reconocidas.
-
-### Base de datos
-
-- No se requiere cambiar inmediatamente el esquema de Producto.
-- No se requiere usar el historial de Inventario para los reportes definidos.
-- Antes de añadir índices se medirán las consultas reales.
-- Si se detecta `stockTotal` histórico desactualizado, se preparará una migración separada, idempotente y respaldada; no se mezclará silenciosamente con esta mejora UI.
-
----
-
-## Verificación
-
-### Automatizada
-
-- Ejecutar `npm run lint`.
-- Ejecutar `npm run build` al finalizar cada fase integrable.
-- Añadir pruebas unitarias para estado de stock:
-  - Stock disponible 0.
-  - Igual a `stockMinimo`.
-  - Superior a `stockMinimo`.
-  - Stock reservado parcial y total.
-- Añadir pruebas de query de ventas:
-  - Paginación y conteo coherentes.
-  - Rol administrador y vendedor.
-  - Método de pago.
-  - Día final inclusivo en `America/La_Paz`.
-  - Texto con caracteres especiales.
-
-### Manual
-
-- Productos sin variantes, sin imagen y sin categoría.
-- Categorías duplicadas por espacios o mayúsculas.
-- Combinación de búsqueda, categoría, precio y stock.
-- Reporte general vacío, filtrado y de varias páginas.
-- Reporte individual con muchas variantes y caracteres españoles.
-- Swatches de colores claros, oscuros y desconocidos.
-- Historial sin ventas y filtros sin coincidencias.
-- Ventas sin cliente y/o vendedor poblado.
-- Cambio de filtros desde una página mayor a 1.
-- Selector de 10, 25 y 50 resultados.
-- Tema claro, oscuro y diseño móvil.
-
----
-
-## Criterios de aceptación
-
-- Productos e Inventario clasifican el stock con la misma regla y el `stockMinimo` del producto.
-- Los filtros consideran stock disponible y no reportan como vendibles unidades totalmente reservadas.
-- Los PDF reflejan los resultados actuales, tienen saltos de página correctos y no prometen historial de movimientos.
-- Las ventas no cargan el historial completo en el navegador.
-- Cliente y vendedor se filtran de forma independiente.
-- El rango de fechas incluye correctamente todo el día final en Bolivia.
-- No se rompen consumidores existentes de las API durante la transición.
-- Lint y build finalizan sin errores.
-
----
-
-## Prioridad recomendada
-
-1. Consistencia de stock y contrato de datos.
-2. Paginación/filtros server-side de ventas.
-3. Filtros y miniaturas de Productos.
-4. Reportes PDF.
-5. Ampliación visual del catálogo de colores.
-
-Los colores y swatches aportan experiencia de usuario, pero no deben implementarse antes de resolver la exactitud del stock y la escalabilidad del historial de ventas.
+- [ ] **CA-01 (Herencia por defecto):** Crear un producto con precio base `Bs 100` y costo `Bs 60`. Las variantes S y M sin precio personalizado deben venderse a `Bs 100` con ganancia `Bs 40`.
+- [ ] **CA-02 (Sobreescritura por talla):** La variante XL se define con precio `Bs 120` y costo `Bs 75`. En el POS y en pedidos web, al agregar la variante XL, el subtotal debe calcularse a `Bs 120` y la ganancia registrada en la venta debe ser exactamente `Bs 45`.
+- [ ] **CA-03 (Medidas opcionales):** Guardar una variante con 2 de las 5 medidas (ej: `anchoPecho: 54` y `largoTotal: 70`). El sistema debe persistirlas en cm y el popover de `VarianteRow` debe mostrarlas correctamente sin requerir las otras 3.
+- [ ] **CA-04 (Venta POS en vivo):** Agregar al carrito del POS una talla M (`Bs 100`) y una XL (`Bs 120`). El subtotal debe sumar exactamente `Bs 220`. Al emitir el ticket de venta, cada línea debe conservar su precio unitario específico.
+- [ ] **CA-05 (Catálogo con rangos):** Un producto con precios diferenciados debe mostrar en el listado administrativo y en el catálogo comercial el rango `Bs 100.00 - Bs 120.00`.

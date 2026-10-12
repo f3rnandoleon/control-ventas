@@ -12,6 +12,7 @@ import { generateOrderedId } from "@/utils/generarId";
 import { uploadFileToCloudinary } from "@/libs/cloudinary";
 import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 import type { CreateWhatsAppOrderInput } from "@/schemas/whatsapp-integration.schema";
+import { getVariantPricing } from "@/utils/pricing";
 
 const BANK_SOL_QR_IMAGE =
   "https://res.cloudinary.com/dq1jeikev/image/upload/v1777964054/comprobante_xvdhuf.jpg";
@@ -67,6 +68,8 @@ interface WhatsAppVariante {
   qrCode?: string;
   imagenes?: string[];
   imagen?: string;
+  precioVenta?: number;
+  precioCosto?: number;
 }
 
 interface WhatsAppProductoDoc {
@@ -269,8 +272,9 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
       );
     }
 
-    const precioUnitario = producto.precioVenta;
-    const precioCosto = producto.precioCosto || 0;
+    const pricing = getVariantPricing(producto, variante);
+    const precioUnitario = pricing.precioVenta;
+    const precioCosto = pricing.precioCosto;
     const totalLinea = precioUnitario * itemInput.cantidad;
     const gananciaLinea = Math.max(0, (precioUnitario - precioCosto) * itemInput.cantidad);
 
