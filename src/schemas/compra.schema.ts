@@ -21,6 +21,7 @@ export const compraItemInputSchema = z.object({
 
 export const createCompraSchema = z.object({
   sucursalDestinoId: objectIdSchema.optional(),
+  cuentaDineroId: objectIdSchema.optional(),
   fecha: z.union([z.string(), z.date()]).optional(),
   proveedor: z.string().trim().max(120, "El proveedor no puede exceder 120 caracteres").optional(),
   comprobanteReferencia: z.string().trim().max(100, "La referencia no puede exceder 100 caracteres").optional(),

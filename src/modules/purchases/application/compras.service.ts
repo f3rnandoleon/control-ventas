@@ -14,6 +14,10 @@ import {
   getDefaultWarehouseId,
   increaseStockInBranch,
 } from "@/modules/inventory/application/branch-stock.service";
+import {
+  resolveDefaultAccountForPayment,
+  registrarMovimientoEnCuenta,
+} from "@/modules/finance/application/cash-account.service";
 
 export async function registrarCompra(
   input: CrearCompraInput,
@@ -232,6 +236,35 @@ export async function registrarCompra(
       },
       session
     );
+  }
+
+  // Registrar egreso en la cuenta de dinero seleccionada o cuenta bancaria predeterminada
+  if (totalBOB > 0) {
+    let cuentaDineroIdParaEgreso = input.cuentaDineroId;
+    if (!cuentaDineroIdParaEgreso) {
+      const cuentaDefault = await resolveDefaultAccountForPayment(
+        "TRANSFERENCIA",
+        sucursalDestinoId,
+        session
+      );
+      if (cuentaDefault) cuentaDineroIdParaEgreso = cuentaDefault._id.toString();
+    }
+
+    if (cuentaDineroIdParaEgreso) {
+      await registrarMovimientoEnCuenta(
+        {
+          cuentaId: cuentaDineroIdParaEgreso,
+          tipo: "EGRESO",
+          monto: totalBOB,
+          concepto: `Pago Compra Mercadería ${numeroCompra} (${input.proveedor || "Proveedor"})`,
+          origenTipo: "COMPRA",
+          origenId: compra._id.toString(),
+          sucursalId: sucursalDestinoId,
+          usuarioId: userId,
+        },
+        session
+      );
+    }
   }
 
   await recordAuditEventSafe({

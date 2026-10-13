@@ -6,6 +6,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
+import CajaPosWidget from "@/components/pos/CajaPosWidget";
 import { createPedidoSchema } from "@/schemas/pedido.schema";
 import { createVenta } from "@/services/pedidos.service";
 import type { Producto } from "@/types/producto";
@@ -162,8 +163,15 @@ export default function VentaPOS({
     setValue(`items.${index}.cantidad`, nextQuantity, { shouldValidate: true });
   };
 
+  const [cajaAbierta, setCajaAbierta] = useState(false);
+
   const onSubmit = async (data: VentaFormSubmitValues) => {
     try {
+      if (!cajaAbierta) {
+        toast.error("Apertura de caja obligatoria: Debes abrir la caja física de la tienda antes de registrar ventas.");
+        return;
+      }
+
       if (data.items.length === 0) {
         toast.error("Agrega al menos un producto");
         return;
@@ -197,6 +205,8 @@ export default function VentaPOS({
   return (
     <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
       <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
+        <CajaPosWidget onCajaStatusChange={setCajaAbierta} />
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           Seleccione los productos.
           <div className="w-fit rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">

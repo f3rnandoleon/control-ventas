@@ -57,6 +57,7 @@ export interface Compra {
 
 export interface CrearCompraInput {
   sucursalDestinoId?: string;
+  cuentaDineroId?: string;
   fecha?: string | Date;
   proveedor?: string;
   comprobanteReferencia?: string;

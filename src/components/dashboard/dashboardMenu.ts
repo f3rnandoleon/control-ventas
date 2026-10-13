@@ -34,6 +34,18 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
       ],
     },
     { label: "Sucursales", href: "/dashboard/admin/sucursales", keywords: ["tiendas", "almacenes", "locales", "red"] },
+    {
+      label: "Finanzas",
+      href: "/dashboard/admin/finanzas/cuentas",
+      keywords: ["cuentas", "cajas", "gastos", "pl", "utilidad", "tesoreria", "cierre"],
+      children: [
+        { label: "Cuentas y Cajas", href: "/dashboard/admin/finanzas/cuentas" },
+        { label: "Gastos Operativos", href: "/dashboard/admin/finanzas/gastos" },
+        { label: "Sesiones de Caja (POS)", href: "/dashboard/admin/finanzas/cajas" },
+        { label: "Estado de Resultados (P&L)", href: "/dashboard/admin/finanzas/reportes" },
+        { label: "Flujo de Caja", href: "/dashboard/admin/finanzas/flujo-caja" },
+      ],
+    },
     { label: "Pedidos", href: "/dashboard/admin/pedidos", keywords: ["reserva", "comprobante"] },
     { label: "Reportes", href: "/dashboard/admin/reportes", keywords: ["metricas", "graficos"] },
     { label: "Usuarios", href: "/dashboard/admin/usuarios", keywords: ["roles", "equipo"] },

@@ -4,6 +4,14 @@ import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
 import User from "@/models/user";
 import { getDefaultWarehouseId } from "@/modules/inventory/application/branch-stock.service";
+import {
+  resolveDefaultAccountForPayment,
+  registrarMovimientoEnCuenta,
+} from "@/modules/finance/application/cash-account.service";
+import {
+  obtenerSesionCajaActiva,
+  acumularVentaEnSesion,
+} from "@/modules/finance/application/cash-register-session.service";
 
 import { getValidatedCartForCheckout, clearCartByUserId } from "@/modules/cart/application/cart.service";
 import {
@@ -395,6 +403,17 @@ export async function crearVentaDirecta(
       }
     }
 
+    // Si la venta es de mostrador (POS), validar obligatoriedad de sesión de caja abierta
+    if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
+      const sesionActiva = await obtenerSesionCajaActiva(targetSucursalId.toString(), session);
+      if (!sesionActiva) {
+        throw new AppError(
+          "Apertura de caja obligatoria: No existe una sesión de caja abierta en esta tienda. Debe realizar la apertura de caja antes de registrar ventas.",
+          400
+        );
+      }
+    }
+
     let subtotal = 0;
     let gananciaTotal = 0;
     const itemsProcesados = [];
@@ -478,6 +497,42 @@ export async function crearVentaDirecta(
       total,
       gananciaTotal,
     }, session);
+
+    // Registrar ingreso automático en la cuenta de dinero correspondiente (Caja física o Banco/QR)
+    if (total > 0) {
+      const cuentaDestino = await resolveDefaultAccountForPayment(
+        payload.metodoPago as "EFECTIVO" | "QR" | "TRANSFERENCIA" | "TARJETA",
+        targetSucursalId,
+        session
+      );
+      if (cuentaDestino) {
+        await registrarMovimientoEnCuenta(
+          {
+            cuentaId: cuentaDestino._id,
+            tipo: "INGRESO",
+            monto: total,
+            concepto: `Cobro Venta ${pedido.numeroPedido} (${payload.canal} - ${payload.metodoPago})`,
+            origenTipo: "VENTA_PEDIDO",
+            origenId: pedido._id.toString(),
+            sucursalId: targetSucursalId,
+            usuarioId: actor.id,
+          },
+          session
+        );
+      }
+    }
+
+    // Acumular venta en la sesión de caja si aplica
+    if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
+      await acumularVentaEnSesion(
+        {
+          sucursalId: targetSucursalId,
+          total: pedido.total,
+          metodoPago: payload.metodoPago,
+        },
+        session
+      );
+    }
 
     await recordAuditEventSafe({
       accion: "VENTA_DIRECTA_CREADA",
