@@ -1,18 +1,42 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import type { Compra, CompraItem } from "@/types/compra";
 import { formatMoney } from "@/utils/pricing";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
+import { anularCompra } from "@/services/compras.service";
 
 export default function ComprasTable({
   compras,
   loading,
+  onRefresh,
 }: {
   compras: Compra[];
   loading: boolean;
+  onRefresh?: () => void;
 }) {
   const [selectedCompra, setSelectedCompra] = useState<Compra | null>(null);
+  const [anulando, setAnulando] = useState(false);
+
+  const handleAnular = async (compra: Compra) => {
+    const motivo = window.prompt(
+      `¿Estás seguro de anular la compra ${compra.numeroCompra}?\nSe descontará el stock reabastecido y se reembolsará el dinero a la cuenta.\n\nIngresa el motivo de anulación:`
+    );
+    if (!motivo) return;
+
+    try {
+      setAnulando(true);
+      await anularCompra(compra._id, motivo);
+      toast.success("Compra anulada exitosamente. Stock y dinero revertidos.");
+      setSelectedCompra(null);
+      onRefresh?.();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al anular compra");
+    } finally {
+      setAnulando(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -54,6 +78,7 @@ export default function ComprasTable({
                 <th className="px-5 py-3.5 text-center">Moneda & TC</th>
                 <th className="px-5 py-3.5 text-center">Prendas</th>
                 <th className="px-5 py-3.5 text-right">Total Invertido</th>
+                <th className="px-5 py-3.5 text-center">Estado</th>
                 <th className="px-5 py-3.5 text-center">Acción</th>
               </tr>
             </thead>
@@ -117,6 +142,17 @@ export default function ComprasTable({
                       )}
                     </td>
                     <td className="px-5 py-4 text-center">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
+                          compra.estado === "ANULADA"
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        }`}
+                      >
+                        {compra.estado === "ANULADA" ? "ANULADA" : "COMPLETADA"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-center">
                       <button
                         type="button"
                         onClick={() => setSelectedCompra(compra)}
@@ -161,6 +197,22 @@ export default function ComprasTable({
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {selectedCompra.estado === "ANULADA" && (
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-sm">
+                    <span>⚠️</span> Esta compra fue ANULADA
+                  </div>
+                  <p className="text-[11px] text-rose-400">
+                    El stock añadido fue revertido y los egresos monetarios fueron reintegrados a la cuenta.
+                  </p>
+                  {selectedCompra.motivoAnulacion && (
+                    <p className="text-[11px] text-slate-300 italic pt-1">
+                      Motivo: &quot;{selectedCompra.motivoAnulacion}&quot;
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Tarjetas de Resumen */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
@@ -290,7 +342,19 @@ export default function ComprasTable({
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-gray-900/80 flex justify-end">
+            <div className="p-4 border-t border-white/10 bg-gray-900/80 flex items-center justify-between">
+              <div>
+                {selectedCompra.estado !== "ANULADA" && (
+                  <button
+                    type="button"
+                    disabled={anulando}
+                    onClick={() => handleAnular(selectedCompra)}
+                    className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50"
+                  >
+                    {anulando ? "Anulando..." : "🗑️ Anular Compra"}
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedCompra(null)}

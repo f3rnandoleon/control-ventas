@@ -42,6 +42,7 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
         { label: "Cuentas y Cajas", href: "/dashboard/admin/finanzas/cuentas" },
         { label: "Gastos Operativos", href: "/dashboard/admin/finanzas/gastos" },
         { label: "Sesiones de Caja (POS)", href: "/dashboard/admin/finanzas/cajas" },
+        { label: "Devoluciones y Cambios", href: "/dashboard/admin/finanzas/devoluciones", keywords: ["cambios", "garantia", "reembolsos"] },
         { label: "Estado de Resultados (P&L)", href: "/dashboard/admin/finanzas/reportes" },
         { label: "Flujo de Caja", href: "/dashboard/admin/finanzas/flujo-caja" },
       ],

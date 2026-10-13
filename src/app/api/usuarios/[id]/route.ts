@@ -33,6 +33,9 @@ export async function PUT(
     if (data.email) updateData.email = data.email;
     if (data.rol) updateData.rol = data.rol;
     if (data.estaActivo !== undefined) updateData.estaActivo = data.estaActivo;
+    if (data.sucursalAsignadaId !== undefined) {
+      updateData.sucursalAsignadaId = data.sucursalAsignadaId || null;
+    }
 
     // 🔐 SOLO actualizar password si viene y no está vacío
     if (data.password && data.password.trim() !== "") {
@@ -43,7 +46,9 @@ export async function PUT(
       id,
       updateData,
       { new: true }
-    ).select("-password");
+    )
+      .select("-password")
+      .populate("sucursalAsignadaId", "nombre codigo");
 
     if (!user) {
       return NextResponse.json(
@@ -61,6 +66,51 @@ export async function PUT(
     console.error("PUT usuario error:", err);
     return NextResponse.json(
       { message: "Error al actualizar usuario" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const auth = await requireAdminApiAuth(request);
+    if (auth.response) return auth.response;
+
+    if (auth.userAuth?.id === id) {
+      return NextResponse.json(
+        { message: "No puedes eliminar o desactivar tu propia cuenta de administrador" },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    // Damos de baja lógica al usuario
+    const user = await User.findByIdAndUpdate(
+      id,
+      { estaActivo: false },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Usuario dado de baja exitosamente",
+      user,
+    });
+  } catch (err) {
+    console.error("DELETE usuario error:", err);
+    return NextResponse.json(
+      { message: "Error al dar de baja al usuario" },
       { status: 500 }
     );
   }

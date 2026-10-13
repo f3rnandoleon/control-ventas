@@ -9,8 +9,9 @@ export default function CuentasFinanzasPage() {
   const [cuentas, setCuentas] = useState<CuentaDinero[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal Nueva Cuenta
+  // Modal Nueva / Editar Cuenta
   const [modalCuentaOpen, setModalCuentaOpen] = useState(false);
+  const [editingCuenta, setEditingCuenta] = useState<CuentaDinero | null>(null);
   const [nombreNueva, setNombreNueva] = useState("");
   const [tipoNueva, setTipoNueva] = useState<TipoCuentaDinero>("CAJA_FISICA");
   const [saldoInicialNueva, setSaldoInicialNueva] = useState<number>(0);
@@ -64,6 +65,47 @@ export default function CuentasFinanzasPage() {
     cargarSucursales();
   }, [cargarCuentas, cargarSucursales]);
 
+  const handleOpenCrear = () => {
+    setEditingCuenta(null);
+    setNombreNueva("");
+    setTipoNueva("CAJA_FISICA");
+    setSaldoInicialNueva(0);
+    setEsPredPOS(false);
+    setEsPredQR(false);
+    setSucursalIdNueva("");
+    setModalCuentaOpen(true);
+  };
+
+  const handleOpenEditar = (c: CuentaDinero) => {
+    setEditingCuenta(c);
+    setNombreNueva(c.nombre);
+    setTipoNueva(c.tipo);
+    setSaldoInicialNueva(c.saldoActual || 0);
+    setEsPredPOS(!!c.esPredeterminadaPOS);
+    setEsPredQR(!!c.esPredeterminadaQR);
+    const sucId = typeof c.sucursalId === "object" && c.sucursalId !== null
+      ? (c.sucursalId as unknown as { _id: string })._id
+      : c.sucursalId || "";
+    setSucursalIdNueva(sucId);
+    setModalCuentaOpen(true);
+  };
+
+  const handleToggleActiva = async (c: CuentaDinero) => {
+    try {
+      const res = await fetch(`/api/admin/finanzas/cuentas/${c._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activa: !c.activa }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || "Error al modificar estado");
+      toast.success(`Cuenta ${!c.activa ? "activada" : "desactivada"} correctamente`);
+      await cargarCuentas();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al modificar estado");
+    }
+  };
+
   const abrirMovimientos = async (cuenta: CuentaDinero) => {
     setCuentaSeleccionada(cuenta);
     setLoadingMovs(true);
@@ -91,24 +133,41 @@ export default function CuentasFinanzasPage() {
 
     try {
       setSubmitting(true);
-      const res = await fetch("/api/admin/finanzas/cuentas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: nombreNueva.trim(),
-          tipo: tipoNueva,
-          saldoInicial: saldoInicialNueva,
-          sucursalId: sucursalIdNueva || undefined,
-          esPredeterminadaPOS: esPredPOS,
-          esPredeterminadaQR: esPredQR,
-        }),
-      });
+      if (editingCuenta) {
+        const res = await fetch(`/api/admin/finanzas/cuentas/${editingCuenta._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: nombreNueva.trim(),
+            tipo: tipoNueva,
+            sucursalId: sucursalIdNueva || null,
+            esPredeterminadaPOS: esPredPOS,
+            esPredeterminadaQR: esPredQR,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || "Error al actualizar cuenta");
+        toast.success("Cuenta actualizada exitosamente");
+      } else {
+        const res = await fetch("/api/admin/finanzas/cuentas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: nombreNueva.trim(),
+            tipo: tipoNueva,
+            saldoInicial: saldoInicialNueva,
+            sucursalId: sucursalIdNueva || undefined,
+            esPredeterminadaPOS: esPredPOS,
+            esPredeterminadaQR: esPredQR,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || "Error al crear cuenta");
+        toast.success("Cuenta creada exitosamente");
+      }
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || "Error al crear cuenta");
-
-      toast.success("Cuenta creada exitosamente");
       setModalCuentaOpen(false);
+      setEditingCuenta(null);
       setNombreNueva("");
       setSaldoInicialNueva(0);
       setEsPredPOS(false);
@@ -116,7 +175,7 @@ export default function CuentasFinanzasPage() {
       setSucursalIdNueva("");
       await cargarCuentas();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Error al crear cuenta");
+      toast.error(err instanceof Error ? err.message : "Error al procesar cuenta");
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +249,7 @@ export default function CuentasFinanzasPage() {
           </button>
           <button
             type="button"
-            onClick={() => setModalCuentaOpen(true)}
+            onClick={handleOpenCrear}
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white transition shadow-lg shadow-blue-900/30"
           >
             <span>+</span> Nueva Cuenta
@@ -236,7 +295,16 @@ export default function CuentasFinanzasPage() {
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-xl border border-white/10">
                       {esCaja ? "💵" : c.tipo === "BANCO" ? "🏦" : "📱"}
                     </span>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                          c.activa
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                            : "bg-red-500/20 text-red-300 border-red-500/30"
+                        }`}
+                      >
+                        {c.activa ? "Activa" : "Inactiva"}
+                      </span>
                       {c.esPredeterminadaPOS && (
                         <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
                           POS Mostrador
@@ -259,20 +327,40 @@ export default function CuentasFinanzasPage() {
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/10 flex items-end justify-between">
+                <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-3">
                   <div>
                     <p className="text-[11px] uppercase tracking-wider text-gray-400">Saldo Disponible</p>
                     <p className="text-xl sm:text-2xl font-black text-white">
                       Bs {(c.saldoActual || 0).toFixed(2)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => abrirMovimientos(c)}
-                    className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20 transition"
-                  >
-                    Movimientos →
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditar(c)}
+                      className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 transition"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActiva(c)}
+                      className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+                        c.activa
+                          ? "border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+                          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                      }`}
+                    >
+                      {c.activa ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => abrirMovimientos(c)}
+                      className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20 transition"
+                    >
+                      Movimientos →
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -285,7 +373,9 @@ export default function CuentasFinanzasPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-              <h3 className="text-lg font-bold text-white">Nueva Cuenta de Dinero / Caja</h3>
+              <h3 className="text-lg font-bold text-white">
+                {editingCuenta ? "Editar Cuenta de Dinero" : "Nueva Cuenta de Dinero / Caja"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setModalCuentaOpen(false)}
@@ -324,14 +414,19 @@ export default function CuentasFinanzasPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Saldo Inicial (Bs)</label>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    {editingCuenta ? "Saldo Actual (Bs)" : "Saldo Inicial (Bs)"}
+                  </label>
                   <input
                     type="number"
+                    disabled={!!editingCuenta}
                     step="0.5"
                     min="0"
                     value={saldoInicialNueva}
                     onChange={(e) => setSaldoInicialNueva(parseFloat(e.target.value) || 0)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                    className={`w-full rounded-xl border border-white/10 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none ${
+                      editingCuenta ? "bg-slate-800/50 opacity-60 cursor-not-allowed" : "bg-slate-800"
+                    }`}
                   />
                 </div>
               </div>
@@ -389,7 +484,7 @@ export default function CuentasFinanzasPage() {
                   disabled={submitting}
                   className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
                 >
-                  {submitting ? "Guardando..." : "Crear Cuenta"}
+                  {submitting ? "Guardando..." : editingCuenta ? "Guardar Cambios" : "Crear Cuenta"}
                 </button>
               </div>
             </form>

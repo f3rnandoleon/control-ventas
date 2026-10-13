@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   await connectDB();
   const users = await User.find()
     .select("-password")
+    .populate("sucursalAsignadaId", "nombre codigo")
     .sort({ createdAt: -1 });
 
   return NextResponse.json(users);
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     return validationErrorResponse(validation.errors);
   }
 
-  const { email, nombreCompleto, rol, password, estaActivo } = validation.data;
+  const { email, nombreCompleto, rol, password, estaActivo, sucursalAsignadaId } = validation.data;
 
   await connectDB();
 
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
     email,
     nombreCompleto,
     rol,
+    sucursalAsignadaId: sucursalAsignadaId || null,
     password: hash,
     estaActivo,
     authProviders: ["credentials"],

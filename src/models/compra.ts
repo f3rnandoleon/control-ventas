@@ -127,6 +127,31 @@ const compraSchema = new Schema(
       required: false,
       index: true,
     },
+    cuentaDineroId: {
+      type: Types.ObjectId,
+      ref: "CuentaDinero",
+      required: false,
+    },
+    estado: {
+      type: String,
+      enum: ["COMPLETADA", "ANULADA"],
+      default: "COMPLETADA",
+      index: true,
+    },
+    anuladaPor: {
+      type: Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
+    fechaAnulacion: {
+      type: Date,
+      required: false,
+    },
+    motivoAnulacion: {
+      type: String,
+      trim: true,
+      required: false,
+    },
     creadoPor: {
       type: Types.ObjectId,
       ref: "User",

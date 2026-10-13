@@ -24,6 +24,8 @@ export const createUsuarioSchema = z.object({
 
     rol: userRoleSchema.default("CLIENTE"),
 
+    sucursalAsignadaId: z.string().nullable().optional(),
+
     estaActivo: z.boolean().default(true),
 });
 
@@ -43,6 +45,8 @@ export const updateUsuarioSchema = z.object({
     }).transform(val => val === "" ? undefined : val),
 
     rol: userRoleSchema.optional(),
+
+    sucursalAsignadaId: z.string().nullable().optional(),
 
     estaActivo: z.boolean().optional(),
 });

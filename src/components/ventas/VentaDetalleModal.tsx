@@ -1,14 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { Pedido } from "@/types/pedido";
+import DevolucionCambioModal from "@/components/ventas/DevolucionCambioModal";
 
 export default function VentaDetalleModal({
   Pedido,
   onClose,
+  onUpdated,
 }: {
   Pedido: Pedido | null;
   onClose: () => void;
+  onUpdated?: () => void;
 }) {
+  const [modalDevolucionOpen, setModalDevolucionOpen] = useState(false);
+
   if (!Pedido) return null;
 
   return (
@@ -65,19 +71,42 @@ export default function VentaDetalleModal({
           </tbody>
         </table>
 
-        {/* Totales */}
-        <div className="text-right space-y-1">
-          <p className="text-gray-400">
-            Subtotal: Bs {Pedido.subtotal}
-          </p>
-          <p className="text-gray-400">
-            Descuento: Bs {Pedido.descuento}
-          </p>
-          <p className="text-xl font-bold text-cyan-400">
-            Total: Bs {Pedido.total}
-          </p>
+        {/* Totales y Acciones */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10 mt-4">
+          <button
+            type="button"
+            onClick={() => setModalDevolucionOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 text-xs font-bold text-amber-300 transition"
+          >
+            <span>🔄</span> Procesar Devolución / Cambio
+          </button>
+
+          <div className="text-right space-y-1">
+            <p className="text-gray-400 text-xs">
+              Subtotal: Bs {Pedido.subtotal.toFixed(2)}
+            </p>
+            {Pedido.descuento > 0 && (
+              <p className="text-amber-400 text-xs">
+                Descuento: - Bs {Pedido.descuento.toFixed(2)}
+              </p>
+            )}
+            <p className="text-xl font-bold text-cyan-400">
+              Total: Bs {Pedido.total.toFixed(2)}
+            </p>
+          </div>
         </div>
       </div>
+
+      {modalDevolucionOpen && (
+        <DevolucionCambioModal
+          pedido={Pedido}
+          onClose={() => setModalDevolucionOpen(false)}
+          onSuccess={() => {
+            onUpdated?.();
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }

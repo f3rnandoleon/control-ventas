@@ -46,6 +46,16 @@ export interface Compra {
   totalBOB: number;
   items: CompraItem[];
   notas?: string;
+  sucursalDestinoId?: string;
+  cuentaDineroId?: string;
+  estado?: "COMPLETADA" | "ANULADA";
+  anuladaPor?: {
+    _id: string;
+    nombreCompleto: string;
+    email: string;
+  } | string;
+  fechaAnulacion?: string | Date;
+  motivoAnulacion?: string;
   creadoPor?: {
     _id: string;
     nombreCompleto: string;

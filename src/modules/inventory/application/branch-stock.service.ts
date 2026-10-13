@@ -56,7 +56,7 @@ export async function getStockLevelsByProduct(
 ): Promise<NivelStockConDetalles[]> {
   await connectDB();
   return (await NivelStock.find({ productoId })
-    .populate("sucursal", "nombre codigo tipo permiteVentaPOS activa")
+    .populate("sucursalId", "nombre codigo tipo permiteVentaPOS activa")
     .lean()) as unknown as NivelStockConDetalles[];
 }
 
@@ -246,6 +246,48 @@ export async function increaseStockInBranch({
   await Producto.updateOne(
     { _id: productoId, "variantes.varianteId": varianteId },
     { $inc: { "variantes.$.stock": cantidad } },
+    session ? { session } : undefined
+  );
+
+  return updated;
+}
+
+/**
+ * Decrementa stock físico en una sucursal (ej: anulación de compra o merma).
+ */
+export async function decreaseStockInBranch({
+  sucursalId,
+  productoId,
+  varianteId,
+  cantidad,
+}: {
+  sucursalId: string | mongoose.Types.ObjectId;
+  productoId: string | mongoose.Types.ObjectId;
+  varianteId: string;
+  cantidad: number;
+}, session?: ClientSession) {
+  if (cantidad <= 0) return;
+  await connectDB();
+
+  const updated = await NivelStock.findOneAndUpdate(
+    { sucursalId, varianteId, stockFisico: { $gte: cantidad } },
+    {
+      $inc: { stockFisico: -cantidad },
+    },
+    {
+      new: true,
+      session: session ?? undefined,
+    }
+  );
+
+  if (!updated) {
+    throw new AppError("No hay suficiente stock físico en la sucursal para realizar la deducción", 400);
+  }
+
+  // Sincronizar stock global en Producto
+  await Producto.updateOne(
+    { _id: productoId, "variantes.varianteId": varianteId },
+    { $inc: { "variantes.$.stock": -cantidad } },
     session ? { session } : undefined
   );
 

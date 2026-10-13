@@ -72,3 +72,16 @@ export async function updatePerfil(data: UpdatePerfilDTO) {
 
   return responseData;
 }
+
+export async function deleteUsuario(id: string) {
+  const res = await fetch(`/api/usuarios/${id}`, {
+    method: "DELETE",
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Error al dar de baja al usuario");
+  }
+
+  return data;
+}

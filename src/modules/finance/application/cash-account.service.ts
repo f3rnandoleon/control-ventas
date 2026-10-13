@@ -349,3 +349,30 @@ export async function listMovimientosCuenta(
     .limit(limit)
     .lean();
 }
+
+export async function actualizarCuentaDinero(
+  id: string,
+  input: Partial<CrearCuentaDineroInput> & { activa?: boolean }
+): Promise<CuentaDineroType> {
+  assertObjectId(id, "ID de cuenta inválido");
+  await connectDB();
+
+  const cuenta = await CuentaDinero.findById(id);
+  if (!cuenta) {
+    throw new AppError("Cuenta de dinero no encontrada", 404);
+  }
+
+  if (input.nombre !== undefined) cuenta.nombre = input.nombre;
+  if (input.tipo !== undefined) cuenta.tipo = input.tipo;
+  if (input.numeroCuenta !== undefined) cuenta.numeroCuenta = input.numeroCuenta;
+  if (input.bancoNombre !== undefined) cuenta.bancoNombre = input.bancoNombre;
+  if (input.sucursalId !== undefined) {
+    cuenta.sucursalId = input.sucursalId ? new mongoose.Types.ObjectId(input.sucursalId) : null;
+  }
+  if (input.esPredeterminadaPOS !== undefined) cuenta.esPredeterminadaPOS = input.esPredeterminadaPOS;
+  if (input.esPredeterminadaQR !== undefined) cuenta.esPredeterminadaQR = input.esPredeterminadaQR;
+  if (input.activa !== undefined) cuenta.activa = input.activa;
+
+  await cuenta.save();
+  return cuenta.toObject();
+}

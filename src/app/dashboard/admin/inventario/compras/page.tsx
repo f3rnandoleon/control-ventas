@@ -10,15 +10,17 @@ export default function AdminComprasPage() {
   const [compras, setCompras] = useState<Compra[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadCompras = async () => {
+    try {
+      setLoading(true);
+      setCompras(await getCompras());
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        setCompras(await getCompras());
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadCompras();
   }, []);
 
   return (
@@ -39,7 +41,7 @@ export default function AdminComprasPage() {
         </Link>
       </div>
 
-      <ComprasTable compras={compras} loading={loading} />
+      <ComprasTable compras={compras} loading={loading} onRefresh={loadCompras} />
     </div>
   );
 }

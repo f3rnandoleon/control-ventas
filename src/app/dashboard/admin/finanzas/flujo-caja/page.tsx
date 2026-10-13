@@ -33,6 +33,54 @@ export default function FlujoCajaPage() {
     cargarFlujo();
   }, [cargarFlujo]);
 
+  const exportarCSV = () => {
+    if (!reporte || !reporte.cuentas || reporte.cuentas.length === 0) {
+      toast.error("No hay datos de flujo para exportar");
+      return;
+    }
+    const headers = [
+      "Cuenta",
+      "Tipo",
+      "Saldo Inicial Estimado",
+      "Total Ingresos (+)",
+      "Total Egresos (-)",
+      "Flujo Neto",
+      "Saldo Final Estimado",
+    ];
+    const rows = reporte.cuentas.map((c) => [
+      `"${c.nombreCuenta}"`,
+      `"${c.tipoCuenta}"`,
+      c.saldoInicialEstimado.toFixed(2),
+      c.totalIngresos.toFixed(2),
+      c.totalEgresos.toFixed(2),
+      c.flujoNeto.toFixed(2),
+      c.saldoFinalEstimado.toFixed(2),
+    ].join(","));
+
+    // Fila total global
+    if (reporte.resumenGlobal) {
+      rows.push([
+        `"TOTAL CONSOLIDADO"`,
+        `""`,
+        `""`,
+        reporte.resumenGlobal.totalIngresos.toFixed(2),
+        reporte.resumenGlobal.totalEgresos.toFixed(2),
+        reporte.resumenGlobal.flujoNeto.toFixed(2),
+        `""`,
+      ].join(","));
+    }
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `flujo_caja_${desde}_al_${hasta}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Flujo de caja exportado a CSV");
+  };
+
   const global = reporte?.resumenGlobal;
 
   return (
@@ -47,6 +95,14 @@ export default function FlujoCajaPage() {
             Seguimiento de entradas reales, salidas y liquidez neta por cada cuenta de dinero.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={exportarCSV}
+          className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-800 hover:bg-slate-700 px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition"
+        >
+          <span>📥</span> Exportar CSV
+        </button>
       </div>
 
       {/* Controles de Filtro */}

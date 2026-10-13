@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import type { Pedido, PedidoItem } from "@/types/pedido";
+import DevolucionCambioModal from "@/components/ventas/DevolucionCambioModal";
 import { 
   ORDER_STATUS_LABELS, 
   PAYMENT_STATUS_LABELS, 
@@ -15,7 +17,17 @@ interface OrderDetailModalProps {
 }
 
 export default function OrderDetailModal({ Pedido, onClose }: OrderDetailModalProps) {
+  const [modalDevolucionOpen, setModalDevolucionOpen] = useState(false);
+
   if (!Pedido) return null;
+
+  const rawPhone = Pedido.snapshotCliente?.telefono?.replace(/[^0-9]/g, "") || "";
+  const cleanPhone = rawPhone.length === 8 ? `591${rawPhone}` : rawPhone;
+  const whatsappUrl = cleanPhone
+    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+        `Hola ${Pedido.snapshotCliente?.nombreCompleto || "estimado(a)"}, te escribimos de la tienda respecto a tu pedido #${Pedido.numeroPedido}.`
+      )}`
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -43,9 +55,22 @@ export default function OrderDetailModal({ Pedido, onClose }: OrderDetailModalPr
                 <p className="text-sm font-medium text-slate-900 dark:text-white">
                   {Pedido.snapshotCliente?.nombreCompleto || "Anónimo"}
                 </p>
-                <p className="text-xs text-slate-500">
-                  📞 {Pedido.snapshotCliente?.telefono || "Sin teléfono"}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-500">
+                    📞 {Pedido.snapshotCliente?.telefono || "Sin teléfono"}
+                  </p>
+                  {whatsappUrl && (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-850 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
+                      title="Enviar WhatsApp al cliente"
+                    >
+                      <span>💬 WhatsApp</span>
+                    </a>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500">
                   📧 {Pedido.snapshotCliente?.email || "Sin email registrado"}
                 </p>
@@ -207,7 +232,18 @@ export default function OrderDetailModal({ Pedido, onClose }: OrderDetailModalPr
           )}
         </div>
 
-        <div className="p-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+        <div className="p-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div>
+            {(Pedido.estadoPago === "PAID" || Pedido.estadoEntrega === "DELIVERED" || Pedido.estadoPedido === "DELIVERED") && (
+              <button
+                type="button"
+                onClick={() => setModalDevolucionOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-500/20 transition-all shadow-sm"
+              >
+                🔄 Devolución / Cambio
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-semibold rounded-xl transition-all"
@@ -215,6 +251,17 @@ export default function OrderDetailModal({ Pedido, onClose }: OrderDetailModalPr
             Cerrar
           </button>
         </div>
+
+        {modalDevolucionOpen && (
+          <DevolucionCambioModal
+            pedido={Pedido}
+            onClose={() => setModalDevolucionOpen(false)}
+            onSuccess={() => {
+              setModalDevolucionOpen(false);
+              onClose();
+            }}
+          />
+        )}
       </div>
     </div>
   );

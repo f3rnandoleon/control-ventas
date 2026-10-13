@@ -1,6 +1,7 @@
 import mongoose, { type ClientSession } from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/producto";
+import Compra from "@/models/compra";
 import { comprasRepository } from "@/modules/purchases/infrastructure/compras.repository";
 import { inventoryRepository } from "@/modules/inventory/infrastructure/inventory.repository";
 import { calcularCostoPromedioPonderado } from "@/utils/pricing";
@@ -13,6 +14,7 @@ import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import {
   getDefaultWarehouseId,
   increaseStockInBranch,
+  decreaseStockInBranch,
 } from "@/modules/inventory/application/branch-stock.service";
 import {
   resolveDefaultAccountForPayment,
@@ -298,4 +300,105 @@ export async function obtenerCompraPorId(id: string) {
     throw new AppError("Compra no encontrada", 404);
   }
   return compra;
+}
+
+export async function anularCompra(
+  compraId: string,
+  userIdRaw: string,
+  motivo?: string
+) {
+  if (!mongoose.Types.ObjectId.isValid(userIdRaw)) {
+    throw new AppError("Usuario no autenticado", 401);
+  }
+  if (!mongoose.Types.ObjectId.isValid(compraId)) {
+    throw new AppError("ID de compra inválido", 400);
+  }
+
+  await connectDB();
+  const userId = new mongoose.Types.ObjectId(userIdRaw);
+
+  const compra = await Compra.findById(compraId);
+  if (!compra) {
+    throw new AppError("Compra no encontrada", 404);
+  }
+
+  if (compra.estado === "ANULADA") {
+    throw new AppError("Esta compra ya se encuentra anulada", 400);
+  }
+
+  const sucursalId = compra.sucursalDestinoId || (await getDefaultWarehouseId());
+
+  // 1. Revertir stock físico y costos anteriores en cada producto
+  for (const item of compra.items) {
+    await decreaseStockInBranch({
+      sucursalId,
+      productoId: item.productoId,
+      varianteId: item.varianteId,
+      cantidad: item.cantidad,
+    });
+
+    // Restaurar costo promedio previo si estaba registrado
+    if (item.costoAnteriorBOB !== undefined && item.costoAnteriorBOB >= 0) {
+      await Producto.updateOne(
+        { _id: item.productoId, "variantes.varianteId": item.varianteId },
+        { $set: { "variantes.$.costoUnitario": item.costoAnteriorBOB } }
+      );
+    }
+
+    // Registrar movimiento de inventario de ajuste negativo
+    await inventoryRepository.create({
+      productoId: item.productoId,
+      varianteId: item.varianteId,
+      tipo: "AJUSTE_NEGATIVO",
+      cantidad: item.cantidad,
+      motivo: `Anulación de compra #${compra.numeroCompra}: ${motivo || "Anulación manual"}`,
+      sucursalId,
+      usuarioId: userId,
+    });
+  }
+
+  // 2. Revertir egreso monetario (devolver dinero a la cuenta)
+  if (compra.totalBOB > 0) {
+    let cuentaDineroIdParaReversa = compra.cuentaDineroId;
+    if (!cuentaDineroIdParaReversa) {
+      const cuentaDefault = await resolveDefaultAccountForPayment("TRANSFERENCIA", sucursalId);
+      if (cuentaDefault) cuentaDineroIdParaReversa = cuentaDefault._id;
+    }
+
+    if (cuentaDineroIdParaReversa) {
+      await registrarMovimientoEnCuenta({
+        cuentaId: cuentaDineroIdParaReversa,
+        tipo: "INGRESO",
+        monto: compra.totalBOB,
+        concepto: `Reversa / Anulación de compra ${compra.numeroCompra}`,
+        origenTipo: "COMPRA",
+        origenId: compra._id.toString(),
+        sucursalId,
+        usuarioId: userId,
+      });
+    }
+  }
+
+  // 3. Marcar documento como ANULADA
+  compra.estado = "ANULADA";
+  compra.anuladaPor = userId;
+  compra.fechaAnulacion = new Date();
+  compra.motivoAnulacion = motivo || "Anulación manual por staff";
+  await compra.save();
+
+  await recordAuditEventSafe({
+    tipoEntidad: "COMPRA",
+    idEntidad: compra._id.toString(),
+    accion: "ANULAR",
+    estado: "SUCCESS",
+    idActor: userIdRaw,
+    rolActor: "ADMIN",
+    metadata: {
+      numeroCompra: compra.numeroCompra,
+      motivo,
+      totalBOB: compra.totalBOB,
+    },
+  });
+
+  return compra.toObject();
 }

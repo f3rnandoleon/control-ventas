@@ -8,6 +8,7 @@ import ProductoForm from "@/components/productos/ProductoForm";
 import ProductoModal from "@/components/productos/ProductoModal";
 import VariantesManager from "@/components/productos/VariantesManager";
 import ProductoFilters, { EMPTY_PRODUCT_FILTERS, type ProductoFilterValues } from "@/components/productos/ProductoFilters";
+import StockSucursalesModal from "@/components/productos/StockSucursalesModal";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import { getVarianteImagenPrincipal, getVarianteSegundaImagen } from "@/utils/varianteImagen";
 import { getEstadoStock, getStockDisponibleVariante, getStockProducto } from "@/utils/stock";
@@ -24,6 +25,7 @@ export default function AdminProductosPage() {
   const [filters, setFilters] = useState<ProductoFilterValues>(EMPTY_PRODUCT_FILTERS);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
+  const [stockModalProduct, setStockModalProduct] = useState<Producto | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const [imageProduct, setImageProduct] = useState<Producto | null>(null);
@@ -307,6 +309,7 @@ export default function AdminProductosPage() {
                   )}
                 </td>
                 <td className="whitespace-nowrap px-6 text-right">
+                  <button className="btn-link mr-3 text-sky-400 font-medium" onClick={() => setStockModalProduct(producto)}>🏬 Stock Tiendas</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}>Editar</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}>Variantes</button>
                   <button className="btn-link mr-3" onClick={() => generarReporteProductoPDF(producto)}>Reporte</button>
@@ -324,6 +327,11 @@ export default function AdminProductosPage() {
         {view === "PRODUCTO" && <ProductoForm initialData={editing || undefined} onSubmit={handleSave} />}
         {view === "VARIANTES" && editing && <VariantesManager producto={editing} onUpdated={loadProductos} />}
       </ProductoModal>
+      <StockSucursalesModal
+        producto={stockModalProduct}
+        open={Boolean(stockModalProduct)}
+        onClose={() => setStockModalProduct(null)}
+      />
       {imageProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">

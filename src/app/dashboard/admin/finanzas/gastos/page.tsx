@@ -138,6 +138,37 @@ export default function GastosOperativosPage() {
     }
   };
 
+  const exportarCSV = () => {
+    if (gastos.length === 0) {
+      toast.error("No hay gastos para exportar");
+      return;
+    }
+    const headers = ["Fecha", "Categoria", "Naturaleza", "Descripcion", "Beneficiario", "Monto (BOB)", "Sucursal", "Cuenta Dinero"];
+    const rows = gastos.map((g) => {
+      const suc = typeof g.sucursalId === "object" && g.sucursalId ? (g.sucursalId as unknown as { nombre: string }).nombre : "Global";
+      const cuenta = typeof g.cuentaDineroId === "object" && g.cuentaDineroId ? (g.cuentaDineroId as unknown as { nombre: string }).nombre : "—";
+      return [
+        `"${new Date(g.fecha || g.createdAt).toLocaleDateString("es-BO")}"`,
+        `"${g.categoria}"`,
+        `"${g.naturaleza}"`,
+        `"${g.descripcion.replace(/"/g, '""')}"`,
+        `"${(g.beneficiarioProveedor || "").replace(/"/g, '""')}"`,
+        g.monto.toFixed(2),
+        `"${suc}"`,
+        `"${cuenta}"`,
+      ].join(",");
+    });
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gastos_operativos_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Gastos exportados a CSV");
+  };
+
   const totalGastosMonto = gastos.reduce((acc, g) => acc + (g.monto || 0), 0);
   const totalFijos = gastos.filter((g) => g.naturaleza === "FIJO").reduce((acc, g) => acc + g.monto, 0);
   const totalVariables = gastos.filter((g) => g.naturaleza === "VARIABLE").reduce((acc, g) => acc + g.monto, 0);
@@ -155,13 +186,22 @@ export default function GastosOperativosPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white transition shadow-lg shadow-rose-900/30"
-        >
-          <span>+</span> Registrar Gasto
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportarCSV}
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-slate-800 hover:bg-slate-700 px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition"
+          >
+            <span>📥</span> Exportar CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white transition shadow-lg shadow-rose-900/30"
+          >
+            <span>+</span> Registrar Gasto
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas KPI */}

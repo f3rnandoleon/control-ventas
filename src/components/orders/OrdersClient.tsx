@@ -282,8 +282,28 @@ export default function OrdersClient() {
                       <div className="font-medium text-primary">
                         {order.snapshotCliente?.nombreCompleto || "Usuario anonimo"}
                       </div>
-                      <div className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
-                        {order.snapshotCliente?.telefono || "Sin telefono"}
+                      <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+                        <span>{order.snapshotCliente?.telefono || "Sin telefono"}</span>
+                        {(() => {
+                          const rawPhone = order.snapshotCliente?.telefono?.replace(/[^0-9]/g, "") || "";
+                          const cleanPhone = rawPhone.length === 8 ? `591${rawPhone}` : rawPhone;
+                          if (!cleanPhone) return null;
+                          const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+                            `Hola ${order.snapshotCliente?.nombreCompleto || "estimado(a)"}, te escribimos de la tienda sobre tu pedido #${order.numeroPedido}.`
+                          )}`;
+                          return (
+                            <a
+                              href={waUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 transition"
+                              title="Chat WhatsApp directo con el cliente"
+                            >
+                              💬 WhatsApp
+                            </a>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-4">

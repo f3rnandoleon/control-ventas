@@ -5,10 +5,11 @@ import {
   getUsuarios,
   createUsuario,
   updateUsuario,
+  deleteUsuario,
 } from "@/services/usuario.service";
 import UsuarioTable from "@/components/usuarios/UsuarioTable";
 import UsuarioModal from "@/components/usuarios/UsuarioModal";
-import { Usuario,CreateUsuarioDTO,UpdateUsuarioDTO } from "@/types/usuario";
+import { Usuario, CreateUsuarioDTO, UpdateUsuarioDTO } from "@/types/usuario";
 
 export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -23,6 +24,19 @@ export default function AdminUsuariosPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const handleDelete = async (u: Usuario) => {
+    if (!confirm(`¿Estás seguro de que deseas dar de baja al usuario "${u.nombreCompleto}"? Ya no podrá iniciar sesión en el sistema.`)) {
+      return;
+    }
+    try {
+      await deleteUsuario(u._id);
+      toast.success("Usuario dado de baja exitosamente");
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al dar de baja");
+    }
+  };
 
   const handleSave = async (
       data: CreateUsuarioDTO | UpdateUsuarioDTO
@@ -75,6 +89,7 @@ export default function AdminUsuariosPage() {
           setEditing(u);
           setOpen(true);
         }}
+        onDelete={handleDelete}
       />
 
       <UsuarioModal

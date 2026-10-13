@@ -38,3 +38,20 @@ export async function crearCompra(data: CrearCompraInput): Promise<{ message: st
 
   return res.json();
 }
+
+export async function anularCompra(id: string, motivo?: string): Promise<{ message: string; compra: Compra }> {
+  const res = await fetch(`/api/compras/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ motivo }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.message || "Error al anular la compra");
+  }
+
+  return res.json();
+}

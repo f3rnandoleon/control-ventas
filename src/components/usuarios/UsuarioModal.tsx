@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Usuario, CreateUsuarioDTO, UpdateUsuarioDTO } from "@/types/usuario";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +24,17 @@ export default function UsuarioModal({
   const isEditing = !!initialData;
   const Schema = isEditing ? updateUsuarioSchema : createUsuarioSchema;
 
+  const [sucursales, setSucursales] = useState<Array<{ _id: string; nombre: string; codigo: string }>>([]);
+
+  useEffect(() => {
+    fetch("/api/admin/sucursales")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setSucursales(data);
+      })
+      .catch(() => {});
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -36,6 +47,7 @@ export default function UsuarioModal({
       nombreCompleto: "",
       email: "",
       rol: "VENDEDOR",
+      sucursalAsignadaId: "",
       estaActivo: true,
       password: "",
     },
@@ -43,11 +55,17 @@ export default function UsuarioModal({
 
   useEffect(() => {
     if (open) {
+      const sucursalId =
+        typeof initialData?.sucursalAsignadaId === "object" && initialData?.sucursalAsignadaId !== null
+          ? (initialData.sucursalAsignadaId as unknown as { _id: string })._id
+          : initialData?.sucursalAsignadaId || "";
+
       if (initialData) {
         reset({
           nombreCompleto: initialData.nombreCompleto,
           email: initialData.email,
           rol: initialData.rol,
+          sucursalAsignadaId: sucursalId,
           estaActivo: initialData.estaActivo,
           password: "",
         });
@@ -56,6 +74,7 @@ export default function UsuarioModal({
           nombreCompleto: "",
           email: "",
           rol: "VENDEDOR",
+          sucursalAsignadaId: "",
           estaActivo: true,
           password: "",
         });
@@ -124,6 +143,7 @@ export default function UsuarioModal({
 
         {/* Rol */}
         <div className="mb-4">
+          <label className="block text-xs font-semibold text-slate-300 mb-1">Rol</label>
           <select
             {...register("rol")}
             className="input w-full"
@@ -137,6 +157,25 @@ export default function UsuarioModal({
               {errors.rol.message}
             </p>
           )}
+        </div>
+
+        {/* Sucursal Asignada */}
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-slate-300 mb-1">Sucursal / Local Asignado</label>
+          <select
+            {...register("sucursalAsignadaId")}
+            className="input w-full"
+          >
+            <option value="">Todas las sucursales (Sin asignación fija)</option>
+            {sucursales.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.nombre} ({s.codigo})
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Si se asigna a un vendedor, sus ventas en POS se asociarán automáticamente a este local.
+          </p>
         </div>
 
         {/* Estado */}

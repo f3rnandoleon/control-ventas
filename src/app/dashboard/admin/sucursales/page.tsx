@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSucursales, crearSucursal } from "@/services/sucursales.service";
+import Link from "next/link";
+import { toast } from "sonner";
+import {
+  getSucursales,
+  crearSucursal,
+  actualizarSucursal,
+  toggleActivarSucursal,
+} from "@/services/sucursales.service";
 import type { Sucursal, TipoSucursal } from "@/types/sucursal";
 
 export default function SucursalesPage() {
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingSucursal, setEditingSucursal] = useState<Sucursal | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -16,8 +24,8 @@ export default function SucursalesPage() {
     codigo: "",
     tipo: "TIENDA_FISICA" as TipoSucursal,
     direccion: "",
+    ciudad: "La Paz",
     telefono: "",
-    email: "",
     permiteVentaPOS: true,
     permiteDespachoWeb: false,
     permiteRetiroCliente: true,
@@ -40,25 +48,66 @@ export default function SucursalesPage() {
     loadData();
   }, []);
 
+  const handleOpenCreate = () => {
+    setEditingSucursal(null);
+    setFormData({
+      nombre: "",
+      codigo: "",
+      tipo: "TIENDA_FISICA",
+      direccion: "",
+      ciudad: "La Paz",
+      telefono: "",
+      permiteVentaPOS: true,
+      permiteDespachoWeb: false,
+      permiteRetiroCliente: true,
+      esAlmacenPrincipal: false,
+    });
+    setErrorMsg("");
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (s: Sucursal) => {
+    setEditingSucursal(s);
+    setFormData({
+      nombre: s.nombre,
+      codigo: s.codigo,
+      tipo: s.tipo,
+      direccion: s.direccion || "",
+      ciudad: s.ciudad || "La Paz",
+      telefono: s.telefono || "",
+      permiteVentaPOS: s.permiteVentaPOS,
+      permiteDespachoWeb: s.permiteDespachoWeb,
+      permiteRetiroCliente: s.permiteRetiroCliente,
+      esAlmacenPrincipal: s.esAlmacenPrincipal || false,
+    });
+    setErrorMsg("");
+    setShowModal(true);
+  };
+
+  const handleToggleActiva = async (s: Sucursal) => {
+    try {
+      await toggleActivarSucursal(s._id, !s.activa);
+      toast.success(`Sucursal ${!s.activa ? "activada" : "desactivada"} exitosamente`);
+      loadData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error al cambiar estado");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setSubmitting(true);
     try {
-      await crearSucursal(formData);
+      if (editingSucursal) {
+        await actualizarSucursal(editingSucursal._id, formData);
+        toast.success("Sucursal actualizada correctamente");
+      } else {
+        await crearSucursal(formData);
+        toast.success("Sucursal creada correctamente");
+      }
       setShowModal(false);
-      setFormData({
-        nombre: "",
-        codigo: "",
-        tipo: "TIENDA_FISICA",
-        direccion: "",
-        telefono: "",
-        email: "",
-        permiteVentaPOS: true,
-        permiteDespachoWeb: false,
-        permiteRetiroCliente: true,
-        esAlmacenPrincipal: false,
-      });
+      setEditingSucursal(null);
       await loadData();
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Error al guardar sucursal");
@@ -84,10 +133,7 @@ export default function SucursalesPage() {
           </p>
         </div>
         <button
-          onClick={() => {
-            setErrorMsg("");
-            setShowModal(true);
-          }}
+          onClick={handleOpenCreate}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-blue-900/30 transition cursor-pointer"
         >
           <span className="text-lg leading-none">+</span>
@@ -156,6 +202,7 @@ export default function SucursalesPage() {
                   <th className="px-5 py-4 text-left">Capacidades Operativas</th>
                   <th className="px-5 py-4 text-left">Contacto & Dirección</th>
                   <th className="px-5 py-4 text-center">Estado</th>
+                  <th className="px-5 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -223,6 +270,32 @@ export default function SucursalesPage() {
                         {s.activa ? "Activa" : "Inactiva"}
                       </span>
                     </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenEdit(s)}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition cursor-pointer"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleToggleActiva(s)}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                            s.activa
+                              ? "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border-rose-500/20"
+                              : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
+                          }`}
+                        >
+                          {s.activa ? "Desactivar" : "Activar"}
+                        </button>
+                        <Link
+                          href={`/dashboard/admin/inventario?sucursalId=${s._id}`}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-700 border border-white/10 transition"
+                        >
+                          Stock
+                        </Link>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -231,12 +304,14 @@ export default function SucursalesPage() {
         </div>
       )}
 
-      {/* Modal Nueva Sucursal */}
+      {/* Modal Nueva / Editar Sucursal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-gray-900 p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="text-xl font-bold text-white">Nueva Sucursal / Ubicación</h2>
+              <h2 className="text-xl font-bold text-white">
+                {editingSucursal ? "Editar Sucursal" : "Nueva Sucursal / Ubicación"}
+              </h2>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-gray-400 hover:text-white text-xl cursor-pointer"
@@ -273,10 +348,13 @@ export default function SucursalesPage() {
                   <input
                     type="text"
                     required
+                    disabled={!!editingSucursal}
                     placeholder="Ej. TDA-02"
                     value={formData.codigo}
                     onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm uppercase font-mono"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm uppercase font-mono ${
+                      editingSucursal ? "bg-white/5 opacity-60 cursor-not-allowed" : "bg-white/5"
+                    }`}
                   />
                 </div>
               </div>
@@ -333,13 +411,13 @@ export default function SucursalesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                    Email de Contacto
+                    Ciudad
                   </label>
                   <input
-                    type="email"
-                    placeholder="tienda2@empresa.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    type="text"
+                    placeholder="Ej. La Paz, Santa Cruz, Cochabamba"
+                    value={formData.ciudad}
+                    onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 text-sm"
                   />
                 </div>
@@ -395,7 +473,7 @@ export default function SucursalesPage() {
                   disabled={submitting}
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-blue-900/30 transition disabled:opacity-50 cursor-pointer"
                 >
-                  {submitting ? "Guardando..." : "Crear Sucursal"}
+                  {submitting ? "Guardando..." : editingSucursal ? "Guardar Cambios" : "Crear Sucursal"}
                 </button>
               </div>
             </form>
