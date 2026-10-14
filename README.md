@@ -26,7 +26,9 @@ Aplicacion de comercio y operacion para catalogo, carrito, pedidos, pagos, entre
 
 ## Documentacion
 
-- API de integracion: [api_documentacion.md](./api_documentacion.md)
+- Manual Integral del Sistema Central (SSOT para Agentes Web, App, WhatsApp y Backend): [SISTEMA_CENTRAL.md](./SISTEMA_CENTRAL.md)
+- Catálogo y Ejemplos de Endpoints Públicos y Externos: [ENDPOINTS_PUBLICOS_Y_EXTERNOS.md](./ENDPOINTS_PUBLICOS_Y_EXTERNOS.md)
+- API de integracion interna: [API_DOCUMENTACION.md](./API_DOCUMENTACION.md)
 - Plan de refactor estructural: [implementation_plan2.md](./implementation_plan2.md)
 
 ## Desarrollo local
