@@ -3,7 +3,10 @@ import { connectDB } from "@/libs/mongodb";
 import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
 import User from "@/models/user";
-import { getDefaultWarehouseId } from "@/modules/inventory/application/branch-stock.service";
+import {
+  getDefaultWarehouseId,
+  getWebDispatchBranchId,
+} from "@/modules/inventory/application/branch-stock.service";
 import {
   resolveDefaultAccountForPayment,
   registrarMovimientoEnCuenta,
@@ -92,6 +95,7 @@ async function releasePedidoReservation(pedido: {
       producto,
       variante,
       cantidad: item.cantidad,
+      sucursalId: (pedido as unknown as { sucursalId?: mongoose.Types.ObjectId }).sucursalId,
     }, session);
   }
 }
@@ -272,6 +276,8 @@ export async function crearPedidoDesdeCarrito(
     const subtotal = validatedItems.reduce((sum, item) => sum + item.subtotal, 0);
     const total = subtotal;
 
+    const webDispatchBranchId = await getWebDispatchBranchId(session);
+
     for (const { producto, variante, cartItem } of validatedItems) {
       if (getAvailableStockForVariant(variante) < cartItem.cantidad) {
         throw new AppError(
@@ -284,6 +290,7 @@ export async function crearPedidoDesdeCarrito(
           producto,
           variante,
           cantidad: cartItem.cantidad,
+          sucursalId: webDispatchBranchId,
         },
         session
       );
@@ -321,12 +328,10 @@ export async function crearPedidoDesdeCarrito(
 
     const gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
 
-    const defaultWarehouseId = await getDefaultWarehouseId(session);
-
     const pedido = await pedidosRepository.create({
       numeroPedido: createPedidoNumber(),
       canal: "WEB",
-      sucursalId: defaultWarehouseId,
+      sucursalId: webDispatchBranchId,
       estadoPedido: "PENDING_PAYMENT",
       estadoPago: "PENDING",
       estadoEntrega,
@@ -371,9 +376,10 @@ export async function crearPedidoDesdeCarrito(
           metodoEntrega,
           total: pedido.total,
           items: pedido.items.length,
-          sucursalId: defaultWarehouseId.toString(),
+          sucursalId: webDispatchBranchId.toString(),
         },
       },
+
       session
     );
 

@@ -13,9 +13,16 @@ import {
   matchesVariant,
   withComputedStock,
   withVariantAvailability,
+  withWebVariantAvailability,
 } from "@/modules/catalog/domain/variant.utils";
 import { recordInventoryMovement } from "@/modules/inventory/application/inventory.service";
+import {
+  getWebStockMapForProducts,
+  getDefaultWarehouseId,
+} from "@/modules/inventory/application/branch-stock.service";
+import NivelStock from "@/models/nivelStock";
 import type { Variante, Producto } from "@/types/producto";
+
 import { getVariantPricing } from "@/utils/pricing";
 
 type ProductoPayload = Partial<Producto> & {
@@ -110,12 +117,31 @@ export async function createCatalogProduct(
     };
   });
 
-  return catalogRepository.create({
+  const created = await catalogRepository.create({
     ...data,
     sku,
     creadoPor: userId,
     variantes: variantesProcesadas,
   });
+
+  try {
+    const defaultWarehouseId = await getDefaultWarehouseId();
+    const niveles = (variantesProcesadas as Variante[]).map((v) => ({
+      sucursalId: defaultWarehouseId,
+      productoId: created._id,
+      varianteId: v.varianteId,
+      stockFisico: Math.max(0, Number(v.stock || 0)),
+      stockReservado: 0,
+      stockMinimo: 2,
+    }));
+    if (niveles.length > 0) {
+      await NivelStock.insertMany(niveles, { ordered: false });
+    }
+  } catch (err) {
+    console.warn("No se pudo inicializar NivelStock para el nuevo producto:", err);
+  }
+
+  return created;
 }
 
 export async function updateCatalogProduct(
@@ -333,8 +359,14 @@ export async function getPublicCatalog(filters: PublicCatalogFilters = {}) {
     queryFilter
   );
 
+  const productIds = productos.map((p) => p._id);
+  const webStockMap = await getWebStockMapForProducts(productIds);
+
   let procesados = productos.map((producto) =>
-    withVariantAvailability(producto.toObject())
+    withWebVariantAvailability(
+      producto.toObject(),
+      webStockMap.get(producto._id.toString())
+    )
   );
 
   if (filters.color?.trim() || filters.talla?.trim() || filters.soloDisponible) {
@@ -410,7 +442,11 @@ export async function getPublicCatalogProductById(id: string) {
     throw new AppError("Producto no encontrado", 404);
   }
 
-  return withVariantAvailability(producto.toObject());
+  const webStockMap = await getWebStockMapForProducts([producto._id]);
+  return withWebVariantAvailability(
+    producto.toObject(),
+    webStockMap.get(producto._id.toString())
+  );
 }
 
 export async function findCatalogProductByCode(code: string) {

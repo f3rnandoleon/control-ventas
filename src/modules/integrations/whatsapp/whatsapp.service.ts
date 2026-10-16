@@ -4,6 +4,7 @@ import Pedido from "@/models/pedido";
 import TransaccionPago from "@/models/transaccionPago";
 import PerfilCliente from "@/models/perfilCliente";
 import User from "@/models/user";
+import NivelStock from "@/models/nivelStock";
 import { catalogRepository } from "@/modules/catalog/infrastructure/catalog.repository";
 import { deliveryOptionsRepository } from "@/modules/delivery-options/infrastructure/delivery-options.repository";
 import { runInTransaction } from "@/shared/db/runTransaction";
@@ -13,6 +14,10 @@ import { uploadFileToCloudinary } from "@/libs/cloudinary";
 import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 import type { CreateWhatsAppOrderInput } from "@/schemas/whatsapp-integration.schema";
 import { getVariantPricing } from "@/utils/pricing";
+import {
+  getAvailableWebStockForVariant,
+  getWebDispatchBranchId,
+} from "@/modules/inventory/application/branch-stock.service";
 
 const BANK_SOL_QR_IMAGE =
   "https://res.cloudinary.com/dq1jeikev/image/upload/v1777964054/comprobante_xvdhuf.jpg";
@@ -262,8 +267,12 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
       );
     }
 
-    const stockReservado = Math.max(0, variante.stockReservado || 0);
-    const stockDisponible = Math.max(0, (variante.stock || 0) - stockReservado);
+    const varId = (variante.varianteId as string) || String(variante._id);
+    const stockDisponible = await getAvailableWebStockForVariant(
+      producto._id.toString(),
+      varId
+    );
+
 
     if (stockDisponible < itemInput.cantidad) {
       throw new AppError(
@@ -335,8 +344,17 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
 
   // 5. Transactional Order & Payment Creation
   const { pedido, pago } = await runInTransaction(async (session) => {
-    // Reserve stock on variant documents
+    const webDispatchBranchId = await getWebDispatchBranchId(session);
+
+    // Reserve stock on variant documents and branch NivelStock
     for (const itemProc of itemsProcesados) {
+      const varId = itemProc.variante.varianteId || String(itemProc.variante._id);
+      await NivelStock.findOneAndUpdate(
+        { sucursalId: webDispatchBranchId, varianteId: varId },
+        { $inc: { stockReservado: itemProc.cantidad } },
+        { session }
+      );
+
       itemProc.variante.stockReservado =
         (itemProc.variante.stockReservado || 0) + itemProc.cantidad;
       await itemProc.producto.save({ session });
@@ -346,6 +364,7 @@ export async function createWhatsAppOrder(input: CreateWhatsAppOrderInput) {
     const nuevoPedido = new Pedido({
       numeroPedido,
       canal: "WHATSAPP",
+      sucursalId: webDispatchBranchId,
       estadoPedido: "PENDING_PAYMENT",
       estadoPago: "PENDING",
       estadoEntrega: "PENDING",

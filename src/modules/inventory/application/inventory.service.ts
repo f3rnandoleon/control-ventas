@@ -179,14 +179,29 @@ export async function reserveStockForOrder({
   producto,
   variante,
   cantidad,
+  sucursalId,
 }: {
   producto: ProductoWithVariants;
   variante: VariantWithStock;
   cantidad: number;
+  sucursalId?: mongoose.Types.ObjectId | string;
 }, session?: ClientSession) {
   if (getAvailableStockForVariant(variante) < cantidad) {
     throw new AppError(`Stock insuficiente (${producto.nombre})`, 400);
   }
+
+  const targetSucursalId =
+    sucursalId || (await getDefaultWarehouseId(session));
+
+  // Verificar y reservar en NivelStock de la sucursal de despacho
+  await NivelStock.findOneAndUpdate(
+    {
+      sucursalId: targetSucursalId,
+      varianteId: variante.varianteId,
+    },
+    { $inc: { stockReservado: cantidad } },
+    { session: session ?? undefined }
+  );
 
   variante.stockReservado = getVariantReservedStock(variante) + cantidad;
   await producto.save(session ? { session } : undefined);
@@ -201,16 +216,32 @@ export async function releaseReservedStockForOrder({
   producto,
   variante,
   cantidad,
+  sucursalId,
 }: {
   producto: ProductoWithVariants;
   variante: VariantWithStock;
   cantidad: number;
+  sucursalId?: mongoose.Types.ObjectId | string;
 }, session?: ClientSession) {
   variante.stockReservado = Math.max(
     0,
     getVariantReservedStock(variante) - cantidad
   );
   await producto.save(session ? { session } : undefined);
+
+  const targetSucursalId =
+    sucursalId || (await getDefaultWarehouseId(session));
+
+  const updatedNivel = await NivelStock.findOneAndUpdate(
+    { sucursalId: targetSucursalId, varianteId: variante.varianteId },
+    { $inc: { stockReservado: -cantidad } },
+    { new: true, session: session ?? undefined }
+  );
+
+  if (updatedNivel && updatedNivel.stockReservado < 0) {
+    updatedNivel.stockReservado = 0;
+    await updatedNivel.save(session ? { session } : undefined);
+  }
 
   return {
     stockReservado: variante.stockReservado,

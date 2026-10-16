@@ -11,7 +11,9 @@ import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import { AppError } from "@/shared/errors/AppError";
 import { cartRepository } from "@/modules/cart/infrastructure/cart.repository";
 import { getAvailableStockForVariant } from "@/modules/inventory/application/inventory.service";
+import { getAvailableWebStockForVariant } from "@/modules/inventory/application/branch-stock.service";
 import { getVariantPricing } from "@/utils/pricing";
+
 
 function assertObjectId(value: string, message: string) {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -89,8 +91,9 @@ export async function addCartItemByUserId(
 
   const nextQuantity = (existingItem?.cantidad || 0) + input.cantidad;
 
-  if (getAvailableStockForVariant(variante) < nextQuantity) {
-    throw new AppError("Stock insuficiente para agregar al carrito", 400);
+  const stockDisponibleWeb = await getAvailableWebStockForVariant(producto._id, variante.varianteId || "", session);
+  if (stockDisponibleWeb < nextQuantity) {
+    throw new AppError("Stock insuficiente en tienda online para la cantidad solicitada", 400);
   }
 
   const pricing = getVariantPricing(producto, variante);
@@ -171,8 +174,9 @@ export async function updateCartItemByUserId(
     throw new AppError("Variante no encontrada", 404);
   }
 
-  if (getAvailableStockForVariant(variante) < input.cantidad) {
-    throw new AppError("Stock insuficiente para actualizar el carrito", 400);
+  const stockDisponibleWeb = await getAvailableWebStockForVariant(producto._id, variante.varianteId || "", session);
+  if (stockDisponibleWeb < input.cantidad) {
+    throw new AppError("Stock insuficiente en tienda online para actualizar el carrito", 400);
   }
 
   const pricing = getVariantPricing(producto, variante);
@@ -267,9 +271,10 @@ export async function getValidatedCartForCheckout(
       throw new AppError("Una variante del carrito ya no existe", 404);
     }
 
-    if (getAvailableStockForVariant(variante) < item.cantidad) {
+    const stockDisponibleWeb = await getAvailableWebStockForVariant(producto._id, variante.varianteId || "", session);
+    if (stockDisponibleWeb < item.cantidad) {
       throw new AppError(
-        `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
+        `Stock insuficiente en tienda online para ${producto.nombre} ${variante.color}/${variante.talla}`,
         400
       );
     }

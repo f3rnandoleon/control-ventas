@@ -161,7 +161,10 @@ curl -X GET https://control-ventas-azure.vercel.app/api/estado
 ---
 
 ### 3.2 Catálogo Público (`GET /api/productos/publicos`)
-Consulta prendas activas disponibles para el público. Filtra datos sensibles (oculta costos y códigos de barras internos).
+Consulta prendas activas disponibles para la tienda web.
+* **Seguridad:** Oculta estrictamente costos internos (`precioCosto`, `costoOrigen`, `variantes.precioCosto`) y códigos de barra/QR internos.
+* **Inventario Web:** Las existencias (`stockTotal`, `stockReservadoTotal`, `stockDisponible` de producto y variantes) se calculan sumando únicamente las sucursales activas autorizadas para despacho web (`permiteDespachoWeb = true`). Las existencias de tiendas físicas aisladas de la web no computan aquí.
+* **Precios y Rangos:** Cada variante incluye su `precioVenta` efectivo garantizado (con fallback al precio base del padre si no está diferenciado). El producto raíz incluye `precioMinimo`, `precioMaximo`, `tieneRangoPrecios` y `precioDisplay` formateado.
 
 - **Método:** `GET`
 - **Ruta:** `/api/productos/publicos`
@@ -175,7 +178,7 @@ Consulta prendas activas disponibles para el público. Filtra datos sensibles (o
 | `categoria` | `string` | Filtrar por categoría | `?categoria=Chompas` |
 | `color` | `string` | Filtrar por color específico | `?color=Negro` |
 | `talla` | `string` | Filtrar por talla (`S`, `M`, `L`, `XL`, etc.) | `?talla=M` |
-| `soloDisponible`| `boolean`| Si es `true`, devuelve solo variantes con stock vendible | `?soloDisponible=true` |
+| `soloDisponible`| `boolean`| Si es `true`, devuelve solo variantes con stock vendible en sucursales web | `?soloDisponible=true` |
 | `page` | `number` | Número de página (activa respuesta paginada) | `?page=1` |
 | `limit` | `number` | Cantidad de ítems por página (default 20, max 100) | `?limit=10` |
 
@@ -197,8 +200,14 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/productos/publicos?q=ch
       "marca": "Fit Andes",
       "sku": "CH-ALP-001",
       "precioVenta": 135.00,
+      "precioMinimo": 135.00,
+      "precioMaximo": 150.00,
+      "tieneRangoPrecios": true,
+      "precioDisplay": "Bs 135.00 - Bs 150.00",
       "descuento": 0,
       "stockTotal": 14,
+      "stockReservadoTotal": 1,
+      "stockDisponible": 13,
       "estado": "ACTIVO",
       "variantes": [
         {
@@ -206,6 +215,7 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/productos/publicos?q=ch
           "color": "Negro",
           "colorSecundario": "Gris",
           "talla": "M",
+          "precioVenta": 135.00,
           "stock": 8,
           "stockReservado": 1,
           "stockDisponible": 7,
@@ -223,16 +233,24 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/productos/publicos?q=ch
           }
         },
         {
-          "varianteId": "var-alp-neg-l",
+          "varianteId": "var-alp-neg-xl",
           "color": "Negro",
           "colorSecundario": "Gris",
-          "talla": "L",
+          "talla": "XL",
+          "precioVenta": 150.00,
           "stock": 6,
           "stockReservado": 0,
           "stockDisponible": 6,
           "imagenes": [
             "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864000/chompa_negra_1.jpg"
-          ]
+          ],
+          "medidas": {
+            "anchoPecho": 58,
+            "anchoHombros": 48,
+            "largoTotal": 72,
+            "largoMangaAxila": 52,
+            "largoMangaHombro": 65
+          }
         }
       ]
     }
@@ -243,6 +261,7 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/productos/publicos?q=ch
   "totalPages": 1
 }
 ```
+
 
 ---
 

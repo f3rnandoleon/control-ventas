@@ -239,9 +239,11 @@ async function consumeStockForPedido(
         userId: actor.id,
         motivo: "Pedido web confirmado",
         referencia: "ORDER_PAYMENT_CONFIRM",
+        sucursalId: (pedido as unknown as { sucursalId?: mongoose.Types.ObjectId }).sucursalId,
       },
       session
     );
+
   }
 
   pedido.estadoReservaStock = "CONSUMED";
