@@ -54,13 +54,16 @@ export type CrearTraspasoInput = {
   sucursalDestinoId: string;
   motivo?: string;
   notas?: string;
+  notasEnvio?: string;
   items: Array<{
     productoId: string;
     varianteId: string;
-    cantidad: number;
+    cantidad?: number;
+    cantidadEnviada?: number;
     notasItem?: string;
   }>;
 };
+
 
 export type DespacharTraspasoInput = {
   traspasoId: string;

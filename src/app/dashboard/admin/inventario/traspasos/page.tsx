@@ -146,6 +146,7 @@ export default function TraspasosPage() {
         items: itemsDraft.map((i) => ({
           productoId: i.productoId,
           varianteId: i.varianteId,
+          cantidad: i.cantidadEnviada,
           cantidadEnviada: i.cantidadEnviada,
         })),
       });

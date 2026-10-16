@@ -30,15 +30,31 @@ export async function crearTraspaso(data: {
   items: Array<{
     productoId: string;
     varianteId: string;
-    cantidadEnviada: number;
+    cantidad?: number;
+    cantidadEnviada?: number;
+    notasItem?: string;
   }>;
   motivo?: string;
   notasEnvio?: string;
+  notas?: string;
 }): Promise<Traspaso> {
+  const payload = {
+    ...data,
+    notas: data.notas || data.notasEnvio,
+    items: data.items.map((i) => {
+      const cant = i.cantidad ?? i.cantidadEnviada ?? 0;
+      return {
+        ...i,
+        cantidad: cant,
+        cantidadEnviada: cant,
+      };
+    }),
+  };
+
   const res = await fetch("/api/admin/traspasos", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));

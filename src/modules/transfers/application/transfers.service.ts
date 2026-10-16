@@ -55,8 +55,9 @@ export async function crearSolicitudTraspaso(
   const processedItems = [];
 
   for (const item of input.items) {
-    const qty = Number(item.cantidad);
-    if (qty <= 0 || !Number.isInteger(qty)) {
+    const rawQty = item.cantidad ?? item.cantidadEnviada;
+    const qty = Number(rawQty);
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isInteger(qty)) {
       throw new AppError("La cantidad debe ser un entero positivo", 400);
     }
 
@@ -137,7 +138,7 @@ export async function crearSolicitudTraspaso(
         valorTotalCostoTraspaso: Number(valorTotalCostoTraspaso.toFixed(2)),
         solicitadoPor: userId,
         motivo: input.motivo || "Reabastecimiento de tienda",
-        notas: input.notas,
+        notas: input.notas || input.notasEnvio || null,
       },
     ],
     { session }
