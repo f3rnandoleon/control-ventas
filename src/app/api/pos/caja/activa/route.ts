@@ -3,6 +3,7 @@ import { obtenerSesionCajaActiva } from "@/modules/finance/application/cash-regi
 import { requireStaffApiAuth } from "@/libs/requireApiAuth";
 import { connectDB } from "@/libs/mongodb";
 import User from "@/models/user";
+import Sucursal from "@/models/sucursal";
 import { getDefaultWarehouseId } from "@/modules/inventory/application/branch-stock.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
@@ -28,11 +29,24 @@ export async function GET(request: Request) {
     }
 
     if (!sucursalId) {
-      return NextResponse.json(null);
+      return NextResponse.json({ sesion: null, sucursal: null });
     }
 
-    const sesion = await obtenerSesionCajaActiva(sucursalId);
-    return NextResponse.json(sesion);
+    const [sucursal, sesion] = await Promise.all([
+      Sucursal.findById(sucursalId)
+        .select("nombre requiereAperturaCaja")
+        .lean() as Promise<{ _id?: unknown; nombre?: string; requiereAperturaCaja?: boolean } | null>,
+      obtenerSesionCajaActiva(sucursalId),
+    ]);
+
+    return NextResponse.json({
+      sesion,
+      sucursal: {
+        _id: sucursalId,
+        nombre: sucursal?.nombre || "Sucursal",
+        requiereAperturaCaja: sucursal?.requiereAperturaCaja ?? true,
+      },
+    });
   } catch (error) {
     return handleRouteError(error, {
       fallbackMessage: "Error al consultar sesión de caja activa",

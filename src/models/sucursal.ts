@@ -46,6 +46,10 @@ const sucursalSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    requiereAperturaCaja: {
+      type: Boolean,
+      default: true,
+    },
     activa: {
       type: Boolean,
       default: true,

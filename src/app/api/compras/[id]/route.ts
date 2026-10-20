@@ -3,7 +3,9 @@ import {
   obtenerCompraPorId,
   anularCompra,
   actualizarCompra,
+  reemplazarCompra,
 } from "@/modules/purchases/application/compras.service";
+import { createCompraSchema } from "@/schemas/compra.schema";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 import { requireStaffApiAuth } from "@/libs/requireApiAuth";
 
@@ -76,6 +78,44 @@ export async function DELETE(
     return handleRouteError(error, {
       fallbackMessage: "Error al anular compra",
       logLabel: "COMPRA DELETE/ANULAR ERROR:",
+    });
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireStaffApiAuth(request);
+    if (auth.response) return auth.response;
+
+    const { id } = await params;
+    const body = await request.json();
+
+    const validation = createCompraSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: "Datos de compra inválidos", errors: validation.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const nuevaCompra = await reemplazarCompra(
+      id,
+      validation.data,
+      auth.userAuth.id,
+      body.motivo
+    );
+
+    return NextResponse.json({
+      message: "Compra corregida y reemplazada exitosamente",
+      compra: nuevaCompra,
+    });
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error al corregir y reemplazar la compra",
+      logLabel: "COMPRA PUT/REPLACE ERROR:",
     });
   }
 }

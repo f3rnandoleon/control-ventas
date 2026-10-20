@@ -17,6 +17,7 @@ export interface Sucursal {
   permiteVentaPOS: boolean;
   permiteDespachoWeb: boolean;
   permiteRetiroCliente: boolean;
+  requiereAperturaCaja?: boolean;
   activa: boolean;
   esAlmacenPrincipal: boolean;
   createdAt?: string;
@@ -33,6 +34,7 @@ export type CreateSucursalDTO = {
   permiteVentaPOS?: boolean;
   permiteDespachoWeb?: boolean;
   permiteRetiroCliente?: boolean;
+  requiereAperturaCaja?: boolean;
   activa?: boolean;
   esAlmacenPrincipal?: boolean;
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import NuevaCompraForm from "@/components/inventario/NuevaCompraForm";
 
@@ -34,7 +35,9 @@ export default function NuevaCompraPage() {
         </Link>
       </div>
 
-      <NuevaCompraForm />
+      <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl border border-white/10 bg-white/5" />}>
+        <NuevaCompraForm />
+      </Suspense>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { crearCompra } from "@/services/compras.service";
+import { crearCompra, getCompra, reemplazarCompra } from "@/services/compras.service";
 import { getProductosInventario } from "@/services/inventario.service";
 import type { ProductoInventario } from "@/types/inventario";
 import type { Variante } from "@/types/producto";
+import type { Compra } from "@/types/compra";
 import { calcularCostoPromedioPonderado, formatMoney } from "@/utils/pricing";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
@@ -24,9 +25,16 @@ interface FormItem {
 
 export default function NuevaCompraForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const corregirId = searchParams.get("corregirId");
+
   const [productos, setProductos] = useState<ProductoInventario[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Modo corrección
+  const [compraOriginal, setCompraOriginal] = useState<Compra | null>(null);
+  const [loadingCorregir, setLoadingCorregir] = useState(false);
 
   // Cabecera
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
@@ -64,6 +72,51 @@ export default function NuevaCompraForm() {
     };
     load();
   }, []);
+
+  // Cargar datos de la compra original si estamos en modo corrección
+  useEffect(() => {
+    if (!corregirId) return;
+    let isMounted = true;
+    setLoadingCorregir(true);
+    getCompra(corregirId)
+      .then((compra) => {
+        if (!isMounted) return;
+        setCompraOriginal(compra);
+        if (compra.fecha) {
+          setFecha(new Date(compra.fecha).toISOString().slice(0, 10));
+        }
+        if (compra.proveedor) setProveedor(compra.proveedor);
+        if (compra.comprobanteReferencia) setComprobanteReferencia(compra.comprobanteReferencia);
+        if (compra.monedaOrigen) setMonedaOrigen(compra.monedaOrigen);
+        if (compra.tipoCambio) setTipoCambio(compra.tipoCambio);
+        if (compra.notas) setNotas(compra.notas);
+
+        if (compra.items && compra.items.length > 0) {
+          const itemsClonados: FormItem[] = compra.items.map((it) => ({
+            productoId: it.productoId,
+            varianteId: it.varianteId,
+            color: it.varianteSnapshot.color,
+            colorSecundario: it.varianteSnapshot.colorSecundario,
+            talla: it.varianteSnapshot.talla,
+            cantidad: it.cantidad,
+            costoUnitarioOrigen: it.costoUnitarioOrigen,
+            imagen: it.varianteSnapshot.imagen,
+          }));
+          setItems(itemsClonados);
+        }
+        toast.info(`Compra #${compra.numeroCompra} cargada para corrección`);
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Error al cargar la compra a corregir");
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCorregir(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [corregirId]);
 
   // Producto seleccionado para el selector
   const activeProducto = useMemo(
@@ -223,21 +276,37 @@ export default function NuevaCompraForm() {
 
     setSubmitting(true);
     try {
-      const res = await crearCompra({
-        fecha,
-        proveedor: proveedor.trim() || undefined,
-        comprobanteReferencia: comprobanteReferencia.trim() || undefined,
-        monedaOrigen,
-        tipoCambio,
-        notas: notas.trim() || undefined,
-        items,
-      });
+      if (corregirId) {
+        const res = await reemplazarCompra(corregirId, {
+          fecha,
+          proveedor: proveedor.trim() || undefined,
+          comprobanteReferencia: comprobanteReferencia.trim() || undefined,
+          monedaOrigen,
+          tipoCambio,
+          notas: notas.trim() || undefined,
+          items,
+          motivo: "Corrección y reemplazo desde formulario",
+        });
 
-      toast.success(res.message || "Compra registrada correctamente");
+        toast.success(res.message || "Compra corregida y reemplazada exitosamente");
+      } else {
+        const res = await crearCompra({
+          fecha,
+          proveedor: proveedor.trim() || undefined,
+          comprobanteReferencia: comprobanteReferencia.trim() || undefined,
+          monedaOrigen,
+          tipoCambio,
+          notas: notas.trim() || undefined,
+          items,
+        });
+
+        toast.success(res.message || "Compra registrada correctamente");
+      }
+
       router.push("/dashboard/admin/inventario/compras");
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error ? err.message : "Error al registrar la compra"
+        err instanceof Error ? err.message : "Error al procesar la compra"
       );
     } finally {
       setSubmitting(false);
@@ -246,6 +315,45 @@ export default function NuevaCompraForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* BANNER MODO CORRECCIÓN */}
+      {loadingCorregir && (
+        <div className="h-16 animate-pulse rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-center gap-3">
+          <span className="text-sm font-semibold text-amber-300">
+            ⏳ Precargando datos de la compra original para corrección...
+          </span>
+        </div>
+      )}
+
+      {compraOriginal && (
+        <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900/60 p-4 sm:p-5 shadow-xl backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-2xl text-amber-400 border border-amber-500/30">
+              ✏️
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-amber-200 text-sm sm:text-base">
+                  Modo Corrección: Compra #{compraOriginal.numeroCompra}
+                </p>
+                <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
+                  REEMPLAZO ATÓMICO
+                </span>
+              </div>
+              <p className="text-xs text-amber-300/80 mt-0.5">
+                Modifica variantes, cantidades, costos o tipo de cambio con libertad. Al guardar, el sistema anulará la anterior y registrará esta nueva versión en una sola transacción protegida.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/admin/inventario/compras/nueva")}
+            className="shrink-0 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs text-gray-300 transition cursor-pointer"
+          >
+            ✕ Descartar y empezar de cero
+          </button>
+        </div>
+      )}
+
       {/* SECCIÓN 1: DATOS GENERALES DE LA COMPRA */}
       <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_20px_rgba(0,180,255,0.08)] space-y-6">
         <h2 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
@@ -670,11 +778,11 @@ export default function NuevaCompraForm() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/30 transition disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/30 transition disabled:opacity-50 cursor-pointer"
             >
               {submitting
-                ? "Registrando compra..."
-                : "💾 Confirmar Compra y Actualizar Inventario"}
+                ? (corregirId ? "Reemplazando compra..." : "Registrando compra...")
+                : (corregirId ? "💾 Confirmar y Reemplazar Compra" : "💾 Confirmar Compra y Actualizar Inventario")}
             </button>
           </div>
         )}

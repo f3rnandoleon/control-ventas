@@ -62,6 +62,7 @@ export async function PUT(
         permiteVentaPOS: body.permiteVentaPOS,
         permiteDespachoWeb: body.permiteDespachoWeb,
         permiteRetiroCliente: body.permiteRetiroCliente,
+        requiereAperturaCaja: body.requiereAperturaCaja,
         esAlmacenPrincipal: body.esAlmacenPrincipal,
       },
       { new: true, runValidators: true }

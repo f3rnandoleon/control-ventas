@@ -29,6 +29,7 @@ export default function SucursalesPage() {
     permiteVentaPOS: true,
     permiteDespachoWeb: false,
     permiteRetiroCliente: true,
+    requiereAperturaCaja: true,
     esAlmacenPrincipal: false,
   });
 
@@ -60,6 +61,7 @@ export default function SucursalesPage() {
       permiteVentaPOS: true,
       permiteDespachoWeb: false,
       permiteRetiroCliente: true,
+      requiereAperturaCaja: true,
       esAlmacenPrincipal: false,
     });
     setErrorMsg("");
@@ -78,6 +80,7 @@ export default function SucursalesPage() {
       permiteVentaPOS: s.permiteVentaPOS,
       permiteDespachoWeb: s.permiteDespachoWeb,
       permiteRetiroCliente: s.permiteRetiroCliente,
+      requiereAperturaCaja: s.requiereAperturaCaja ?? true,
       esAlmacenPrincipal: s.esAlmacenPrincipal || false,
     });
     setErrorMsg("");
@@ -239,9 +242,18 @@ export default function SucursalesPage() {
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-1.5">
                         {s.permiteVentaPOS && (
-                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                            POS Mostrador
-                          </span>
+                          <>
+                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                              POS Mostrador
+                            </span>
+                            <span className={`text-[11px] px-2 py-0.5 rounded-md font-medium border ${
+                              (s.requiereAperturaCaja ?? true)
+                                ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                                : "bg-cyan-500/10 text-cyan-300 border-cyan-500/20"
+                            }`}>
+                              {(s.requiereAperturaCaja ?? true) ? "Caja Obligatoria" : "Caja Libre"}
+                            </span>
+                          </>
                         )}
                         {s.permiteDespachoWeb && (
                           <span className="text-[11px] px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
@@ -436,6 +448,27 @@ export default function SucursalesPage() {
                     Permite venta directa en mostrador (POS)
                   </span>
                 </label>
+
+                {formData.permiteVentaPOS && (
+                  <div className="ml-7 pl-3 border-l-2 border-blue-500/30 py-1">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.requiereAperturaCaja}
+                        onChange={(e) => setFormData({ ...formData, requiereAperturaCaja: e.target.checked })}
+                        className="w-4 h-4 rounded text-amber-500 bg-gray-800 border-gray-600"
+                      />
+                      <div>
+                        <span className="text-xs font-semibold text-gray-200">
+                          Exigir apertura de caja diaria para registrar ventas
+                        </span>
+                        <p className="text-[11px] text-gray-400">
+                          Si está marcado, no se podrá cobrar en mostrador sin abrir turno previo. Si se desmarca, se opera en modo &quot;Caja Libre&quot;.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                )}
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"

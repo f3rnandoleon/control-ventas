@@ -8,8 +8,15 @@ interface CajaPosWidgetProps {
     onCajaStatusChange?: (abierta: boolean) => void;
 }
 
+interface SucursalCajaInfo {
+    _id: string;
+    nombre: string;
+    requiereAperturaCaja: boolean;
+}
+
 export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps) {
     const [sesionActiva, setSesionActiva] = useState<SesionCaja | null>(null);
+    const [sucursalInfo, setSucursalInfo] = useState<SucursalCajaInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [modalAperturaOpen, setModalAperturaOpen] = useState(false);
     const [modalCierreOpen, setModalCierreOpen] = useState(false);
@@ -35,14 +42,22 @@ export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps
             const res = await fetch("/api/pos/caja/activa");
             if (res.ok) {
                 const data = await res.json();
-                setSesionActiva(data);
-                onCajaStatusChange?.(Boolean(data));
+                const sesion = data && "sesion" in data ? data.sesion : data;
+                const sucursal = data && "sucursal" in data ? data.sucursal : null;
+                setSesionActiva(sesion);
+                setSucursalInfo(sucursal);
+
+                // Si hay sesión abierta O si la sucursal no exige apertura, el estado es apto para vender
+                const puedeVender = Boolean(sesion) || (sucursal && sucursal.requiereAperturaCaja === false);
+                onCajaStatusChange?.(Boolean(puedeVender));
             } else {
                 setSesionActiva(null);
+                setSucursalInfo(null);
                 onCajaStatusChange?.(false);
             }
         } catch {
             setSesionActiva(null);
+            setSucursalInfo(null);
             onCajaStatusChange?.(false);
         } finally {
             setLoading(false);
@@ -168,32 +183,64 @@ export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps
         );
     }
 
-    // CUANDO NO HAY CAJA ABIERTA (Alerta Obligatoria)
+    // CUANDO NO HAY CAJA ABIERTA
     if (!sesionActiva) {
+        const esOpcional = sucursalInfo && sucursalInfo.requiereAperturaCaja === false;
+
         return (
             <>
-                <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900/60 p-4 shadow-xl backdrop-blur-md">
-                    <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl text-amber-400 border border-amber-500/30">
-                            ⚠️
-                        </span>
-                        <div>
-                            <p className="font-bold text-amber-200 text-sm sm:text-base">
-                                Apertura de Caja Requerida para Ventas
-                            </p>
-                            <p className="text-xs text-amber-300/80">
-                                Debes abrir la caja física de esta sucursal (Caja Chica Tienda 1) con tu saldo inicial para empezar a cobrar.
-                            </p>
+                {esOpcional ? (
+                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-slate-900/40 to-slate-900/60 p-3.5 shadow-lg backdrop-blur-md">
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-xl text-cyan-400 border border-cyan-500/30">
+                                🏬
+                            </span>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-bold text-cyan-200 text-sm">
+                                        Caja Libre Activa — {sucursalInfo?.nombre || "Tienda"}
+                                    </p>
+                                    <span className="rounded-md bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-500/30">
+                                        Turno Opcional
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-400">
+                                    Esta sucursal no exige apertura obligatoria. Puedes registrar ventas directamente o abrir un turno formal si lo deseas.
+                                </p>
+                            </div>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setModalAperturaOpen(true)}
+                            className="w-full sm:w-auto shrink-0 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 px-4 py-2 text-xs font-semibold text-cyan-300 transition active:scale-95"
+                        >
+                            Abrir Turno Formal
+                        </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setModalAperturaOpen(true)}
-                        className="w-full sm:w-auto shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95"
-                    >
-                        Abrir Caja Diaria
-                    </button>
-                </div>
+                ) : (
+                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900/60 p-4 shadow-xl backdrop-blur-md">
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl text-amber-400 border border-amber-500/30">
+                                ⚠️
+                            </span>
+                            <div>
+                                <p className="font-bold text-amber-200 text-sm sm:text-base">
+                                    Apertura de Caja Requerida para Ventas
+                                </p>
+                                <p className="text-xs text-amber-300/80">
+                                    Debes abrir la caja física de esta sucursal ({sucursalInfo?.nombre || "Tienda"}) con tu saldo inicial para empezar a cobrar.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setModalAperturaOpen(true)}
+                            className="w-full sm:w-auto shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95"
+                        >
+                            Abrir Caja Diaria
+                        </button>
+                    </div>
+                )}
 
                 {/* MODAL DE APERTURA */}
                 {modalAperturaOpen && (

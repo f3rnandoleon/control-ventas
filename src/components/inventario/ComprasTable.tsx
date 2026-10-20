@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import type { Compra, CompraItem } from "@/types/compra";
 import { formatMoney } from "@/utils/pricing";
@@ -152,13 +153,24 @@ export default function ComprasTable({
                                             </span>
                                         </td>
                                         <td className="px-5 py-4 text-center">
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedCompra(compra)}
-                                                className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition"
-                                            >
-                                                Ver Detalle
-                                            </button>
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedCompra(compra)}
+                                                    className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition"
+                                                >
+                                                    Detalle
+                                                </button>
+                                                {compra.estado !== "ANULADA" && (
+                                                    <Link
+                                                        href={`/dashboard/admin/inventario/compras/nueva?corregirId=${compra._id}`}
+                                                        className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold transition inline-flex items-center gap-1"
+                                                        title="Corregir compra: precarga los ítems y anula la anterior al confirmar"
+                                                    >
+                                                        <span>✏️</span> Corregir
+                                                    </Link>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -344,14 +356,22 @@ export default function ComprasTable({
                         <div className="p-4 border-t border-white/10 bg-gray-900/80 flex items-center justify-between">
                             <div>
                                 {selectedCompra.estado !== "ANULADA" && (
-                                    <button
-                                        type="button"
-                                        disabled={anulando}
-                                        onClick={() => handleAnular(selectedCompra)}
-                                        className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50"
-                                    >
-                                        {anulando ? "Anulando..." : "🗑️ Anular Compra"}
-                                    </button>
+                                    <div className="flex items-center gap-2.5">
+                                        <button
+                                            type="button"
+                                            disabled={anulando}
+                                            onClick={() => handleAnular(selectedCompra)}
+                                            className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50"
+                                        >
+                                            {anulando ? "Anulando..." : "🗑️ Anular Compra"}
+                                        </button>
+                                        <Link
+                                            href={`/dashboard/admin/inventario/compras/nueva?corregirId=${selectedCompra._id}`}
+                                            className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold transition inline-flex items-center gap-1.5"
+                                        >
+                                            <span>✏️</span> Corregir / Reemplazar Compra
+                                        </Link>
+                                    </div>
                                 )}
                             </div>
                             <button

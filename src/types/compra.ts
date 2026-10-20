@@ -56,6 +56,9 @@ export interface Compra {
   } | string;
   fechaAnulacion?: string | Date;
   motivoAnulacion?: string;
+  reemplazaACompraId?: string;
+  reemplazadaPorCompraId?: string;
+  motivoEdicion?: string;
   creadoPor?: {
     _id: string;
     nombreCompleto: string;

@@ -55,3 +55,23 @@ export async function anularCompra(id: string, motivo?: string): Promise<{ messa
 
     return res.json();
 }
+
+export async function reemplazarCompra(
+    id: string,
+    data: CrearCompraInput & { motivo?: string }
+): Promise<{ message: string; compra: Compra }> {
+    const res = await fetch(`/api/compras/${id}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.message || "Error al corregir y reemplazar la compra");
+    }
+
+    return res.json();
+}

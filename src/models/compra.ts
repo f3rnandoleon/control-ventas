@@ -152,6 +152,21 @@ const compraSchema = new Schema(
       trim: true,
       required: false,
     },
+    reemplazaACompraId: {
+      type: Types.ObjectId,
+      ref: "Compra",
+      required: false,
+    },
+    reemplazadaPorCompraId: {
+      type: Types.ObjectId,
+      ref: "Compra",
+      required: false,
+    },
+    motivoEdicion: {
+      type: String,
+      trim: true,
+      required: false,
+    },
     creadoPor: {
       type: Types.ObjectId,
       ref: "User",

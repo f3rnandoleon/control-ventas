@@ -6,6 +6,7 @@ import { comprasRepository } from "@/modules/purchases/infrastructure/compras.re
 import { inventoryRepository } from "@/modules/inventory/infrastructure/inventory.repository";
 import { calcularCostoPromedioPonderado } from "@/utils/pricing";
 import { AppError } from "@/shared/errors/AppError";
+import { runInTransaction } from "@/shared/db/runTransaction";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
 import type { CrearCompraInput } from "@/types/compra";
 import type { Variante } from "@/types/producto";
@@ -305,7 +306,8 @@ export async function obtenerCompraPorId(id: string) {
 export async function anularCompra(
   compraId: string,
   userIdRaw: string,
-  motivo?: string
+  motivo?: string,
+  session?: ClientSession
 ) {
   if (!mongoose.Types.ObjectId.isValid(userIdRaw)) {
     throw new AppError("Usuario no autenticado", 401);
@@ -317,7 +319,7 @@ export async function anularCompra(
   await connectDB();
   const userId = new mongoose.Types.ObjectId(userIdRaw);
 
-  const compra = await Compra.findById(compraId);
+  const compra = await Compra.findById(compraId).session(session ?? null);
   if (!compra) {
     throw new AppError("Compra no encontrada", 404);
   }
@@ -326,7 +328,7 @@ export async function anularCompra(
     throw new AppError("Esta compra ya se encuentra anulada", 400);
   }
 
-  const sucursalId = compra.sucursalDestinoId || (await getDefaultWarehouseId());
+  const sucursalId = compra.sucursalDestinoId || (await getDefaultWarehouseId(session));
 
   // 1. Revertir stock físico y costos anteriores en cada producto
   for (const item of compra.items) {
@@ -335,7 +337,7 @@ export async function anularCompra(
       productoId: item.productoId,
       varianteId: item.varianteId,
       cantidad: item.cantidad,
-    });
+    }, session);
 
     const stockActual = updatedNivel?.stockFisico ?? 0;
     const stockAnterior = stockActual + item.cantidad;
@@ -344,7 +346,8 @@ export async function anularCompra(
     if (item.costoAnteriorBOB !== undefined && item.costoAnteriorBOB >= 0) {
       await Producto.updateOne(
         { _id: item.productoId, "variantes.varianteId": item.varianteId },
-        { $set: { "variantes.$.precioCosto": item.costoAnteriorBOB } }
+        { $set: { "variantes.$.precioCosto": item.costoAnteriorBOB } },
+        session ? { session } : undefined
       );
     }
 
@@ -375,14 +378,14 @@ export async function anularCompra(
       referencia: compra.numeroCompra,
       compraId: compra._id,
       usuario: userId,
-    });
+    }, session);
   }
 
   // 2. Revertir egreso monetario (devolver dinero a la cuenta)
   if (compra.totalBOB > 0) {
     let cuentaDineroIdParaReversa = compra.cuentaDineroId;
     if (!cuentaDineroIdParaReversa) {
-      const cuentaDefault = await resolveDefaultAccountForPayment("TRANSFERENCIA", sucursalId);
+      const cuentaDefault = await resolveDefaultAccountForPayment("TRANSFERENCIA", sucursalId, session);
       if (cuentaDefault) cuentaDineroIdParaReversa = cuentaDefault._id;
     }
 
@@ -396,7 +399,7 @@ export async function anularCompra(
         origenId: compra._id.toString(),
         sucursalId,
         usuarioId: userId,
-      });
+      }, session);
     }
   }
 
@@ -405,7 +408,7 @@ export async function anularCompra(
   compra.anuladaPor = userId;
   compra.fechaAnulacion = new Date();
   compra.motivoAnulacion = motivo || "Anulación manual por staff";
-  await compra.save();
+  await compra.save(session ? { session } : undefined);
 
   await recordAuditEventSafe({
     tipoEntidad: "COMPRA",
@@ -419,7 +422,7 @@ export async function anularCompra(
       motivo,
       totalBOB: compra.totalBOB,
     },
-  });
+  }, session);
 
   return compra.toObject();
 }
@@ -481,4 +484,73 @@ export async function actualizarCompra(
   });
 
   return compra.toObject();
+}
+
+/**
+ * Reemplaza una compra de forma atómica:
+ * 1. Anula la compra original dentro de una transacción (revierte stock, CPP y egreso bancario).
+ * 2. Registra la nueva compra con los datos actualizados (stock, nuevo CPP, egreso y kardex).
+ * 3. Enlaza ambas compras con referencias cruzadas de auditoría.
+ */
+export async function reemplazarCompra(
+  compraIdOriginal: string,
+  nuevoInput: CrearCompraInput,
+  userIdRaw: string,
+  motivo?: string
+) {
+  if (!mongoose.Types.ObjectId.isValid(userIdRaw)) {
+    throw new AppError("Usuario no autenticado", 401);
+  }
+  if (!mongoose.Types.ObjectId.isValid(compraIdOriginal)) {
+    throw new AppError("ID de compra original inválido", 400);
+  }
+
+  await connectDB();
+
+  return runInTransaction(async (session) => {
+    const compraOriginal = await Compra.findById(compraIdOriginal).session(session);
+    if (!compraOriginal) {
+      throw new AppError("Compra original no encontrada", 404);
+    }
+    if (compraOriginal.estado === "ANULADA") {
+      throw new AppError("No se puede reemplazar una compra que ya se encuentra anulada", 400);
+    }
+
+    const motivoAnulacion = motivo
+      ? `Anulada por corrección / reemplazo: ${motivo}`
+      : `Anulada por corrección y reemplazo #${compraOriginal.numeroCompra}`;
+
+    // 1. Revertir compra original en la misma transacción
+    await anularCompra(compraIdOriginal, userIdRaw, motivoAnulacion, session);
+
+    // 2. Registrar la nueva compra dentro de la misma transacción
+    const nuevaCompra = await registrarCompra(nuevoInput, userIdRaw, session);
+
+    // 3. Enlazar referencias cruzadas
+    compraOriginal.reemplazadaPorCompraId = nuevaCompra._id;
+    compraOriginal.motivoEdicion = motivo || "Corrección de mercadería / costos";
+    await compraOriginal.save({ session });
+
+    nuevaCompra.reemplazaACompraId = compraOriginal._id;
+    nuevaCompra.notas = nuevaCompra.notas
+      ? `${nuevaCompra.notas} (Reemplaza a compra #${compraOriginal.numeroCompra})`
+      : `Reemplaza a compra #${compraOriginal.numeroCompra}`;
+    await nuevaCompra.save({ session });
+
+    await recordAuditEventSafe({
+      tipoEntidad: "COMPRA",
+      idEntidad: nuevaCompra._id.toString(),
+      accion: "ACTUALIZAR",
+      estado: "SUCCESS",
+      idActor: userIdRaw,
+      rolActor: "ADMIN",
+      metadata: {
+        numeroCompraNueva: nuevaCompra.numeroCompra,
+        numeroCompraOriginal: compraOriginal.numeroCompra,
+        motivo,
+      },
+    }, session);
+
+    return nuevaCompra;
+  });
 }

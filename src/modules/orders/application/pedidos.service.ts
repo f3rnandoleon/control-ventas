@@ -3,6 +3,7 @@ import { connectDB } from "@/libs/mongodb";
 import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
 import User from "@/models/user";
+import Sucursal from "@/models/sucursal";
 import {
     getDefaultWarehouseId,
     getWebDispatchBranchId,
@@ -409,14 +410,19 @@ export async function crearVentaDirecta(
             }
         }
 
-        // Si la venta es de mostrador (POS), validar obligatoriedad de sesión de caja abierta
+        // Si la venta es de mostrador (POS), validar obligatoriedad de sesión de caja abierta según configuración de sucursal
         if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
-            const sesionActiva = await obtenerSesionCajaActiva(targetSucursalId.toString(), session);
-            if (!sesionActiva) {
-                throw new AppError(
-                    "Apertura de caja obligatoria: No existe una sesión de caja abierta en esta tienda. Debe realizar la apertura de caja antes de registrar ventas.",
-                    400
-                );
+            const sucursalDoc = await Sucursal.findById(targetSucursalId).session(session);
+            const exigeCaja = sucursalDoc?.requiereAperturaCaja ?? true;
+
+            if (exigeCaja) {
+                const sesionActiva = await obtenerSesionCajaActiva(targetSucursalId.toString(), session);
+                if (!sesionActiva) {
+                    throw new AppError(
+                        "Apertura de caja obligatoria: No existe una sesión de caja abierta en esta tienda. Debe realizar la apertura de caja antes de registrar ventas.",
+                        400
+                    );
+                }
             }
         }
 
