@@ -77,3 +77,14 @@ export const createWhatsAppOrderSchema = z.object({
 });
 
 export type CreateWhatsAppOrderInput = z.infer<typeof createWhatsAppOrderSchema>;
+
+export const whatsappProductSearchSchema = z.object({
+  q: z.string().trim().optional(),
+  color: z.string().trim().optional(),
+  talla: z.string().trim().optional(),
+  minPrecio: z.coerce.number().min(0).optional(),
+  maxPrecio: z.coerce.number().min(0).optional(),
+  limit: z.coerce.number().int().min(1).max(20).default(5),
+});
+
+export type WhatsAppProductSearchInput = z.infer<typeof whatsappProductSearchSchema>;

@@ -148,6 +148,19 @@ const productoSchema = new Schema(
 productoSchema.index({ estado: 1, createdAt: -1 });
 productoSchema.index({ "variantes.varianteId": 1 }, { unique: true, sparse: true });
 
+// ⚡ Índices optimizados para el Agente IA y catálogo omnicanal
+productoSchema.index(
+  { nombre: "text", modelo: "text", descripcion: "text" },
+  { default_language: "spanish", weights: { nombre: 5, modelo: 3, descripcion: 1 } }
+);
+productoSchema.index({
+  estado: 1,
+  "variantes.color": 1,
+  "variantes.talla": 1,
+  "variantes.stock": 1,
+});
+productoSchema.index({ estado: 1, precioVenta: 1 });
+
 // 🔄 Calcular stock total automáticamente
 productoSchema.pre("save", function (next) {
   this.stockTotal = this.variantes.reduce(

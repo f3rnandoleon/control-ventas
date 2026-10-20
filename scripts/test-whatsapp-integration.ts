@@ -147,6 +147,44 @@ async function runTests() {
   assert(verifyLink.includes("/verificar/pago/"), "URL de verificación contiene la ruta /verificar/pago/");
   assert(linkEscapado.includes("\\-") || linkEscapado.includes("/verificar/pago/"), "Link de verificación escapa caracteres MarkdownV2 correctamente");
 
+  // Test 8: Validación Zod de Búsqueda de Productos WhatsApp
+  const { whatsappProductSearchSchema } = await import(
+    "../src/schemas/whatsapp-integration.schema"
+  );
+  const validSearchPayload = {
+    q: "alpaca clásica",
+    color: "azul",
+    talla: "M",
+    minPrecio: 100,
+    maxPrecio: 200,
+    limit: 5,
+  };
+  const parsedSearch = whatsappProductSearchSchema.safeParse(validSearchPayload);
+  assert(parsedSearch.success === true, "whatsappProductSearchSchema valida correctamente parámetros completos");
+
+  // Test 9: Rechazo y coerción en Búsqueda de Productos WhatsApp
+  const coercedSearch = whatsappProductSearchSchema.safeParse({
+    minPrecio: "50",
+    maxPrecio: "150",
+    limit: "10",
+  });
+  assert(
+    coercedSearch.success === true &&
+      coercedSearch.data.minPrecio === 50 &&
+      coercedSearch.data.limit === 10,
+    "whatsappProductSearchSchema coerciona cadenas numéricas a number correctamente"
+  );
+
+  // Test 10: Validación de seguridad con verifyWhatsAppApiKey para endpoints de productos
+  const reqSearchValid = new Request("http://localhost:3000/api/integrations/whatsapp/products/search", {
+    headers: { authorization: `Bearer ${testApiKey}` },
+  });
+  const reqSearchInvalid = new Request("http://localhost:3000/api/integrations/whatsapp/products/search", {
+    headers: { authorization: "Bearer invalid_secret_token" },
+  });
+  assert(verifyWhatsAppApiKey(reqSearchValid) === true, "verifyWhatsAppApiKey autoriza petición de búsqueda con clave válida");
+  assert(verifyWhatsAppApiKey(reqSearchInvalid) === false, "verifyWhatsAppApiKey rechaza petición de búsqueda con clave incorrecta");
+
   console.log(`\n📊 --- RESUMEN DE PRUEBAS ---`);
   console.log(`Pasaron: ${passed} | Fallaron: ${failed}`);
 

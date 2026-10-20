@@ -1,6 +1,8 @@
 import crypto, { createHash, randomUUID } from "crypto";
+import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import Pedido from "@/models/pedido";
+import Producto from "@/models/producto";
 import TransaccionPago from "@/models/transaccionPago";
 import PerfilCliente from "@/models/perfilCliente";
 import User from "@/models/user";
@@ -12,11 +14,15 @@ import { AppError } from "@/shared/errors/AppError";
 import { generateOrderedId } from "@/utils/generarId";
 import { uploadFileToCloudinary } from "@/libs/cloudinary";
 import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
-import type { CreateWhatsAppOrderInput } from "@/schemas/whatsapp-integration.schema";
+import type {
+  CreateWhatsAppOrderInput,
+  WhatsAppProductSearchInput,
+} from "@/schemas/whatsapp-integration.schema";
 import { getVariantPricing } from "@/utils/pricing";
 import {
   getAvailableWebStockForVariant,
   getWebDispatchBranchId,
+  getWebStockMapForProducts,
 } from "@/modules/inventory/application/branch-stock.service";
 
 const BANK_SOL_QR_IMAGE =
@@ -619,6 +625,257 @@ export async function getWhatsAppOrderStatus(numeroPedido: string, phone: string
       sucursal: pedido.snapshotEntrega?.sucursal,
       programadoPara: pedido.snapshotEntrega?.programadoPara,
     },
+  };
+}
+
+/**
+ * Búsqueda de productos de alto rendimiento y bajo consumo de tokens para el Agente IA de WhatsApp.
+ * Devuelve únicamente prendas activas con variantes que tienen stock web real disponible (> 0).
+ */
+export async function searchWhatsAppProducts(filters: WhatsAppProductSearchInput) {
+  await connectDB();
+
+  const query: Record<string, unknown> = { estado: "ACTIVO" };
+
+  if (filters.q?.trim()) {
+    const safeQ = filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(safeQ, "i");
+    query.$or = [
+      { nombre: regex },
+      { modelo: regex },
+      { descripcion: regex },
+      { "variantes.color": regex },
+      { "variantes.talla": regex },
+    ];
+  }
+
+  if (filters.color?.trim()) {
+    const safeColor = filters.color.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const colorRegex = new RegExp(safeColor, "i");
+    const existingOr = (query.$or as Record<string, unknown>[]) || [];
+    query.$or = [
+      ...existingOr,
+      { "variantes.color": colorRegex },
+      { "variantes.colorSecundario": colorRegex },
+    ];
+  }
+
+  if (filters.talla?.trim()) {
+    const safeTalla = filters.talla.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    query["variantes.talla"] = new RegExp(`^${safeTalla}$`, "i");
+  }
+
+  if (filters.minPrecio !== undefined || filters.maxPrecio !== undefined) {
+    const precioFilter: Record<string, number> = {};
+    if (filters.minPrecio !== undefined) precioFilter.$gte = filters.minPrecio;
+    if (filters.maxPrecio !== undefined) precioFilter.$lte = filters.maxPrecio;
+    query.precioVenta = precioFilter;
+  }
+
+  const limit = Math.min(filters.limit || 5, 20);
+
+  // Consultar con margen superior para cubrir variantes con stock agotado
+  const rawProducts = await Producto.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit * 3)
+    .lean();
+
+  if (rawProducts.length === 0) {
+    return { total: 0, productos: [] };
+  }
+
+  const productIds = rawProducts.map(
+    (p: Record<string, unknown>) => p._id as mongoose.Types.ObjectId
+  );
+  const webStockMap = await getWebStockMapForProducts(productIds);
+
+  const colorNorm = filters.color?.trim().toLowerCase();
+  const tallaNorm = filters.talla?.trim().toLowerCase();
+
+  const resultados: Array<{
+    productoId: string;
+    nombre: string;
+    modelo: string;
+    categoria: string;
+    precioVenta: number;
+    descripcionCorta?: string;
+    variantesDisponibles: Array<{
+      varianteId: string;
+      color: string;
+      colorSecundario?: string;
+      talla: string;
+      stockDisponible: number;
+      precioVenta: number;
+      imagen?: string;
+      medidasResumen?: {
+        anchoPecho?: number;
+        largoTotal?: number;
+      };
+    }>;
+  }> = [];
+
+  for (const prod of rawProducts) {
+    const prodKey = String(prod._id);
+    const prodStockMap = webStockMap.get(prodKey);
+    const variantes = (prod.variantes || []) as Array<{
+      varianteId?: string;
+      color: string;
+      colorSecundario?: string;
+      talla: string;
+      stock?: number;
+      stockReservado?: number;
+      precioVenta?: number;
+      imagenes?: string[];
+      imagen?: string;
+      medidas?: {
+        anchoPecho?: number;
+        largoTotal?: number;
+      };
+    }>;
+
+    const variantesValidas = [];
+
+    for (const v of variantes) {
+      const varId = v.varianteId || "";
+      const stockInfo = prodStockMap?.get(varId);
+      const stockDisponible =
+        stockInfo !== undefined
+          ? stockInfo.stockDisponible
+          : Math.max(0, Number(v.stock || 0) - Number(v.stockReservado || 0));
+
+      if (stockDisponible <= 0) continue;
+
+      if (colorNorm) {
+        const c1 = (v.color || "").toLowerCase();
+        const c2 = (v.colorSecundario || "").toLowerCase();
+        if (!c1.includes(colorNorm) && !c2.includes(colorNorm)) {
+          continue;
+        }
+      }
+
+      if (tallaNorm) {
+        const t = (v.talla || "").toLowerCase();
+        if (t !== tallaNorm) {
+          continue;
+        }
+      }
+
+      const img =
+        (Array.isArray(v.imagenes) && v.imagenes.length > 0 ? v.imagenes[0] : undefined) ||
+        v.imagen ||
+        undefined;
+
+      variantesValidas.push({
+        varianteId: varId,
+        color: v.color,
+        colorSecundario: v.colorSecundario || undefined,
+        talla: v.talla,
+        stockDisponible,
+        precioVenta:
+          typeof v.precioVenta === "number" && v.precioVenta > 0
+            ? v.precioVenta
+            : Number(prod.precioVenta || 0),
+        imagen: img,
+        medidasResumen: v.medidas
+          ? {
+              anchoPecho: v.medidas.anchoPecho,
+              largoTotal: v.medidas.largoTotal,
+            }
+          : undefined,
+      });
+    }
+
+    if (variantesValidas.length > 0) {
+      resultados.push({
+        productoId: prodKey,
+        nombre: String(prod.nombre || ""),
+        modelo: String(prod.modelo || ""),
+        categoria: String(prod.categoria || "Chompas"),
+        precioVenta: Number(prod.precioVenta || 0),
+        descripcionCorta: prod.descripcion ? String(prod.descripcion).substring(0, 140) : undefined,
+        variantesDisponibles: variantesValidas,
+      });
+
+      if (resultados.length >= limit) {
+        break;
+      }
+    }
+  }
+
+  return {
+    total: resultados.length,
+    productos: resultados,
+  };
+}
+
+/**
+ * Consulta de medidas anatómicas y tallas para asesorar al cliente en WhatsApp.
+ */
+export async function getWhatsAppProductMeasurements(productoId: string) {
+  if (!mongoose.Types.ObjectId.isValid(productoId)) {
+    throw new AppError("ID de producto inválido", 400);
+  }
+
+  await connectDB();
+  const rawProd = await Producto.findById(productoId).lean();
+
+  if (!rawProd || Array.isArray(rawProd)) {
+    throw new AppError("Producto no encontrado", 404);
+  }
+
+  const prod = rawProd as Record<string, unknown> & {
+    _id: unknown;
+    nombre?: string;
+    modelo?: string;
+    categoria?: string;
+    variantes?: Array<{
+      talla?: string;
+      color?: string;
+      medidas?: Record<string, unknown>;
+    }>;
+  };
+
+  const tallasMap = new Map<
+    string,
+    {
+      colores: Set<string>;
+      medidas?: Record<string, unknown>;
+    }
+  >();
+
+  const variantes = (prod.variantes || []) as Array<{
+    talla?: string;
+    color?: string;
+    medidas?: Record<string, unknown>;
+  }>;
+
+  for (const v of variantes) {
+    const t = v.talla || "Única";
+    if (!tallasMap.has(t)) {
+      tallasMap.set(t, {
+        colores: new Set<string>(),
+        medidas: v.medidas || undefined,
+      });
+    }
+    const entry = tallasMap.get(t)!;
+    if (v.color) entry.colores.add(v.color);
+    if (!entry.medidas && v.medidas) {
+      entry.medidas = v.medidas;
+    }
+  }
+
+  const tallas = Array.from(tallasMap.entries()).map(([talla, data]) => ({
+    talla,
+    coloresDisponibles: Array.from(data.colores),
+    medidas: data.medidas || null,
+  }));
+
+  return {
+    productoId: String(prod._id),
+    nombre: String(prod.nombre),
+    modelo: String(prod.modelo),
+    categoria: String(prod.categoria),
+    tallas,
   };
 }
 

@@ -41,6 +41,8 @@
    - [8.1 Crear Pedido WhatsApp (`POST /api/integrations/whatsapp/orders`)](#81-crear-pedido-whatsapp-post-apiintegrationswhatsapporders)
    - [8.2 Subir Comprobante WhatsApp (`POST /api/integrations/whatsapp/payments/:id/proof`)](#82-subir-comprobante-whatsapp-post-apiintegrationswhatsapppaymentsidproof)
    - [8.3 Consultar Estado por Celular (`GET /api/integrations/whatsapp/orders/:numeroPedido`)](#83-consultar-estado-por-celular-get-apiintegrationswhatsappordersnumeropedido)
+   - [8.4 Búsqueda Rápida y Compacta para IA (`GET /api/integrations/whatsapp/products/search`)](#84-búsqueda-rápida-y-compacta-para-ia-get-apiintegrationswhatsappproductssearch)
+   - [8.5 Medidas y Asesoría de Tallas (`GET /api/integrations/whatsapp/products/:id/measurements`)](#85-medidas-y-asesoría-de-tallas-get-apiintegrationswhatsappproductsidmeasurements)
 9. [Módulo POS y Escáner (App Móvil / Personal de Tienda)](#9-módulo-pos-y-escáner-app-móvil--personal-de-tienda)
    - [9.1 Escanear Código de Barras / QR (`GET /api/pos/scan/:code`)](#91-escanear-código-de-barras--qr-get-apiposscancode)
    - [9.2 Registrar Venta Directa en Mostrador (`POST /api/pos/sales`)](#92-registrar-venta-directa-en-mostrador-post-apipossales)
@@ -989,6 +991,114 @@ Por privacidad, exige el parámetro `phone` que debe coincidir con el teléfono 
     "puntoRecojo": "Estación Teleférico Central (Línea Roja)",
     "programadoPara": "2026-10-18T16:00:00-04:00"
   }
+}
+```
+
+---
+
+### 8.4 Búsqueda Rápida y Compacta para IA (`GET /api/integrations/whatsapp/products/search`)
+Diseñado para que el **Agente IA de WhatsApp** busque productos y variantes disponibles de forma ultrarrápida (<50ms) y con un consumo mínimo de tokens de contexto (80% más liviano que el catálogo público).
+
+- **Método:** `GET`
+- **Ruta:** `/api/integrations/whatsapp/products/search`
+- **Cabeceras:** `Authorization: Bearer <WHATSAPP_INTEGRATION_API_KEY>`
+- **Query Params:**
+  * `q` *(opcional)*: Término de búsqueda o modelo (ej. `alpaca`, `cuello V`, `chompa`).
+  * `color` *(opcional)*: Color primario o secundario (ej. `azul`, `marino`, `negro`).
+  * `talla` *(opcional)*: Talla exacta (ej. `S`, `M`, `L`, `XL`).
+  * `minPrecio` / `maxPrecio` *(opcional)*: Rango de precio en Bs.
+  * `limit` *(opcional, default 5, máx 20)*: Cantidad máxima de productos.
+
+#### Reglas de Negocio:
+1. Filtra automáticamente en MongoDB prendas con `estado: "ACTIVO"`.
+2. Filtra y devuelve **únicamente variantes con stock web real disponible (`stockDisponible > 0`)**.
+3. Si la variante tiene fotos en Cloudinary, retorna directamente la URL de la primera foto para que el bot la envíe al chat de WhatsApp.
+4. Incluye un resumen anatómico de medidas (`anchoPecho` y `largoTotal`) si están registradas.
+
+#### Ejemplo de Petición:
+```bash
+curl -X GET "https://control-ventas-azure.vercel.app/api/integrations/whatsapp/products/search?color=azul&talla=M" \
+  -H "Authorization: Bearer fit_andes_wa_secret_..."
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "total": 1,
+  "productos": [
+    {
+      "productoId": "670e10a2f1b4c90012345678",
+      "nombre": "Chompa Cuello V",
+      "modelo": "Alpaca Clásica",
+      "categoria": "Chompas",
+      "precioVenta": 140,
+      "descripcionCorta": "Chompa tejida con lana de alpaca suave, abrigadora y liviana para clima frío.",
+      "variantesDisponibles": [
+        {
+          "varianteId": "var-alp-az-m",
+          "color": "Azul Marino",
+          "colorSecundario": null,
+          "talla": "M",
+          "stockDisponible": 4,
+          "precioVenta": 140,
+          "imagen": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864000/chompa-azul-m.jpg",
+          "medidasResumen": {
+            "anchoPecho": 54,
+            "largoTotal": 68
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 8.5 Medidas y Asesoría de Tallas (`GET /api/integrations/whatsapp/products/:id/measurements`)
+Permite al bot responder con precisión cuando el cliente pregunta por la estatura, contextura física o medidas exactas de una prenda (ej. *"Mido 1.80m y peso 75kg, ¿qué talla me recomiendan?"*).
+
+- **Método:** `GET`
+- **Ruta:** `/api/integrations/whatsapp/products/:id/measurements`
+- **Cabeceras:** `Authorization: Bearer <WHATSAPP_INTEGRATION_API_KEY>`
+
+#### Ejemplo de Petición:
+```bash
+curl -X GET "https://control-ventas-azure.vercel.app/api/integrations/whatsapp/products/670e10a2f1b4c90012345678/measurements" \
+  -H "Authorization: Bearer fit_andes_wa_secret_..."
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "productoId": "670e10a2f1b4c90012345678",
+  "nombre": "Chompa Cuello V",
+  "modelo": "Alpaca Clásica",
+  "categoria": "Chompas",
+  "tallas": [
+    {
+      "talla": "M",
+      "coloresDisponibles": ["Azul Marino", "Negro"],
+      "medidas": {
+        "anchoPecho": 54,
+        "anchoHombros": 46,
+        "largoTotal": 68,
+        "largoMangaAxila": 50,
+        "largoMangaHombro": 62
+      }
+    },
+    {
+      "talla": "L",
+      "coloresDisponibles": ["Azul Marino"],
+      "medidas": {
+        "anchoPecho": 58,
+        "anchoHombros": 49,
+        "largoTotal": 72,
+        "largoMangaAxila": 52,
+        "largoMangaHombro": 64
+      }
+    }
+  ]
 }
 ```
 
