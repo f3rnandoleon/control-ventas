@@ -180,7 +180,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
     if (loading) {
         return (
-            <div className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/60 p-3 text-xs text-gray-400">
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900/60 p-3 text-xs text-slate-600 dark:text-gray-400">
                 <span>Verificando estado de caja física...</span>
             </div>
         );
@@ -193,21 +193,21 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
         return (
             <>
                 {esOpcional ? (
-                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-slate-900/40 to-slate-900/60 p-3.5 shadow-lg backdrop-blur-md">
+                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-cyan-300 dark:border-cyan-500/30 bg-gradient-to-r from-cyan-50 via-sky-50/80 to-white dark:from-cyan-950/40 dark:via-slate-900/40 dark:to-slate-900/60 p-3.5 shadow-md dark:shadow-lg backdrop-blur-md">
                         <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-xl text-cyan-400 border border-cyan-500/30">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 dark:bg-cyan-500/20 text-xl text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/30">
                                 🏬
                             </span>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <p className="font-bold text-cyan-200 text-sm">
+                                    <p className="font-bold text-cyan-900 dark:text-cyan-200 text-sm">
                                         Caja Libre Activa — {sucursalInfo?.nombre || "Tienda"}
                                     </p>
-                                    <span className="rounded-md bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-500/30">
+                                    <span className="rounded-md bg-cyan-100 dark:bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30">
                                         Turno Opcional
                                     </span>
                                 </div>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-slate-600 dark:text-gray-400">
                                     Esta sucursal no exige apertura obligatoria. Puedes registrar ventas directamente o abrir un turno formal si lo deseas.
                                 </p>
                             </div>
@@ -215,22 +215,22 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                         <button
                             type="button"
                             onClick={() => setModalAperturaOpen(true)}
-                            className="w-full sm:w-auto shrink-0 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 px-4 py-2 text-xs font-semibold text-cyan-300 transition active:scale-95"
+                            className="w-full sm:w-auto shrink-0 rounded-xl border border-cyan-300 dark:border-cyan-500/40 bg-cyan-100/70 hover:bg-cyan-200/80 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 px-4 py-2 text-xs font-semibold text-cyan-900 dark:text-cyan-300 transition active:scale-95 shadow-sm"
                         >
                             Abrir Turno Formal
                         </button>
                     </div>
                 ) : (
-                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-slate-900/60 p-4 shadow-xl backdrop-blur-md">
+                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-300 dark:border-amber-500/40 bg-gradient-to-r from-amber-50 via-amber-100/50 to-white dark:from-amber-950/40 dark:via-amber-900/20 dark:to-slate-900/60 p-4 shadow-md dark:shadow-xl backdrop-blur-md">
                         <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl text-amber-400 border border-amber-500/30">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-500/20 text-xl text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
                                 ⚠️
                             </span>
                             <div>
-                                <p className="font-bold text-amber-200 text-sm sm:text-base">
+                                <p className="font-bold text-amber-950 dark:text-amber-200 text-sm sm:text-base">
                                     Apertura de Caja Requerida para Ventas
                                 </p>
-                                <p className="text-xs text-amber-300/80">
+                                <p className="text-xs text-amber-900/80 dark:text-amber-300/80">
                                     Debes abrir la caja física de esta sucursal ({sucursalInfo?.nombre || "Tienda"}) con tu saldo inicial para empezar a cobrar.
                                 </p>
                             </div>
@@ -248,16 +248,16 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                 {/* MODAL DE APERTURA */}
                 {modalAperturaOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
-                        <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-                            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                        <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+                            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+                                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                     <span>🏪</span> Apertura de Caja Diaria
                                 </h3>
                                 <button
                                     type="button"
                                     onClick={() => setModalAperturaOpen(false)}
                                     aria-label="Cerrar modal"
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white"
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition"
                                 >
                                     ✕
                                 </button>
@@ -265,11 +265,11 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
                             <form onSubmit={handleAbrirCaja} className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                         Monto de Apertura (Saldo Inicial en Gaveta) *
                                     </label>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-gray-400 font-bold text-sm">Bs</span>
+                                        <span className="absolute left-3 top-2.5 text-slate-400 dark:text-gray-400 font-bold text-sm">Bs</span>
                                         <input
                                             type="number"
                                             step="0.5"
@@ -277,33 +277,33 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                             required
                                             value={montoApertura}
                                             onChange={(e) => setMontoApertura(parseFloat(e.target.value) || 0)}
-                                            className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-3 py-2.5 text-white font-bold text-lg focus:border-amber-400 focus:outline-none"
+                                            className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 pl-10 pr-3 py-2.5 text-slate-900 dark:text-white font-bold text-lg focus:border-amber-400 focus:outline-none"
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    <p className="mt-1 text-[11px] text-gray-400">
+                                    <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">
                                         Ingresa el cambio o fondo con el que inicia la jornada (o 0 si no hay fondo previo).
                                     </p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                         Observaciones (Opcional)
                                     </label>
                                     <textarea
                                         rows={2}
                                         value={obsApertura}
                                         onChange={(e) => setObsApertura(e.target.value)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800/80 p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 p-2.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
                                         placeholder="Ej. Billetes de 20 y monedas para cambio..."
                                     />
                                 </div>
 
-                                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-white/10">
+                                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                                     <button
                                         type="button"
                                         onClick={() => setModalAperturaOpen(false)}
-                                        className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 active:scale-98"
+                                        className="flex min-h-[42px] items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-98"
                                     >
                                         Cancelar
                                     </button>
@@ -333,22 +333,22 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
     return (
         <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-slate-900 to-slate-900 p-3 sm:p-4 shadow-lg">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-300 dark:border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-emerald-100/30 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 p-3 sm:p-4 shadow-md dark:shadow-lg">
                 <div className="flex items-center gap-3">
-                    <span className="flex h-3 w-3 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="flex h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-white text-xs sm:text-sm">
+                            <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                                 Caja Activa #{sesionActiva._id.slice(-6).toUpperCase()}
                             </span>
-                            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/30">
+                            <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30">
                                 ABIERTA
                             </span>
                         </div>
-                        <p className="text-[11px] text-gray-400">
-                            Fondo inicial: <strong className="text-gray-200">Bs {sesionActiva.montoApertura.toFixed(2)}</strong> |
-                            Ventas: <strong className="text-emerald-300">Bs {(sesionActiva.totalVentasEfectivo + sesionActiva.totalVentasQR).toFixed(2)}</strong> |
-                            Efectivo en gaveta estimado: <strong className="text-white">Bs {totalEsperadoEfectivo.toFixed(2)}</strong>
+                        <p className="text-[11px] text-slate-600 dark:text-gray-400">
+                            Fondo inicial: <strong className="text-slate-800 dark:text-gray-200">Bs {sesionActiva.montoApertura.toFixed(2)}</strong> |
+                            Ventas: <strong className="text-emerald-700 dark:text-emerald-300">Bs {(sesionActiva.totalVentasEfectivo + sesionActiva.totalVentasQR).toFixed(2)}</strong> |
+                            Efectivo en gaveta estimado: <strong className="text-slate-900 dark:text-white">Bs {totalEsperadoEfectivo.toFixed(2)}</strong>
                         </p>
                     </div>
                 </div>
@@ -357,7 +357,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                     <button
                         type="button"
                         onClick={() => setModalMovimientoOpen(true)}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white"
+                        className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition"
                     >
                         ± Movimiento
                     </button>
@@ -367,7 +367,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                             setMontoRealEfectivo(totalEsperadoEfectivo);
                             setModalCierreOpen(true);
                         }}
-                        className="rounded-xl bg-rose-600/80 hover:bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-md transition"
+                        className="rounded-xl bg-rose-600 hover:bg-rose-500 px-3 py-1.5 text-xs font-bold text-white shadow-md transition"
                     >
                         Arqueo / Cerrar Caja
                     </button>
@@ -377,16 +377,16 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
             {/* MODAL DE MOVIMIENTO MANUAL */}
             {modalMovimientoOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+                            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span>💸</span> Registrar Movimiento en Caja
                             </h3>
                             <button
                                 type="button"
                                 onClick={() => setModalMovimientoOpen(false)}
                                 aria-label="Cerrar modal"
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition"
                             >
                                 ✕
                             </button>
@@ -394,14 +394,14 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
                         <form onSubmit={handleRegistrarMovimiento} className="space-y-4">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Tipo de Operación</label>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Tipo de Operación</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
                                         type="button"
                                         onClick={() => setTipoMov("EGRESO_MANUAL")}
                                         className={`rounded-xl p-2.5 text-xs font-bold border transition ${tipoMov === "EGRESO_MANUAL"
-                                                ? "bg-rose-600/30 border-rose-500 text-rose-200"
-                                                : "bg-slate-800 border-white/10 text-gray-400"
+                                                ? "bg-rose-100 dark:bg-rose-600/30 border-rose-300 dark:border-rose-500 text-rose-800 dark:text-rose-200"
+                                                : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400"
                                             }`}
                                     >
                                         Egreso (Salida)
@@ -410,8 +410,8 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                         type="button"
                                         onClick={() => setTipoMov("INGRESO_MANUAL")}
                                         className={`rounded-xl p-2.5 text-xs font-bold border transition ${tipoMov === "INGRESO_MANUAL"
-                                                ? "bg-emerald-600/30 border-emerald-500 text-emerald-200"
-                                                : "bg-slate-800 border-white/10 text-gray-400"
+                                                ? "bg-emerald-100 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500 text-emerald-800 dark:text-emerald-200"
+                                                : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400"
                                             }`}
                                     >
                                         Ingreso (Aporte)
@@ -420,7 +420,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Monto (Bs) *</label>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Monto (Bs) *</label>
                                 <input
                                     type="number"
                                     step="0.5"
@@ -428,28 +428,28 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                     required
                                     value={montoMov || ""}
                                     onChange={(e) => setMontoMov(parseFloat(e.target.value) || 0)}
-                                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-white font-bold text-base focus:border-cyan-400 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-slate-900 dark:text-white font-bold text-base focus:border-cyan-400 focus:outline-none"
                                     placeholder="0.00"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Concepto / Motivo *</label>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Concepto / Motivo *</label>
                                 <input
                                     type="text"
                                     required
                                     value={conceptoMov}
                                     onChange={(e) => setConceptoMov(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                                     placeholder="Ej. Compra de bolsas / Pago flete moto..."
                                 />
                             </div>
 
-                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-white/10">
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                                 <button
                                     type="button"
                                     onClick={() => setModalMovimientoOpen(false)}
-                                    className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 active:scale-98"
+                                    className="flex min-h-[42px] items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-98"
                                 >
                                     Cancelar
                                 </button>
@@ -469,47 +469,47 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
             {/* MODAL DE CIERRE / ARQUEO */}
             {modalCierreOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+                            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span>🔒</span> Arqueo y Cierre de Caja
                             </h3>
                             <button
                                 type="button"
                                 onClick={() => setModalCierreOpen(false)}
                                 aria-label="Cerrar modal"
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white transition"
                             >
                                 ✕
                             </button>
                         </div>
 
-                        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-800/80 p-3 text-xs">
+                        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 p-3 text-xs border border-slate-200 dark:border-white/5">
                             <div>
-                                <p className="text-gray-400 text-[10px] uppercase">Fondo Inicial:</p>
-                                <p className="font-bold text-white">Bs {sesionActiva.montoApertura.toFixed(2)}</p>
+                                <p className="text-slate-500 dark:text-gray-400 text-[10px] uppercase font-medium">Fondo Inicial:</p>
+                                <p className="font-bold text-slate-900 dark:text-white">Bs {sesionActiva.montoApertura.toFixed(2)}</p>
                             </div>
                             <div>
-                                <p className="text-gray-400 text-[10px] uppercase">Ventas Efectivo:</p>
-                                <p className="font-bold text-emerald-300">Bs {sesionActiva.totalVentasEfectivo.toFixed(2)}</p>
+                                <p className="text-slate-500 dark:text-gray-400 text-[10px] uppercase font-medium">Ventas Efectivo:</p>
+                                <p className="font-bold text-emerald-700 dark:text-emerald-300">Bs {sesionActiva.totalVentasEfectivo.toFixed(2)}</p>
                             </div>
                             <div>
-                                <p className="text-gray-400 text-[10px] uppercase">Ventas QR / Banco:</p>
-                                <p className="font-bold text-cyan-300">Bs {sesionActiva.totalVentasQR.toFixed(2)}</p>
+                                <p className="text-slate-500 dark:text-gray-400 text-[10px] uppercase font-medium">Ventas QR / Banco:</p>
+                                <p className="font-bold text-cyan-700 dark:text-cyan-300">Bs {sesionActiva.totalVentasQR.toFixed(2)}</p>
                             </div>
                             <div>
-                                <p className="text-gray-400 text-[10px] uppercase">Efectivo Gaveta Esperado:</p>
-                                <p className="font-bold text-amber-300 text-sm">Bs {totalEsperadoEfectivo.toFixed(2)}</p>
+                                <p className="text-slate-500 dark:text-gray-400 text-[10px] uppercase font-medium">Efectivo Gaveta Esperado:</p>
+                                <p className="font-bold text-amber-700 dark:text-amber-300 text-sm">Bs {totalEsperadoEfectivo.toFixed(2)}</p>
                             </div>
                         </div>
 
                         <form onSubmit={handleCerrarCaja} className="space-y-4">
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                     Efectivo Real Contado en Gaveta (Arqueo Físico) *
                                 </label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-gray-400 font-bold text-sm">Bs</span>
+                                    <span className="absolute left-3 top-2.5 text-slate-400 dark:text-gray-400 font-bold text-sm">Bs</span>
                                     <input
                                         type="number"
                                         step="0.5"
@@ -517,7 +517,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                         required
                                         value={montoRealEfectivo}
                                         onChange={(e) => setMontoRealEfectivo(parseFloat(e.target.value) || 0)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 pl-10 pr-3 py-2 text-white font-bold text-lg focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 pl-10 pr-3 py-2 text-slate-900 dark:text-white font-bold text-lg focus:border-rose-400 focus:outline-none"
                                     />
                                 </div>
 
@@ -526,20 +526,20 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                     const dif = montoRealEfectivo - totalEsperadoEfectivo;
                                     if (Math.abs(dif) < 0.01) {
                                         return (
-                                            <p className="mt-1.5 text-xs font-bold text-emerald-400 flex items-center gap-1">
+                                            <p className="mt-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                                 ✓ Caja cuadrada exactamente sin diferencias.
                                             </p>
                                         );
                                     }
                                     if (dif > 0) {
                                         return (
-                                            <p className="mt-1.5 text-xs font-bold text-cyan-400 flex items-center gap-1">
+                                            <p className="mt-1.5 text-xs font-bold text-cyan-700 dark:text-cyan-400 flex items-center gap-1">
                                                 + Sobrante de efectivo: Bs {dif.toFixed(2)}
                                             </p>
                                         );
                                     }
                                     return (
-                                        <p className="mt-1.5 text-xs font-bold text-rose-400 flex items-center gap-1">
+                                        <p className="mt-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
                                             ⚠️ Faltante de efectivo: Bs {Math.abs(dif).toFixed(2)}
                                         </p>
                                     );
@@ -547,23 +547,23 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                     Observaciones de Cierre (Opcional)
                                 </label>
                                 <textarea
                                     rows={2}
                                     value={obsCierre}
                                     onChange={(e) => setObsCierre(e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-400 focus:outline-none"
                                     placeholder="Detalles del recuento, entrega a supervisor..."
                                 />
                             </div>
 
-                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-white/10">
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                                 <button
                                     type="button"
                                     onClick={() => setModalCierreOpen(false)}
-                                    className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 active:scale-98"
+                                    className="flex min-h-[42px] items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-98"
                                 >
                                     Cancelar
                                 </button>

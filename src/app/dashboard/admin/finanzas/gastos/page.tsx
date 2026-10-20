@@ -206,34 +206,34 @@ export default function GastosOperativosPage() {
 
             {/* Tarjetas KPI */}
             <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-4 shadow-lg">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Gastos (Filtrados)</p>
-                    <p className="mt-1 text-2xl sm:text-3xl font-black text-rose-400">
+                <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-4 shadow-sm dark:shadow-lg">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">Total Gastos (Filtrados)</p>
+                    <p className="mt-1 text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">
                         Bs {totalGastosMonto.toFixed(2)}
                     </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-4 shadow-lg">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Gastos Fijos</p>
-                    <p className="mt-1 text-2xl font-bold text-amber-300">
+                <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-4 shadow-sm dark:shadow-lg">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">Gastos Fijos</p>
+                    <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">
                         Bs {totalFijos.toFixed(2)}
                     </p>
-                    <p className="text-[10px] text-gray-500">Alquileres, sueldos base, servicios</p>
+                    <p className="text-[10px] text-slate-500 dark:text-gray-500">Alquileres, sueldos base, servicios</p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-4 shadow-lg">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Gastos Variables</p>
-                    <p className="mt-1 text-2xl font-bold text-cyan-300">
+                <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-4 shadow-sm dark:shadow-lg">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">Gastos Variables</p>
+                    <p className="mt-1 text-2xl font-bold text-cyan-700 dark:text-cyan-300">
                         Bs {totalVariables.toFixed(2)}
                     </p>
-                    <p className="text-[10px] text-gray-500">Publicidad, empaques, fletes, comisiones</p>
+                    <p className="text-[10px] text-slate-500 dark:text-gray-500">Publicidad, empaques, fletes, comisiones</p>
                 </div>
             </div>
 
             {/* Barra de Filtros */}
-            <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-slate-900/60 p-3 text-xs">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-3 text-xs shadow-sm">
                 <select
                     value={filtroCategoria}
                     onChange={(e) => setFiltroCategoria(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-slate-800 p-2 text-white"
+                    className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 p-2 text-slate-800 dark:text-white shadow-sm"
                 >
                     <option value="">Todas las categorías</option>
                     {CATEGORIAS_GASTO.map((c) => (
@@ -246,7 +246,7 @@ export default function GastosOperativosPage() {
                 <select
                     value={filtroNaturaleza}
                     onChange={(e) => setFiltroNaturaleza(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-slate-800 p-2 text-white"
+                    className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 p-2 text-slate-800 dark:text-white shadow-sm"
                 >
                     <option value="">Toda naturaleza</option>
                     <option value="FIJO">Fijos</option>
@@ -256,7 +256,7 @@ export default function GastosOperativosPage() {
                 <select
                     value={filtroSucursal}
                     onChange={(e) => setFiltroSucursal(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-slate-800 p-2 text-white"
+                    className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 p-2 text-slate-800 dark:text-white shadow-sm"
                 >
                     <option value="">Todas las sucursales</option>
                     {sucursales.map((s) => (
@@ -268,10 +268,10 @@ export default function GastosOperativosPage() {
             </div>
 
             {/* Tabla de Gastos */}
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 shadow-xl">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 shadow-sm dark:shadow-xl">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-gray-300">
-                        <thead className="border-b border-white/10 bg-slate-800/80 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    <table className="w-full text-left text-xs text-slate-700 dark:text-gray-300">
+                        <thead className="border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                             <tr>
                                 <th className="p-3">Gasto # / Fecha</th>
                                 <th className="p-3">Categoría / Naturaleza</th>
@@ -349,16 +349,16 @@ export default function GastosOperativosPage() {
 
             {/* MODAL REGISTRAR GASTO */}
             {modalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 dark:bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
+                    <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span>💸</span> Registrar Gasto Operativo
                             </h3>
                             <button
                                 type="button"
                                 onClick={() => setModalOpen(false)}
-                                className="text-gray-400 hover:text-white font-bold"
+                                className="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold p-1 rounded-lg"
                             >
                                 ✕
                             </button>
@@ -367,26 +367,26 @@ export default function GastosOperativosPage() {
                         <form onSubmit={handleRegistrarGasto} className="space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Categoría *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Categoría *</label>
                                     <select
                                         value={categoria}
                                         onChange={(e) => setCategoria(e.target.value as CategoriaGasto)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                     >
                                         {CATEGORIAS_GASTO.map((c) => (
-                                            <option key={c.value} value={c.value}>
-                                                {c.label}
-                                            </option>
+                                             <option key={c.value} value={c.value}>
+                                                 {c.label}
+                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Naturaleza *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Naturaleza *</label>
                                     <select
                                         value={naturaleza}
                                         onChange={(e) => setNaturaleza(e.target.value as NaturalezaGasto)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                     >
                                         <option value="VARIABLE">Variable (según ventas/operación)</option>
                                         <option value="FIJO">Fijo (recurrente mensual)</option>
@@ -396,7 +396,7 @@ export default function GastosOperativosPage() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Monto (Bs) *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Monto (Bs) *</label>
                                     <input
                                         type="number"
                                         step="0.5"
@@ -404,33 +404,33 @@ export default function GastosOperativosPage() {
                                         required
                                         value={monto || ""}
                                         onChange={(e) => setMonto(parseFloat(e.target.value) || 0)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-white font-bold text-base focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-slate-900 dark:text-white font-bold text-base focus:border-rose-500 focus:outline-none"
                                         placeholder="0.00"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Fecha de Gasto</label>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Fecha de Gasto</label>
                                     <input
                                         type="date"
                                         required
                                         value={fechaGasto}
                                         onChange={(e) => setFechaGasto(e.target.value)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                     />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                         Cuenta de Egreso (Sale el dinero) *
                                     </label>
                                     <select
                                         required
                                         value={cuentaDineroId}
                                         onChange={(e) => setCuentaDineroId(e.target.value)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                     >
                                         {cuentas.map((c) => (
                                             <option key={c._id} value={c._id}>
@@ -441,13 +441,13 @@ export default function GastosOperativosPage() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                         Sucursal Afectada (Opcional)
                                     </label>
                                     <select
                                         value={sucursalId}
                                         onChange={(e) => setSucursalId(e.target.value)}
-                                        className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                     >
                                         <option value="">Gasto General / Corporativo</option>
                                         {sucursales.map((s) => (
@@ -460,19 +460,19 @@ export default function GastosOperativosPage() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">Descripción / Concepto *</label>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Descripción / Concepto *</label>
                                 <input
                                     type="text"
                                     required
                                     value={descripcion}
                                     onChange={(e) => setDescripcion(e.target.value)}
                                     placeholder="Ej. Pago alquiler mes de octubre Tienda 1..."
-                                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                     Beneficiario / Proveedor (Opcional)
                                 </label>
                                 <input
@@ -480,22 +480,22 @@ export default function GastosOperativosPage() {
                                     value={beneficiario}
                                     onChange={(e) => setBeneficiario(e.target.value)}
                                     placeholder="Ej. Inmobiliaria Central, Facebook Ads..."
-                                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-rose-400 focus:outline-none"
+                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-rose-500 focus:outline-none"
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+                            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                                 <button
                                     type="button"
                                     onClick={() => setModalOpen(false)}
-                                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300"
+                                    className="rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 px-5 py-2 text-xs font-bold text-white hover:brightness-110 disabled:opacity-50"
+                                    className="rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 px-5 py-2 text-xs font-bold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-md shadow-rose-600/20"
                                 >
                                     {submitting ? "Registrando..." : "Confirmar Gasto"}
                                 </button>

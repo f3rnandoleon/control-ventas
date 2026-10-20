@@ -101,10 +101,10 @@ export default function EstadoResultadosPage() {
       {/* Cabecera */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
             Estado de Resultados (P&L)
           </h1>
-          <p className="mt-1 text-xs sm:text-sm text-gray-400">
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 dark:text-gray-400">
             Utilidad Bruta, Costo de Ventas (COGS), Gastos Operativos y Utilidad Neta real.
           </p>
         </div>
@@ -112,40 +112,40 @@ export default function EstadoResultadosPage() {
         <button
           type="button"
           onClick={() => setModalCierrePeriodoOpen(true)}
-          className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-950/40 hover:bg-amber-900/50 px-4 py-2 text-xs sm:text-sm font-bold text-amber-300 transition shadow-lg"
+          className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 px-4 py-2 text-xs sm:text-sm font-bold text-amber-800 dark:text-amber-300 transition shadow-sm"
         >
           <span>🔒</span> Cerrar Periodo Contable
         </button>
       </div>
 
       {/* Controles de Filtro */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-xl">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 p-4 shadow-sm dark:shadow-xl">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-gray-400">Desde:</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-gray-400">Desde:</label>
           <input
             type="date"
             value={desde}
             onChange={(e) => setDesde(e.target.value)}
-            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-gray-400">Hasta:</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-gray-400">Hasta:</label>
           <input
             type="date"
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
-            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-gray-400">Sucursal:</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-gray-400">Sucursal:</label>
           <select
             value={sucursalId}
             onChange={(e) => setSucursalId(e.target.value)}
-            className="rounded-xl border border-white/10 bg-slate-800 px-3 py-1.5 text-xs text-white"
+            className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">Todas las sucursales (Consolidado)</option>
             {sucursales.map((s) => (
@@ -159,74 +159,74 @@ export default function EstadoResultadosPage() {
         <button
           type="button"
           onClick={cargarReporte}
-          className="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 transition"
+          className="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 transition shadow-sm"
         >
           Actualizar
         </button>
       </div>
 
       {loading ? (
-        <div className="p-12 text-center text-sm text-gray-400">Calculando Estado de Resultados...</div>
+        <div className="p-12 text-center text-sm text-slate-500 dark:text-gray-400">Calculando Estado de Resultados...</div>
       ) : !m ? (
-        <div className="p-12 text-center text-sm text-gray-400">Sin datos disponibles.</div>
+        <div className="p-12 text-center text-sm text-slate-500 dark:text-gray-400">Sin datos disponibles.</div>
       ) : (
         <>
           {/* Tarjetas Principales de Cascada P&L */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Ventas Netas */}
-            <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5 shadow-lg">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-5 shadow-sm dark:shadow-lg">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                 1. Ventas Netas
               </p>
-              <p className="mt-1 text-2xl sm:text-3xl font-black text-white">
+              <p className="mt-1 text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
                 Bs {m.ventasNetas.toFixed(2)}
               </p>
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">
                 {m.cantidadPedidos} pedidos • {m.prendasVendidas} prendas
               </p>
             </div>
 
             {/* Costo de Ventas (COGS) */}
-            <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5 shadow-lg">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-5 shadow-sm dark:shadow-lg">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                 2. Costo Mercancía (COGS)
               </p>
-              <p className="mt-1 text-2xl sm:text-3xl font-black text-rose-400">
+              <p className="mt-1 text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">
                 Bs {m.costoVentasCOGS.toFixed(2)}
               </p>
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">
                 Costo histórico de las prendas vendidas
               </p>
             </div>
 
             {/* Utilidad Bruta */}
-            <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/40 to-slate-900 p-5 shadow-lg">
+            <div className="rounded-2xl border border-cyan-300 dark:border-cyan-500/30 bg-cyan-50/70 dark:bg-gradient-to-br dark:from-cyan-950/40 dark:to-slate-900 p-5 shadow-sm dark:shadow-lg">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-cyan-800 dark:text-cyan-300">
                   3. Utilidad Bruta
                 </p>
-                <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300 border border-cyan-500/30">
+                <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-800 dark:text-cyan-300 border border-cyan-500/30">
                   {m.margenBrutoPorcentaje.toFixed(1)}% margen
                 </span>
               </div>
-              <p className="mt-1 text-2xl sm:text-3xl font-black text-cyan-200">
+              <p className="mt-1 text-2xl sm:text-3xl font-black text-cyan-900 dark:text-cyan-200">
                 Bs {m.utilidadBruta.toFixed(2)}
               </p>
-              <p className="mt-1 text-[11px] text-cyan-300/70">Ventas netas - Costo de ventas</p>
+              <p className="mt-1 text-[11px] text-cyan-800/80 dark:text-cyan-300/70">Ventas netas - Costo de ventas</p>
             </div>
 
             {/* Utilidad Neta Real */}
             <div
-              className={`rounded-2xl border p-5 shadow-xl ${
+              className={`rounded-2xl border p-5 shadow-sm dark:shadow-xl ${
                 m.utilidadNeta >= 0
-                  ? "border-emerald-500/40 bg-gradient-to-br from-emerald-950/50 to-slate-900"
-                  : "border-rose-500/40 bg-gradient-to-br from-rose-950/50 to-slate-900"
+                  ? "border-emerald-300 dark:border-emerald-500/40 bg-emerald-50/70 dark:bg-gradient-to-br dark:from-emerald-950/50 dark:to-slate-900"
+                  : "border-rose-300 dark:border-rose-500/40 bg-rose-50/70 dark:bg-gradient-to-br dark:from-rose-950/50 dark:to-slate-900"
               }`}
             >
               <div className="flex items-center justify-between">
                 <p
                   className={`text-[11px] font-semibold uppercase tracking-wider ${
-                    m.utilidadNeta >= 0 ? "text-emerald-300" : "text-rose-300"
+                    m.utilidadNeta >= 0 ? "text-emerald-800 dark:text-emerald-300" : "text-rose-800 dark:text-rose-300"
                   }`}
                 >
                   4. Utilidad Neta (Net Income)
@@ -234,8 +234,8 @@ export default function EstadoResultadosPage() {
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
                     m.utilidadNeta >= 0
-                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                      : "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                      ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/30"
+                      : "bg-rose-500/20 text-rose-800 dark:text-rose-300 border-rose-500/30"
                   }`}
                 >
                   {m.margenNetoPorcentaje.toFixed(1)}% margen
@@ -243,12 +243,12 @@ export default function EstadoResultadosPage() {
               </div>
               <p
                 className={`mt-1 text-2xl sm:text-3xl font-black ${
-                  m.utilidadNeta >= 0 ? "text-emerald-300" : "text-rose-300"
+                  m.utilidadNeta >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"
                 }`}
               >
                 Bs {m.utilidadNeta.toFixed(2)}
               </p>
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">
                 Ganancia limpia de la empresa
               </p>
             </div>
@@ -257,48 +257,48 @@ export default function EstadoResultadosPage() {
           {/* Cascada de Desglose Contable */}
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Cascada Detallada */}
-            <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5 shadow-xl">
-              <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-5 shadow-sm dark:shadow-xl">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <span>📊</span> Desglose Estado de Resultados
               </h3>
               <div className="space-y-3 text-xs">
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-gray-300 font-medium">(+) Ventas Brutas</span>
-                  <span className="font-bold text-white">Bs {m.ventasBrutas.toFixed(2)}</span>
+                <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5">
+                  <span className="text-slate-600 dark:text-gray-300 font-medium">(+) Ventas Brutas</span>
+                  <span className="font-bold text-slate-900 dark:text-white">Bs {m.ventasBrutas.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/5 text-amber-300">
+                <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5 text-amber-700 dark:text-amber-300">
                   <span>(-) Descuentos en Ventas</span>
                   <span className="font-bold">- Bs {m.descuentos.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/10 bg-white/5 px-2 rounded-lg font-bold text-white">
+                <div className="flex justify-between py-1 border-b border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-2 rounded-lg font-bold text-slate-900 dark:text-white">
                   <span>(=) VENTAS NETAS</span>
                   <span>Bs {m.ventasNetas.toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between py-1 border-b border-white/5 text-rose-300">
+                <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5 text-rose-600 dark:text-rose-300">
                   <span>(-) Costo de Mercancía Vendida (COGS)</span>
                   <span className="font-bold">- Bs {m.costoVentasCOGS.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/10 bg-cyan-950/30 px-2 rounded-lg font-bold text-cyan-300">
+                <div className="flex justify-between py-1 border-b border-cyan-200 dark:border-white/10 bg-cyan-50 dark:bg-cyan-950/30 px-2 rounded-lg font-bold text-cyan-800 dark:text-cyan-300">
                   <span>(=) UTILIDAD BRUTA</span>
                   <span>Bs {m.utilidadBruta.toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between py-1 border-b border-white/5 text-gray-400 pl-3">
+                <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5 text-slate-500 dark:text-gray-400 pl-3">
                   <span>• Gastos Fijos (Alquiler, sueldos base...)</span>
                   <span>- Bs {m.gastosFijos.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/5 text-gray-400 pl-3">
+                <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5 text-slate-500 dark:text-gray-400 pl-3">
                   <span>• Gastos Variables (Marketing, empaques...)</span>
                   <span>- Bs {m.gastosVariables.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/5 text-rose-300 font-medium">
+                <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5 text-rose-600 dark:text-rose-300 font-medium">
                   <span>(-) Total Gastos Operativos (OPEX)</span>
                   <span className="font-bold">- Bs {m.gastosOperativosTotal.toFixed(2)}</span>
                 </div>
 
                 {m.mermasTotal > 0 && (
-                  <div className="flex justify-between py-1 border-b border-white/5 text-rose-400 font-medium">
+                  <div className="flex justify-between py-1 border-b border-slate-100 dark:border-white/5 text-rose-600 dark:text-rose-400 font-medium">
                     <span>(-) Pérdida por Mermas / Dañados</span>
                     <span className="font-bold">- Bs {m.mermasTotal.toFixed(2)}</span>
                   </div>
@@ -307,8 +307,8 @@ export default function EstadoResultadosPage() {
                 <div
                   className={`flex justify-between py-2.5 px-3 rounded-xl font-black text-sm mt-2 border ${
                     m.utilidadNeta >= 0
-                      ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
-                      : "bg-rose-950/40 border-rose-500/40 text-rose-300"
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-300"
+                      : "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-500/40 text-rose-800 dark:text-rose-300"
                   }`}
                 >
                   <span>(=) UTILIDAD NETA DEL PERIODO</span>
@@ -318,13 +318,13 @@ export default function EstadoResultadosPage() {
             </div>
 
             {/* Gastos por Categoría */}
-            <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5 shadow-xl flex flex-col justify-between">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-5 shadow-sm dark:shadow-xl flex flex-col justify-between">
               <div>
-                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                   <span>🏷️</span> Gastos Operativos por Categoría
                 </h3>
                 {reporte.gastosPorCategoria.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-8 text-center">
+                  <p className="text-xs text-slate-500 dark:text-gray-400 py-8 text-center">
                     No hay gastos operativos registrados en este periodo.
                   </p>
                 ) : (
@@ -337,17 +337,17 @@ export default function EstadoResultadosPage() {
                       return (
                         <div key={cat.categoria} className="space-y-1">
                           <div className="flex justify-between text-xs">
-                            <span className="font-semibold text-gray-200">
+                            <span className="font-semibold text-slate-800 dark:text-gray-200">
                               {cat.categoria}{" "}
-                              <span className="text-[10px] text-gray-400 font-normal">
+                              <span className="text-[10px] text-slate-500 dark:text-gray-400 font-normal">
                                 ({cat.naturaleza})
                               </span>
                             </span>
-                            <span className="font-bold text-white">
+                            <span className="font-bold text-slate-900 dark:text-white">
                               Bs {cat.monto.toFixed(2)} ({porc}%)
                             </span>
                           </div>
-                          <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                          <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                             <div
                               className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full"
                               style={{ width: `${Math.min(100, parseFloat(porc))}%` }}
@@ -364,13 +364,13 @@ export default function EstadoResultadosPage() {
 
           {/* Desglose Comparativo por Sucursales */}
           {reporte.desglosePorSucursales.length > 0 && (
-            <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5 shadow-xl">
-              <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-5 shadow-sm dark:shadow-xl">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <span>🏪</span> Rentabilidad Desglosada por Sucursal
               </h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-300">
-                  <thead className="border-b border-white/10 bg-slate-800/80 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                <table className="w-full text-left text-xs text-slate-700 dark:text-gray-300">
+                  <thead className="border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-gray-400">
                     <tr>
                       <th className="p-3">Sucursal</th>
                       <th className="p-3 text-right">Ventas Netas</th>
@@ -380,27 +380,27 @@ export default function EstadoResultadosPage() {
                       <th className="p-3 text-right font-black">Utilidad Neta</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                     {reporte.desglosePorSucursales.map((suc) => (
-                      <tr key={suc.sucursalId} className="hover:bg-white/5 transition">
-                        <td className="p-3 font-bold text-white">
+                      <tr key={suc.sucursalId} className="hover:bg-slate-50 dark:hover:bg-white/5 transition">
+                        <td className="p-3 font-bold text-slate-900 dark:text-white">
                           {suc.nombreSucursal} ({suc.codigoSucursal})
                         </td>
-                        <td className="p-3 text-right font-semibold text-white">
+                        <td className="p-3 text-right font-semibold text-slate-900 dark:text-white">
                           Bs {suc.ventasNetas.toFixed(2)}
                         </td>
-                        <td className="p-3 text-right text-rose-300">
+                        <td className="p-3 text-right text-rose-600 dark:text-rose-300">
                           Bs {suc.costoVentasCOGS.toFixed(2)}
                         </td>
-                        <td className="p-3 text-right font-semibold text-cyan-300">
+                        <td className="p-3 text-right font-semibold text-cyan-700 dark:text-cyan-300">
                           Bs {suc.utilidadBruta.toFixed(2)}
                         </td>
-                        <td className="p-3 text-right text-rose-300">
+                        <td className="p-3 text-right text-rose-600 dark:text-rose-300">
                           Bs {suc.gastosOperativos.toFixed(2)}
                         </td>
                         <td
                           className={`p-3 text-right font-black text-sm ${
-                            suc.utilidadNeta >= 0 ? "text-emerald-400" : "text-rose-400"
+                            suc.utilidadNeta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                           }`}
                         >
                           Bs {suc.utilidadNeta.toFixed(2)}
@@ -414,16 +414,16 @@ export default function EstadoResultadosPage() {
           )}
 
           {/* Historial de Periodos Cerrados */}
-          <div className="rounded-2xl border border-white/10 bg-slate-900/90 p-5 shadow-xl">
-            <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
+          <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/90 p-5 shadow-sm dark:shadow-xl">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <span>🔒</span> Periodos Contables Cerrados & Bloqueados
             </h3>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-slate-600 dark:text-gray-400 mb-4">
               Los meses cerrados quedan sellados para evitar modificaciones accidentales en fechas pasadas.
             </p>
 
             {periodosCerrados.length === 0 ? (
-              <p className="text-xs text-gray-400 py-4 text-center border border-dashed border-white/10 rounded-xl">
+              <p className="text-xs text-slate-500 dark:text-gray-400 py-4 text-center border border-dashed border-slate-200 dark:border-white/10 rounded-xl">
                 No hay periodos cerrados todavía.
               </p>
             ) : (
@@ -431,24 +431,24 @@ export default function EstadoResultadosPage() {
                 {periodosCerrados.map((p) => (
                   <div
                     key={p._id}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-800/60 p-3"
+                    className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 p-3"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-xs">{p.mesNombre}</span>
+                        <span className="font-bold text-slate-900 dark:text-white text-xs">{p.mesNombre}</span>
                         <span
                           className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
                             p.bloqueado
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                              : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              ? "bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                              : "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30"
                           }`}
                         >
                           {p.bloqueado ? "BLOQUEADO" : "ABIERTO"}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-400">
+                      <p className="text-[11px] text-slate-500 dark:text-gray-400">
                         Resultado al cierre:{" "}
-                        <strong className="text-emerald-300">
+                        <strong className="text-emerald-600 dark:text-emerald-300">
                           Bs {(p.utilidadNetaAlCierre || 0).toFixed(2)}
                         </strong>
                       </p>
@@ -458,7 +458,7 @@ export default function EstadoResultadosPage() {
                       <button
                         type="button"
                         onClick={() => handleReabrirPeriodo(p._id, p.mesNombre)}
-                        className="rounded-lg border border-white/10 px-2 py-1 text-[10px] font-bold text-gray-300 hover:bg-white/10"
+                        className="rounded-lg border border-slate-200 dark:border-white/10 px-2 py-1 text-[10px] font-bold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/10"
                       >
                         Reabrir
                       </button>
@@ -473,16 +473,16 @@ export default function EstadoResultadosPage() {
 
       {/* MODAL CERRAR PERIODO */}
       {modalCierrePeriodoOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 dark:bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>🔒</span> Cerrar y Bloquear Periodo Contable
               </h3>
               <button
                 type="button"
                 onClick={() => setModalCierrePeriodoOpen(false)}
-                className="text-gray-400 hover:text-white font-bold"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold p-1 rounded-lg"
               >
                 ✕
               </button>
@@ -491,11 +491,11 @@ export default function EstadoResultadosPage() {
             <form onSubmit={handleCerrarPeriodo} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Mes *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Mes *</label>
                   <select
                     value={mesCierre}
                     onChange={(e) => setMesCierre(parseInt(e.target.value, 10))}
-                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
                   >
                     {[
                       "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -509,32 +509,32 @@ export default function EstadoResultadosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Año *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Año *</label>
                   <input
                     type="number"
                     value={anioCierre}
                     onChange={(e) => setAnioCierre(parseInt(e.target.value, 10))}
-                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Notas / Observaciones</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Notas / Observaciones</label>
                 <textarea
                   rows={2}
                   value={obsCierre}
                   onChange={(e) => setObsCierre(e.target.value)}
                   placeholder="Ej. Cierre contable mensual revisado con estados de cuenta..."
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setModalCierrePeriodoOpen(false)}
-                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300"
+                  className="rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Cancelar
                 </button>

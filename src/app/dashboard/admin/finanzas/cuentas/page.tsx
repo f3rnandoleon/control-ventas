@@ -288,49 +288,49 @@ export default function CuentasFinanzasPage() {
             return (
               <div
                 key={c._id}
-                className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/80 p-5 transition hover:border-cyan-500/50 hover:bg-slate-800/90 shadow-lg"
+                className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 transition hover:border-cyan-500/50 hover:bg-slate-50 dark:hover:bg-slate-800/90 shadow-sm dark:shadow-lg"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-xl border border-white/10">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-xl border border-slate-200 dark:border-white/10">
                       {esCaja ? "💵" : c.tipo === "BANCO" ? "🏦" : "📱"}
                     </span>
                     <div className="flex flex-wrap items-center gap-1">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
                           c.activa
-                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                            : "bg-red-500/20 text-red-300 border-red-500/30"
+                            ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30"
+                            : "bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-300 border-red-300 dark:border-red-500/30"
                         }`}
                       >
                         {c.activa ? "Activa" : "Inactiva"}
                       </span>
                       {c.esPredeterminadaPOS && (
-                        <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
+                        <span className="rounded-full bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30">
                           POS Mostrador
                         </span>
                       )}
                       {c.esPredeterminadaQR && (
-                        <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300 border border-cyan-500/30">
+                        <span className="rounded-full bg-cyan-100 dark:bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-800 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-500/30">
                           QR Default
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <h3 className="mt-3 text-base font-bold text-white group-hover:text-cyan-300 transition">
+                  <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-white group-hover:text-cyan-700 dark:group-hover:text-cyan-300 transition">
                     {c.nombre}
                   </h3>
-                  <p className="text-xs text-gray-400">
-                    Tipo: <strong className="text-gray-300">{c.tipo}</strong>
+                  <p className="text-xs text-slate-500 dark:text-gray-400">
+                    Tipo: <strong className="text-slate-700 dark:text-gray-300">{c.tipo}</strong>
                     {sucObj?.nombre ? ` • ${sucObj.nombre}` : ""}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/10 flex flex-col gap-3">
+                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/10 flex flex-col gap-3">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-gray-400">Saldo Disponible</p>
-                    <p className="text-xl sm:text-2xl font-black text-white">
+                    <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-gray-400 font-semibold">Saldo Disponible</p>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
                       Bs {(c.saldoActual || 0).toFixed(2)}
                     </p>
                   </div>
@@ -338,17 +338,17 @@ export default function CuentasFinanzasPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenEditar(c)}
-                      className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10 transition"
+                      className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition shadow-sm"
                     >
                       Editar
                     </button>
                     <button
                       type="button"
                       onClick={() => handleToggleActiva(c)}
-                      className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+                      className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition shadow-sm ${
                         c.activa
-                          ? "border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
-                          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                          ? "border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/20"
+                          : "border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20"
                       }`}
                     >
                       {c.activa ? "Desactivar" : "Activar"}
@@ -356,7 +356,7 @@ export default function CuentasFinanzasPage() {
                     <button
                       type="button"
                       onClick={() => abrirMovimientos(c)}
-                      className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20 transition"
+                      className="rounded-xl border border-cyan-300 dark:border-white/15 bg-cyan-50 dark:bg-white/5 px-3 py-1.5 text-xs font-bold text-cyan-800 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 transition shadow-sm"
                     >
                       Movimientos →
                     </button>
@@ -371,15 +371,16 @@ export default function CuentasFinanzasPage() {
       {/* MODAL NUEVA CUENTA */}
       {modalCuentaOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-              <h3 className="text-lg font-bold text-white">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                 {editingCuenta ? "Editar Cuenta de Dinero" : "Nueva Cuenta de Dinero / Caja"}
               </h3>
               <button
                 type="button"
                 onClick={() => setModalCuentaOpen(false)}
-                className="text-gray-400 hover:text-white font-bold"
+                aria-label="Cerrar modal"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold"
               >
                 ✕
               </button>
@@ -387,24 +388,24 @@ export default function CuentasFinanzasPage() {
 
             <form onSubmit={handleCrearCuenta} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Nombre de Cuenta *</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Nombre de Cuenta *</label>
                 <input
                   type="text"
                   required
                   value={nombreNueva}
                   onChange={(e) => setNombreNueva(e.target.value)}
                   placeholder="Ej. Caja Chica Tienda 2, Cuenta BCP..."
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Tipo de Cuenta</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Tipo de Cuenta</label>
                   <select
                     value={tipoNueva}
                     onChange={(e) => setTipoNueva(e.target.value as TipoCuentaDinero)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                   >
                     <option value="CAJA_FISICA">Caja Efectivo</option>
                     <option value="BANCO">Cuenta Bancaria</option>
@@ -414,7 +415,7 @@ export default function CuentasFinanzasPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                     {editingCuenta ? "Saldo Actual (Bs)" : "Saldo Inicial (Bs)"}
                   </label>
                   <input
@@ -424,21 +425,21 @@ export default function CuentasFinanzasPage() {
                     min="0"
                     value={saldoInicialNueva}
                     onChange={(e) => setSaldoInicialNueva(parseFloat(e.target.value) || 0)}
-                    className={`w-full rounded-xl border border-white/10 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none ${
-                      editingCuenta ? "bg-slate-800/50 opacity-60 cursor-not-allowed" : "bg-slate-800"
+                    className={`w-full rounded-xl border border-slate-200 dark:border-white/10 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none ${
+                      editingCuenta ? "bg-slate-100 dark:bg-slate-800/50 opacity-60 cursor-not-allowed" : "bg-slate-50 dark:bg-slate-800"
                     }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                   Sucursal Asignada (Opcional para cuentas globales)
                 </label>
                 <select
                   value={sucursalIdNueva}
                   onChange={(e) => setSucursalIdNueva(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                 >
                   <option value="">(Sin sucursal / Cuenta Global)</option>
                   {sucursales.map((s) => (
@@ -450,39 +451,39 @@ export default function CuentasFinanzasPage() {
               </div>
 
               <div className="space-y-2 pt-2">
-                <label className="flex items-center gap-2 text-xs text-gray-300">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-gray-300">
                   <input
                     type="checkbox"
                     checked={esPredPOS}
                     onChange={(e) => setEsPredPOS(e.target.checked)}
-                    className="rounded border-white/10 bg-slate-800 text-cyan-500"
+                    className="rounded border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-cyan-500"
                   />
                   <span>Es la caja predeterminada de efectivo para ventas en esta sucursal</span>
                 </label>
 
-                <label className="flex items-center gap-2 text-xs text-gray-300">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-gray-300">
                   <input
                     type="checkbox"
                     checked={esPredQR}
                     onChange={(e) => setEsPredQR(e.target.checked)}
-                    className="rounded border-white/10 bg-slate-800 text-cyan-500"
+                    className="rounded border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-cyan-500"
                   />
                   <span>Es la cuenta receptora predeterminada para cobros QR / Transferencias</span>
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setModalCuentaOpen(false)}
-                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300"
+                  className="rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-98"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {submitting ? "Guardando..." : editingCuenta ? "Guardar Cambios" : "Crear Cuenta"}
                 </button>
@@ -495,13 +496,14 @@ export default function CuentasFinanzasPage() {
       {/* MODAL TRANSFERENCIA */}
       {modalTransfOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-              <h3 className="text-lg font-bold text-white">Transferencia Entre Cuentas</h3>
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 mb-4">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transferencia Entre Cuentas</h3>
               <button
                 type="button"
                 onClick={() => setModalTransfOpen(false)}
-                className="text-gray-400 hover:text-white font-bold"
+                aria-label="Cerrar modal"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold"
               >
                 ✕
               </button>
@@ -509,12 +511,12 @@ export default function CuentasFinanzasPage() {
 
             <form onSubmit={handleTransferir} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Cuenta Origen (Sale dinero) *</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Cuenta Origen (Sale dinero) *</label>
                 <select
                   required
                   value={origenId}
                   onChange={(e) => setOrigenId(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                 >
                   <option value="">Selecciona cuenta origen</option>
                   {cuentas.map((c) => (
@@ -526,12 +528,12 @@ export default function CuentasFinanzasPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Cuenta Destino (Entra dinero) *</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Cuenta Destino (Entra dinero) *</label>
                 <select
                   required
                   value={destinoId}
                   onChange={(e) => setDestinoId(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                 >
                   <option value="">Selecciona cuenta destino</option>
                   {cuentas
@@ -545,7 +547,7 @@ export default function CuentasFinanzasPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Monto a Transferir (Bs) *</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Monto a Transferir (Bs) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -553,34 +555,34 @@ export default function CuentasFinanzasPage() {
                   required
                   value={montoTransf || ""}
                   onChange={(e) => setMontoTransf(parseFloat(e.target.value) || 0)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-white font-bold text-base focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-slate-900 dark:text-white font-bold text-base focus:border-cyan-400 focus:outline-none"
                   placeholder="0.00"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Concepto / Motivo</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Concepto / Motivo</label>
                 <input
                   type="text"
                   value={conceptoTransf}
                   onChange={(e) => setConceptoTransf(e.target.value)}
                   placeholder="Ej. Depósito de recaudación de tienda al banco..."
-                  className="w-full rounded-xl border border-white/10 bg-slate-800 p-2.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800 p-2.5 text-xs text-slate-900 dark:text-white focus:border-cyan-400 focus:outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setModalTransfOpen(false)}
-                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300"
+                  className="rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-98"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-xl bg-cyan-600 px-5 py-2 text-xs font-bold text-white hover:bg-cyan-500 disabled:opacity-50"
+                  className="rounded-xl bg-cyan-600 px-5 py-2 text-xs font-bold text-white hover:bg-cyan-500 disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {submitting ? "Transfiriendo..." : "Confirmar Transferencia"}
                 </button>
@@ -593,13 +595,13 @@ export default function CuentasFinanzasPage() {
       {/* DRAWER / MODAL HISTORIAL DE MOVIMIENTOS */}
       {cuentaSeleccionada && (
         <div className="fixed inset-0 z-[100] flex justify-end bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-2xl bg-slate-900 border-l border-white/15 p-6 flex flex-col h-full shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-white/15 p-6 flex flex-col h-full shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-4">
               <div>
-                <h3 className="text-lg font-black text-white">{cuentaSeleccionada.nombre}</h3>
-                <p className="text-xs text-gray-400">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">{cuentaSeleccionada.nombre}</h3>
+                <p className="text-xs text-slate-500 dark:text-gray-400">
                   Saldo Actual:{" "}
-                  <strong className="text-emerald-400 text-sm">
+                  <strong className="text-emerald-600 dark:text-emerald-400 text-sm">
                     Bs {cuentaSeleccionada.saldoActual.toFixed(2)}
                   </strong>
                 </p>
@@ -607,7 +609,8 @@ export default function CuentasFinanzasPage() {
               <button
                 type="button"
                 onClick={() => setCuentaSeleccionada(null)}
-                className="text-gray-400 hover:text-white text-xl font-bold"
+                aria-label="Cerrar historial"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white text-xl font-bold"
               >
                 ✕
               </button>
@@ -615,9 +618,9 @@ export default function CuentasFinanzasPage() {
 
             <div className="flex-1 overflow-y-auto py-4 space-y-2">
               {loadingMovs ? (
-                <div className="p-8 text-center text-xs text-gray-400">Cargando movimientos...</div>
+                <div className="p-8 text-center text-xs text-slate-500 dark:text-gray-400">Cargando movimientos...</div>
               ) : movimientos.length === 0 ? (
-                <div className="p-8 text-center text-xs text-gray-400">
+                <div className="p-8 text-center text-xs text-slate-500 dark:text-gray-400">
                   No hay movimientos registrados en esta cuenta todavía.
                 </div>
               ) : (
@@ -627,27 +630,27 @@ export default function CuentasFinanzasPage() {
                   return (
                     <div
                       key={m._id}
-                      className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-800/60 p-3 hover:bg-slate-800 transition"
+                      className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-800/60 p-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm"
                     >
                       <div className="min-w-0 flex-1 pr-3">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
                               esIngreso
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                                : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30"
+                                : "bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-500/30"
                             }`}
                           >
                             {m.tipo}
                           </span>
-                          <span className="text-[11px] text-gray-400">
+                          <span className="text-[11px] text-slate-500 dark:text-gray-400">
                             {new Date(m.createdAt).toLocaleString("es-BO")}
                           </span>
                         </div>
-                        <p className="mt-1 line-clamp-1 text-xs font-semibold text-white">
+                        <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-900 dark:text-white">
                           {m.concepto}
                         </p>
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-[10px] text-slate-500 dark:text-gray-400">
                           {m.origenTipo} {usr?.nombreCompleto ? `• Registrado por ${usr.nombreCompleto}` : ""}
                         </p>
                       </div>
@@ -655,12 +658,12 @@ export default function CuentasFinanzasPage() {
                       <div className="text-right shrink-0">
                         <p
                           className={`text-sm font-black ${
-                            esIngreso ? "text-emerald-400" : "text-rose-400"
+                            esIngreso ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                           }`}
                         >
                           {esIngreso ? "+" : "-"} Bs {m.monto.toFixed(2)}
                         </p>
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-[10px] text-slate-500 dark:text-gray-400">
                           Saldo: Bs {m.saldoPosterior.toFixed(2)}
                         </p>
                       </div>

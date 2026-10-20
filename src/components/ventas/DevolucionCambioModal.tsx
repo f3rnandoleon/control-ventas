@@ -240,22 +240,23 @@ export default function DevolucionCambioModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-3 sm:p-5 backdrop-blur-md animate-fadeIn">
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-white/20 bg-slate-900 shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-200 dark:border-white/20 bg-white dark:bg-slate-900 shadow-2xl">
         {/* Cabecera */}
-        <div className="flex items-center justify-between border-b border-white/10 p-4 sm:p-5">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 p-4 sm:p-5">
           <div>
-            <h2 className="text-lg font-black text-white sm:text-xl flex items-center gap-2">
+            <h2 className="text-lg font-black text-slate-900 dark:text-white sm:text-xl flex items-center gap-2">
               <span>🔄</span> Devolución o Cambio de Prenda
             </h2>
-            <p className="text-xs text-gray-400">
-              Pedido <strong className="text-cyan-300">{pedido.numeroPedido}</strong> •{" "}
+            <p className="text-xs text-slate-500 dark:text-gray-400">
+              Pedido <strong className="text-cyan-700 dark:text-cyan-300">{pedido.numeroPedido}</strong> •{" "}
               {new Date(pedido.createdAt).toLocaleDateString("es-BO")}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-gray-400 hover:bg-white/10 hover:text-white"
+            aria-label="Cerrar modal"
+            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white transition"
           >
             ✕
           </button>
@@ -265,7 +266,7 @@ export default function DevolucionCambioModal({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {/* Selector de Tipo de Operación */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-gray-400 mb-2">
               Tipo de Operación
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -274,13 +275,13 @@ export default function DevolucionCambioModal({
                 onClick={() => setTipoOperacion("DEVOLUCION")}
                 className={`flex flex-col items-center justify-center rounded-xl p-3 border text-xs font-bold transition ${
                   tipoOperacion === "DEVOLUCION"
-                    ? "border-amber-400 bg-amber-500/20 text-amber-200 shadow-lg shadow-amber-950/40"
-                    : "border-white/10 bg-slate-800 text-gray-400 hover:bg-slate-700"
+                    ? "border-amber-400 bg-amber-50 dark:bg-amber-500/20 text-amber-900 dark:text-amber-200 shadow-md"
+                    : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
                 <span className="text-lg mb-1">💸</span>
                 <span>Devolución con Reembolso</span>
-                <span className="text-[10px] font-normal text-gray-300">
+                <span className="text-[10px] font-normal text-slate-500 dark:text-gray-300">
                   El cliente entrega la prenda y recibe dinero
                 </span>
               </button>
@@ -290,13 +291,13 @@ export default function DevolucionCambioModal({
                 onClick={() => setTipoOperacion("CAMBIO")}
                 className={`flex flex-col items-center justify-center rounded-xl p-3 border text-xs font-bold transition ${
                   tipoOperacion === "CAMBIO"
-                    ? "border-cyan-400 bg-cyan-500/20 text-cyan-200 shadow-lg shadow-cyan-950/40"
-                    : "border-white/10 bg-slate-800 text-gray-400 hover:bg-slate-700"
+                    ? "border-cyan-400 bg-cyan-50 dark:bg-cyan-500/20 text-cyan-900 dark:text-cyan-200 shadow-md"
+                    : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
                 <span className="text-lg mb-1">🔁</span>
                 <span>Cambio de Prenda (Talla/Modelo)</span>
-                <span className="text-[10px] font-normal text-gray-300">
+                <span className="text-[10px] font-normal text-slate-500 dark:text-gray-300">
                   Devuelve una prenda y se lleva otra (± diferencia)
                 </span>
               </button>
@@ -305,7 +306,7 @@ export default function DevolucionCambioModal({
 
           {/* 1. Prendas a Devolver */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-300">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-gray-300">
               1. Selecciona las Prendas Devueltas por el Cliente
             </h3>
 
@@ -315,8 +316,8 @@ export default function DevolucionCambioModal({
                   key={`${item.varianteId}-${idx}`}
                   className={`rounded-xl border p-3 transition ${
                     item.seleccionado
-                      ? "border-amber-500/50 bg-amber-950/20"
-                      : "border-white/5 bg-slate-800/60 opacity-80"
+                      ? "border-amber-400/80 bg-amber-50/70 dark:border-amber-500/50 dark:bg-amber-950/20"
+                      : "border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-800/60 opacity-80"
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -324,23 +325,23 @@ export default function DevolucionCambioModal({
                       type="checkbox"
                       checked={item.seleccionado}
                       onChange={() => handleToggleItem(idx)}
-                      className="mt-1 h-4 w-4 rounded border-gray-600 bg-slate-700 text-cyan-500"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-gray-600 bg-white dark:bg-slate-700 text-cyan-500"
                     />
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-bold text-white text-xs sm:text-sm">{item.nombre}</p>
-                        <p className="font-black text-white text-xs">{formatMoney(item.precioUnitario)} c/u</p>
+                        <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">{item.nombre}</p>
+                        <p className="font-black text-slate-900 dark:text-white text-xs">{formatMoney(item.precioUnitario)} c/u</p>
                       </div>
 
-                      <p className="text-[11px] text-gray-400">
+                      <p className="text-[11px] text-slate-500 dark:text-gray-400">
                         {item.color} • Talla {item.talla} (Comprado: {item.cantidadMax} u.)
                       </p>
 
                       {item.seleccionado && (
-                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 pt-2 border-t border-white/10">
+                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 pt-2 border-t border-slate-200 dark:border-white/10">
                           <div>
-                            <label className="block text-[10px] text-gray-400 mb-1">Cantidad a devolver</label>
+                            <label className="block text-[10px] text-slate-600 dark:text-gray-400 mb-1">Cantidad a devolver</label>
                             <input
                               type="number"
                               min="1"
@@ -354,12 +355,12 @@ export default function DevolucionCambioModal({
                                   ),
                                 })
                               }
-                              className="w-full rounded-lg border border-white/10 bg-slate-900 p-1.5 text-xs text-white"
+                              className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[10px] text-gray-400 mb-1">Destino de la Prenda</label>
+                            <label className="block text-[10px] text-slate-600 dark:text-gray-400 mb-1">Destino de la Prenda</label>
                             <select
                               value={item.destinoFisico}
                               onChange={(e) =>
@@ -367,7 +368,7 @@ export default function DevolucionCambioModal({
                                   destinoFisico: e.target.value as DestinoFisicoItem,
                                 })
                               }
-                              className="w-full rounded-lg border border-white/10 bg-slate-900 p-1.5 text-xs text-white"
+                              className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400"
                             >
                               <option value="REINGRESO_STOCK">Reingreso a Stock (Intacta)</option>
                               <option value="MERMA_DANADO">Merma / Defectuosa (Baja)</option>
@@ -375,11 +376,11 @@ export default function DevolucionCambioModal({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] text-gray-400 mb-1">Motivo</label>
+                            <label className="block text-[10px] text-slate-600 dark:text-gray-400 mb-1">Motivo</label>
                             <select
                               value={item.motivo}
                               onChange={(e) => handleUpdateItem(idx, { motivo: e.target.value })}
-                              className="w-full rounded-lg border border-white/10 bg-slate-900 p-1.5 text-xs text-white"
+                              className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400"
                             >
                               <option value="Talla incorrecta">Talla incorrecta</option>
                               <option value="Cambio de modelo/color">Cambio de modelo/color</option>
@@ -395,26 +396,26 @@ export default function DevolucionCambioModal({
               ))}
             </div>
 
-            <p className="text-right text-xs font-semibold text-amber-300">
+            <p className="text-right text-xs font-semibold text-amber-700 dark:text-amber-300">
               Valor de lo devuelto: <strong>{formatMoney(totalDevuelto)}</strong>
             </p>
           </div>
 
           {/* 2. Prendas Nuevas Entregadas (Solo si es Cambio) */}
           {tipoOperacion === "CAMBIO" && (
-            <div className="space-y-3 pt-3 border-t border-white/10">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-300">
+            <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-white/10">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
                 2. Selecciona las Nuevas Prendas que se Entregan al Cliente
               </h3>
 
               {/* Buscador de Producto en Catálogo */}
-              <div className="rounded-xl border border-white/10 bg-slate-800/80 p-3 space-y-2">
+              <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 p-3 space-y-2">
                 <input
                   type="text"
                   placeholder="Buscar prenda nueva por nombre o modelo..."
                   value={busquedaProducto}
                   onChange={(e) => setBusquedaProducto(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-xs text-white"
+                  className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-400"
                 />
 
                 {busquedaProducto.trim().length > 1 && (
@@ -431,18 +432,18 @@ export default function DevolucionCambioModal({
                             setProductoSeleccionado(p);
                             setBusquedaProducto("");
                           }}
-                          className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 hover:bg-slate-700 cursor-pointer text-xs text-white"
+                          className="flex items-center justify-between p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-slate-700 cursor-pointer text-xs text-slate-900 dark:text-white transition"
                         >
                           <span className="font-semibold">{p.nombre}</span>
-                          <span className="text-cyan-400 font-bold">{formatMoney(p.precioVenta)}</span>
+                          <span className="text-cyan-700 dark:text-cyan-400 font-bold">{formatMoney(p.precioVenta)}</span>
                         </div>
                       ))}
                   </div>
                 )}
 
                 {productoSeleccionado && (
-                  <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/30 space-y-1">
-                    <p className="text-xs font-bold text-cyan-300">
+                  <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-500/30 space-y-1">
+                    <p className="text-xs font-bold text-cyan-800 dark:text-cyan-300">
                       Variantes de {productoSeleccionado.nombre}:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -451,7 +452,7 @@ export default function DevolucionCambioModal({
                           key={v.varianteId}
                           type="button"
                           onClick={() => handleAddVarianteCambio(productoSeleccionado, v.varianteId || "")}
-                          className="rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[11px] text-gray-200 hover:bg-cyan-600 hover:text-white"
+                          className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] text-slate-700 dark:text-gray-200 hover:bg-cyan-600 hover:text-white transition"
                         >
                           {v.color} - T.{v.talla} (Stock {v.stockDisponible ?? v.stock ?? 0}) +
                         </button>
@@ -467,27 +468,27 @@ export default function DevolucionCambioModal({
                   {itemsEntregados.map((it) => (
                     <div
                       key={it.varianteId}
-                      className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-800/80 p-2 text-xs"
+                      className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 p-2 text-xs shadow-sm"
                     >
                       <div>
-                        <span className="font-semibold text-white">{it.nombre}</span>
-                        <span className="text-gray-400 ml-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">{it.nombre}</span>
+                        <span className="text-slate-500 dark:text-gray-400 ml-2">
                           {it.color} • Talla {it.talla} ({it.cantidad} u.)
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{formatMoney(it.cantidad * it.precioUnitario)}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{formatMoney(it.cantidad * it.precioUnitario)}</span>
                         <button
                           type="button"
                           onClick={() => handleRemoveItemEntregado(it.varianteId)}
-                          className="text-red-400 hover:text-red-300 font-bold"
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-bold"
                         >
                           ✕
                         </button>
                       </div>
                     </div>
                   ))}
-                  <p className="text-right text-xs font-semibold text-cyan-300">
+                  <p className="text-right text-xs font-semibold text-cyan-700 dark:text-cyan-300">
                     Valor de lo entregado: <strong>{formatMoney(totalEntregado)}</strong>
                   </p>
                 </div>
@@ -496,20 +497,20 @@ export default function DevolucionCambioModal({
           )}
 
           {/* 3. Liquidación Monetaria & Cuenta */}
-          <div className="rounded-xl border border-white/10 bg-slate-800/90 p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-300">
+          <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/90 p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-gray-300">
               3. Resumen y Liquidación de Caja
             </h3>
 
             <div className="flex items-center justify-between text-sm font-black">
-              <span>Balance de la Operación:</span>
+              <span className="text-slate-800 dark:text-slate-200">Balance de la Operación:</span>
               <span
                 className={
                   diferencia < 0
-                    ? "text-amber-400"
+                    ? "text-amber-700 dark:text-amber-400"
                     : diferencia > 0
-                    ? "text-emerald-400"
-                    : "text-white"
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-slate-900 dark:text-white"
                 }
               >
                 {diferencia < 0
@@ -521,15 +522,15 @@ export default function DevolucionCambioModal({
             </div>
 
             {diferencia !== 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-white/10">
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-1">
+                  <label className="block text-[11px] text-slate-600 dark:text-gray-400 mb-1">
                     {diferencia < 0 ? "Cuenta de donde sale el reembolso:" : "Cuenta donde ingresa el cobro:"}
                   </label>
                   <select
                     value={cuentaDineroId}
                     onChange={(e) => setCuentaDineroId(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-xs text-white"
+                    className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-2 text-xs text-slate-900 dark:text-white focus:outline-none"
                   >
                     {cuentas.map((c) => (
                       <option key={c._id} value={c._id}>
@@ -540,11 +541,11 @@ export default function DevolucionCambioModal({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-gray-400 mb-1">Método de Pago:</label>
+                  <label className="block text-[11px] text-slate-600 dark:text-gray-400 mb-1">Método de Pago:</label>
                   <select
                     value={metodoPagoDiferencia}
                     onChange={(e) => setMetodoPagoDiferencia(e.target.value as "EFECTIVO" | "QR" | "TRANSFERENCIA")}
-                    className="w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-xs text-white"
+                    className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-2 text-xs text-slate-900 dark:text-white focus:outline-none"
                   >
                     <option value="EFECTIVO">Efectivo</option>
                     <option value="QR">Pago QR</option>
@@ -555,13 +556,13 @@ export default function DevolucionCambioModal({
             )}
 
             <div>
-              <label className="block text-[11px] text-gray-400 mb-1">Observaciones / Notas:</label>
+              <label className="block text-[11px] text-slate-600 dark:text-gray-400 mb-1">Observaciones / Notas:</label>
               <input
                 type="text"
                 placeholder="Detalles sobre el motivo o estado de la prenda..."
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-slate-900 p-2 text-xs text-white"
+                className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-2 text-xs text-slate-900 dark:text-white focus:outline-none"
               />
             </div>
           </div>
@@ -571,14 +572,14 @@ export default function DevolucionCambioModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5"
+              className="rounded-xl border border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-98 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2 text-xs font-bold text-slate-950 hover:brightness-110 disabled:opacity-50 shadow-lg shadow-amber-950/50"
+              className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2 text-xs font-bold text-slate-950 hover:brightness-110 disabled:opacity-50 shadow-lg shadow-amber-950/50 active:scale-98 transition"
             >
               {isSubmitting ? "Procesando..." : "Confirmar Operación"}
             </button>

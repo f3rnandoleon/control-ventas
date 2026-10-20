@@ -300,10 +300,10 @@ export default function AdminProductosPage() {
           return (
             <div
               key={producto._id}
-              className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg backdrop-blur-sm space-y-3"
+              className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 p-4 shadow-sm dark:shadow-lg backdrop-blur-sm space-y-3"
             >
               <div className="flex items-start gap-3">
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/40">
                   {imagen ? (
                     <CloudinaryImage
                       src={imagen}
@@ -313,27 +313,27 @@ export default function AdminProductosPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xl text-gray-500">
+                    <div className="flex h-full w-full items-center justify-center text-xl text-slate-400 dark:text-gray-500">
                       👕
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-bold text-white text-sm truncate">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">
                     {producto.nombre}
                   </h3>
-                  <p className="text-xs text-gray-400 truncate">
+                  <p className="text-xs text-slate-500 dark:text-gray-400 truncate">
                     {producto.modelo || "Sin modelo"}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    <span className="rounded-lg bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-300">
+                    <span className="rounded-lg bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
                       {formatProductPriceDisplay(producto)}
                     </span>
-                    <span className="rounded-lg bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-gray-300 border border-white/5">
+                    <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-white/5">
                       Costo: Bs {producto.precioCosto}
                     </span>
                     {producto.costoOrigen && producto.costoOrigen.moneda === "PEN" && (
-                      <span className="text-[10px] text-sky-400 font-normal">
+                      <span className="text-[10px] text-sky-700 dark:text-sky-400 font-semibold">
                         S/ {producto.costoOrigen.montoOriginal}
                       </span>
                     )}
@@ -342,31 +342,31 @@ export default function AdminProductosPage() {
               </div>
 
               {/* Botones de acción táctiles en móvil */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs font-semibold">
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-white/5 text-xs font-semibold">
                 <button
                   type="button"
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 active:scale-95"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:hover:bg-sky-500/25 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30 active:scale-95 shadow-sm"
                   onClick={() => setStockModalProduct(producto)}
                 >
                   🏬 Stock Tiendas
                 </button>
                 <button
                   type="button"
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-white/5 text-gray-200 border border-white/10 hover:bg-white/10 active:scale-95"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-gray-200 border border-slate-200 dark:border-white/10 active:scale-95 shadow-sm"
                   onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}
                 >
                   ✏️ Editar
                 </button>
                 <button
                   type="button"
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 active:scale-95"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:hover:bg-cyan-500/25 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30 active:scale-95 shadow-sm"
                   onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}
                 >
                   🏷️ Variantes
                 </button>
                 <button
                   type="button"
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-white/5 text-gray-200 border border-white/10 hover:bg-white/10 active:scale-95"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-gray-200 border border-slate-200 dark:border-white/10 active:scale-95 shadow-sm"
                   onClick={() => generarReporteProductoPDF(producto)}
                 >
                   📄 Reporte
@@ -374,14 +374,14 @@ export default function AdminProductosPage() {
                 <button
                   type="button"
                   disabled={downloadingImageId === producto._id}
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/25 active:scale-95 disabled:opacity-50"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:hover:bg-purple-500/25 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 active:scale-95 disabled:opacity-50 shadow-sm"
                   onClick={() => openTallaSelector(producto)}
                 >
                   🖼️ {downloadingImageId === producto._id ? "Generando..." : "Imagen"}
                 </button>
                 <button
                   type="button"
-                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 active:scale-95"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 active:scale-95 shadow-sm"
                   onClick={() => void handleDelete(producto)}
                 >
                   🗑️ Eliminar
@@ -391,12 +391,12 @@ export default function AdminProductosPage() {
           );
         })}
         {!loading && productos.length === 0 && (
-          <div className="py-8 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+          <div className="py-8 text-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
             No hay productos registrados
           </div>
         )}
         {!loading && productos.length > 0 && filteredProductos.length === 0 && (
-          <div className="py-8 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+          <div className="py-8 text-center text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm">
             No hay productos que coincidan con los filtros
           </div>
         )}
@@ -450,11 +450,11 @@ export default function AdminProductosPage() {
         onClose={() => setStockModalProduct(null)}
       />
       {imageProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-6 shadow-2xl">
             <div className="mb-5">
-              <h2 className="text-lg font-semibold text-white">Elegir tallas</h2>
-              <p className="mt-1 text-sm text-gray-400">{imageProduct.nombre} - {imageProduct.modelo}</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Elegir tallas</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">{imageProduct.nombre} - {imageProduct.modelo}</p>
             </div>
             <div className="mb-4 flex gap-3">
               <button type="button" className="btn-secondary" onClick={() => setSelectedTallas(imageProductTallas)}>Todas</button>
@@ -462,7 +462,7 @@ export default function AdminProductosPage() {
             </div>
             <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto pr-1">
               {imageProductTallas.map((talla) => (
-                <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-gray-200">
                   <input
                     type="checkbox"
                     checked={selectedTallas.includes(talla)}
@@ -483,16 +483,16 @@ export default function AdminProductosPage() {
         </div>
       )}
       {generalImageOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 shadow-2xl sm:p-6">
             <div className="mb-5">
-              <h2 className="text-lg font-semibold text-white">Imagen general de variantes</h2>
-              <p className="mt-1 text-sm text-gray-400">Elige categorias, productos y tallas que quieres incluir.</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Imagen general de variantes</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">Elige categorias, productos y tallas que quieres incluir.</p>
             </div>
             <div className="grid gap-6 xl:grid-cols-[240px_1fr_280px]">
               <section>
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="font-medium text-white">Categorias</h3>
+                  <h3 className="font-medium text-slate-900 dark:text-white">Categorias</h3>
                   <div className="flex gap-2">
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralCategorias(categoriasParaImagenGeneral)}>Todas</button>
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralCategorias([])}>Limpiar</button>
@@ -500,7 +500,7 @@ export default function AdminProductosPage() {
                 </div>
                 <div className="grid max-h-96 gap-3 overflow-y-auto pr-1">
                   {categoriasParaImagenGeneral.map((categoria) => (
-                    <label key={categoria} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                    <label key={categoria} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-gray-200">
                       <input
                         type="checkbox"
                         checked={selectedGeneralCategorias.includes(categoria)}
@@ -514,7 +514,7 @@ export default function AdminProductosPage() {
               </section>
               <section>
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="font-medium text-white">Productos</h3>
+                  <h3 className="font-medium text-slate-900 dark:text-white">Productos</h3>
                   <div className="flex gap-2">
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductNames(gruposProductosParaImagenGeneral.map((group) => group.nombre))}>Todos</button>
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralProductNames([])}>Limpiar</button>
@@ -522,7 +522,7 @@ export default function AdminProductosPage() {
                 </div>
                 <div className="grid max-h-96 gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-1">
                   {gruposProductosParaImagenGeneral.map((grupo) => (
-                    <label key={grupo.nombre} className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                    <label key={grupo.nombre} className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-gray-200">
                       <input
                         type="checkbox"
                         checked={selectedGeneralProductNames.includes(grupo.nombre)}
@@ -530,19 +530,19 @@ export default function AdminProductosPage() {
                         className="mt-1 h-4 w-4"
                       />
                       <span>
-                        <span className="block font-medium text-white">{grupo.nombre}</span>
-                        <span className="block text-gray-400">{grupo.modelos.length} {grupo.modelos.length === 1 ? "modelo" : "modelos"}</span>
+                        <span className="block font-medium text-slate-900 dark:text-white">{grupo.nombre}</span>
+                        <span className="block text-slate-500 dark:text-gray-400">{grupo.modelos.length} {grupo.modelos.length === 1 ? "modelo" : "modelos"}</span>
                       </span>
                     </label>
                   ))}
                   {gruposProductosParaImagenGeneral.length === 0 && (
-                    <p className="col-span-full rounded-lg border border-white/10 bg-white/5 px-3 py-4 text-sm text-gray-400">No hay productos para las categorias seleccionadas.</p>
+                    <p className="col-span-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-4 text-sm text-slate-500 dark:text-gray-400">No hay productos para las categorias seleccionadas.</p>
                   )}
                 </div>
               </section>
               <section>
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="font-medium text-white">Tallas</h3>
+                  <h3 className="font-medium text-slate-900 dark:text-white">Tallas</h3>
                   <div className="flex gap-2">
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralTallas(tallasParaImagenGeneral)}>Todas</button>
                     <button type="button" className="btn-secondary" onClick={() => setSelectedGeneralTallas([])}>Limpiar</button>
@@ -550,7 +550,7 @@ export default function AdminProductosPage() {
                 </div>
                 <div className="grid max-h-96 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-2">
                   {tallasParaImagenGeneral.map((talla) => (
-                    <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                    <label key={talla} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-gray-200">
                       <input
                         type="checkbox"
                         checked={selectedGeneralTallas.includes(talla)}

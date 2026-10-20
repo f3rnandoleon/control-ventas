@@ -89,7 +89,7 @@ export default function VarianteDetalleDrawer({
   const costoPEN = tipoCambioOficial > 0 ? (precioCosto / tipoCambioOficial).toFixed(2) : "0.00";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div
         className="absolute inset-0"
         onClick={onClose}
@@ -97,11 +97,11 @@ export default function VarianteDetalleDrawer({
       />
 
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-0 sm:pl-10 w-full sm:w-auto">
-        <div className="w-full sm:max-w-md h-[100dvh] bg-slate-900 border-l border-white/10 shadow-2xl flex flex-col justify-between">
+        <div className="w-full sm:max-w-md h-[100dvh] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-white/10 shadow-2xl flex flex-col justify-between transition-colors">
           {/* HEADER DEL DRAWER */}
-          <div className="p-4 sm:p-6 border-b border-white/10 bg-slate-900/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="relative h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-xl border border-white/10 bg-black/40 flex-shrink-0">
+              <div className="relative h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/40 flex-shrink-0">
                 {imagen ? (
                   <CloudinaryImage
                     src={imagen}
@@ -111,19 +111,19 @@ export default function VarianteDetalleDrawer({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xl text-gray-500">
+                  <div className="flex h-full w-full items-center justify-center text-xl text-slate-400 dark:text-gray-500">
                     👕
                   </div>
                 )}
               </div>
               <div className="min-w-0">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-sky-700 dark:text-cyan-400 font-bold block">
                   {producto.sku}
                 </span>
-                <h3 className="text-sm sm:text-base font-bold text-white truncate">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                   {producto.nombre}
                 </h3>
-                <p className="text-xs text-gray-400 truncate">
+                <p className="text-xs text-slate-500 dark:text-gray-400 truncate">
                   {producto.modelo ? `Modelo: ${producto.modelo}` : producto.categoria || "Ropa"}
                 </p>
               </div>
@@ -133,39 +133,39 @@ export default function VarianteDetalleDrawer({
               type="button"
               onClick={onClose}
               aria-label="Cerrar detalle"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95 text-sm font-bold"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white transition active:scale-95 text-sm font-bold cursor-pointer"
             >
               ✕
             </button>
           </div>
 
           {/* CONTENIDO SCROLLEABLE */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-sm">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 sm:space-y-6 text-sm">
             {/* CARACTERÍSTICAS DE LA VARIANTE */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5 p-4 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                 Características de la Variante
               </h4>
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-white/5 bg-slate-800/60 p-2.5">
-                  <span className="text-gray-400 block text-[10px]">Color Principal</span>
-                  <span className="font-semibold text-white capitalize">{variante.color}</span>
+                <div className="rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800/60 p-2.5 shadow-sm">
+                  <span className="text-slate-500 dark:text-gray-400 block text-[10px] font-medium">Color Principal</span>
+                  <span className="font-semibold text-slate-900 dark:text-white capitalize">{variante.color}</span>
                   {variante.colorSecundario && (
-                    <span className="text-gray-400 block text-[10px]">
+                    <span className="text-slate-400 dark:text-gray-400 block text-[10px]">
                       Secundario: {variante.colorSecundario}
                     </span>
                   )}
                 </div>
-                <div className="rounded-xl border border-white/5 bg-slate-800/60 p-2.5">
-                  <span className="text-gray-400 block text-[10px]">Talla</span>
-                  <span className="font-bold text-cyan-300 text-sm font-mono">
+                <div className="rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800/60 p-2.5 shadow-sm">
+                  <span className="text-slate-500 dark:text-gray-400 block text-[10px] font-medium">Talla</span>
+                  <span className="font-bold text-sky-700 dark:text-cyan-300 text-sm font-mono">
                     {variante.talla}
                   </span>
                 </div>
                 {variante.codigoBarra && (
-                  <div className="col-span-2 rounded-xl border border-white/5 bg-slate-800/60 p-2.5">
-                    <span className="text-gray-400 block text-[10px]">Código de Barras</span>
-                    <span className="font-mono text-gray-200 text-xs">
+                  <div className="col-span-2 rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800/60 p-2.5 shadow-sm">
+                    <span className="text-slate-500 dark:text-gray-400 block text-[10px] font-medium">Código de Barras</span>
+                    <span className="font-mono text-slate-800 dark:text-gray-200 text-xs">
                       {variante.codigoBarra}
                     </span>
                   </div>
@@ -174,18 +174,18 @@ export default function VarianteDetalleDrawer({
             </div>
 
             {/* ESTADO GLOBAL DE STOCK */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5 p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                   Resumen de Stock Consolidado
                 </h4>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                     stockDisponible === 0
-                      ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                      ? "bg-rose-100 text-rose-700 border border-rose-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/30"
                       : stockDisponible <= (producto.stockMinimo || 2)
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      ? "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30"
+                      : "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
                   }`}
                 >
                   {stockDisponible === 0
@@ -197,34 +197,34 @@ export default function VarianteDetalleDrawer({
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl border border-white/5 bg-slate-800/60 p-3">
-                  <span className="text-[10px] text-gray-400 block">Físico Total</span>
-                  <span className="text-lg font-bold text-white">{stockFisico} u.</span>
+                <div className="rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800/60 p-3 shadow-sm">
+                  <span className="text-[10px] text-slate-500 dark:text-gray-400 block font-medium">Físico Total</span>
+                  <span className="text-lg font-bold text-slate-900 dark:text-white">{stockFisico} u.</span>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-slate-800/60 p-3">
-                  <span className="text-[10px] text-gray-400 block">Reservado</span>
-                  <span className="text-lg font-bold text-amber-300">{stockReservado} u.</span>
+                <div className="rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800/60 p-3 shadow-sm">
+                  <span className="text-[10px] text-slate-500 dark:text-gray-400 block font-medium">Reservado</span>
+                  <span className="text-lg font-bold text-amber-600 dark:text-amber-300">{stockReservado} u.</span>
                 </div>
-                <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3">
-                  <span className="text-[10px] text-cyan-300 block">Disponible</span>
-                  <span className="text-lg font-extrabold text-cyan-300">{stockDisponible} u.</span>
+                <div className="rounded-xl border border-sky-300 dark:border-cyan-500/30 bg-sky-50 dark:bg-cyan-950/20 p-3 shadow-sm">
+                  <span className="text-[10px] text-sky-700 dark:text-cyan-300 block font-bold">Disponible</span>
+                  <span className="text-lg font-extrabold text-sky-700 dark:text-cyan-300">{stockDisponible} u.</span>
                 </div>
               </div>
             </div>
 
             {/* DISPONIBILIDAD POR SUCURSAL */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center justify-between">
+            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5 p-4 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400 flex items-center justify-between">
                 <span>Stock por Sucursal / Tienda</span>
                 {loadingSucursales && (
-                  <span className="text-[10px] text-cyan-400 animate-pulse">Cargando...</span>
+                  <span className="text-[10px] text-sky-600 dark:text-cyan-400 animate-pulse font-semibold">Cargando...</span>
                 )}
               </h4>
 
               {loadingSucursales ? (
-                <div className="h-20 animate-pulse rounded-xl bg-white/5" />
+                <div className="h-20 animate-pulse rounded-xl bg-slate-200 dark:bg-white/5" />
               ) : nivelesSucursal.length === 0 ? (
-                <p className="text-xs text-gray-400 italic py-2">
+                <p className="text-xs text-slate-500 dark:text-gray-400 italic py-2">
                   No hay registros de existencias en tiendas para esta variante (stock centralizado o en almacén principal).
                 </p>
               ) : (
@@ -234,19 +234,19 @@ export default function VarianteDetalleDrawer({
                     return (
                       <div
                         key={nivel._id}
-                        className="flex items-center justify-between p-2.5 rounded-xl border border-white/5 bg-slate-800/40 text-xs"
+                        className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-slate-800/40 text-xs shadow-sm"
                       >
                         <div>
-                          <span className="font-semibold text-gray-200 block">
+                          <span className="font-semibold text-slate-800 dark:text-gray-200 block">
                             {nivel.sucursalId?.nombre || "Sucursal"}
                           </span>
-                          <span className="text-[10px] text-gray-400 font-mono">
+                          <span className="text-[10px] text-slate-500 dark:text-gray-400 font-mono">
                             {nivel.sucursalId?.codigo || "COD"} • {nivel.sucursalId?.tipo || "TIENDA"}
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="font-bold text-white block">{disp} disp.</span>
-                          <span className="text-[10px] text-gray-400">
+                          <span className="font-bold text-slate-900 dark:text-white block">{disp} disp.</span>
+                          <span className="text-[10px] text-slate-500 dark:text-gray-400">
                             ({nivel.stockFisico} fís. - {nivel.stockReservado} res.)
                           </span>
                         </div>
@@ -259,63 +259,63 @@ export default function VarianteDetalleDrawer({
 
             {/* DETALLES FINANCIEROS Y DE COSTO (SOLO ADMIN) */}
             {isAdmin ? (
-              <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-slate-900 to-slate-900 p-4 space-y-3">
+              <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/70 dark:bg-gradient-to-br dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
                     <span>💰</span> Análisis Financiero y CPP
                   </h4>
-                  <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-500/30">
                     Solo Administrador
                   </span>
                 </div>
 
                 <div className="space-y-2.5 text-xs">
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-gray-400">Costo Promedio Ponderado (BOB):</span>
-                    <span className="font-bold text-emerald-300 font-mono text-sm">
+                  <div className="flex justify-between items-center py-1.5 border-b border-emerald-200/60 dark:border-white/5">
+                    <span className="text-slate-600 dark:text-gray-400">Costo Promedio Ponderado (BOB):</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-300 font-mono text-sm">
                       {formatMoney(precioCosto)}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-gray-400">Equivalente Moneda Extranjera:</span>
-                    <div className="text-right font-mono text-[11px] text-gray-300">
-                      <div>${costoUSD} USD <span className="text-gray-500">(TC 6.96)</span></div>
-                      <div>S/ {costoPEN} PEN <span className="text-gray-500">(TC {tipoCambioOficial})</span></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-emerald-200/60 dark:border-white/5">
+                    <span className="text-slate-600 dark:text-gray-400">Equivalente Moneda Extranjera:</span>
+                    <div className="text-right font-mono text-[11px] text-slate-700 dark:text-gray-300">
+                      <div>${costoUSD} USD <span className="text-slate-400 dark:text-gray-500">(TC 6.96)</span></div>
+                      <div>S/ {costoPEN} PEN <span className="text-slate-400 dark:text-gray-500">(TC {tipoCambioOficial})</span></div>
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-gray-400">Precio de Venta al Público:</span>
-                    <span className="font-bold text-white font-mono text-sm">
+                  <div className="flex justify-between items-center py-1.5 border-b border-emerald-200/60 dark:border-white/5">
+                    <span className="text-slate-600 dark:text-gray-400">Precio de Venta al Público:</span>
+                    <span className="font-bold text-slate-900 dark:text-white font-mono text-sm">
                       {formatMoney(precioVenta)}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-gray-400">Margen de Ganancia Unitario:</span>
+                  <div className="flex justify-between items-center py-1.5 border-b border-emerald-200/60 dark:border-white/5">
+                    <span className="text-slate-600 dark:text-gray-400">Margen de Ganancia Unitario:</span>
                     <div className="text-right">
-                      <span className="font-bold text-teal-300 font-mono block">
+                      <span className="font-bold text-teal-700 dark:text-teal-300 font-mono block">
                         {formatMoney(gananciaBruta)}
                       </span>
-                      <span className="text-[10px] text-teal-400 font-semibold">
+                      <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold">
                         ({margenPorcentaje.toFixed(1)}% margen)
                       </span>
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center py-1.5 pt-2">
-                    <span className="text-gray-400">Capital Invertido en Stock:</span>
-                    <span className="font-extrabold text-emerald-400 font-mono text-sm">
+                    <span className="text-slate-600 dark:text-gray-400 font-medium">Capital Invertido en Stock:</span>
+                    <span className="font-extrabold text-emerald-700 dark:text-emerald-400 font-mono text-sm">
                       {formatMoney(valorTotalStock)}
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-gray-400 flex items-center justify-between">
+              <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4 text-xs text-slate-600 dark:text-gray-400 flex items-center justify-between">
                 <span>Precio de venta sugerido:</span>
-                <span className="font-bold text-white font-mono text-sm">
+                <span className="font-bold text-slate-900 dark:text-white font-mono text-sm">
                   {formatMoney(precioVenta)}
                 </span>
               </div>
@@ -323,11 +323,11 @@ export default function VarianteDetalleDrawer({
           </div>
 
           {/* FOOTER DE ACCIONES */}
-          <div className="p-4 border-t border-white/10 bg-slate-900 flex items-center justify-between gap-3">
+          <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3 shrink-0">
             {isAdmin && (
               <Link
                 href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}`}
-                className="px-3.5 py-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <span>📊</span> Ver Kardex
               </Link>
@@ -335,7 +335,7 @@ export default function VarianteDetalleDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition ml-auto cursor-pointer"
+              className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-white text-xs font-semibold transition ml-auto cursor-pointer"
             >
               Cerrar
             </button>

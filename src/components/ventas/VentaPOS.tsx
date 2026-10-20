@@ -251,25 +251,25 @@ export default function VentaPOS({
 
   return (
     <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
-      <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
+      <div className="shrink-0 space-y-3 border-b border-slate-200 dark:border-white/10 p-4 sm:p-5">
         {/* CABECERA POS CON SELECTOR DE SUCURSAL Y ESTADO DE CAJA */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-3.5 backdrop-blur-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-3.5 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 text-lg">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-lg border border-blue-200 dark:border-blue-500/30">
               🏢
             </span>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                 Sucursal de Venta POS:
               </label>
               <div className="flex items-center gap-2 mt-0.5">
                 <select
                   value={sucursalSeleccionadaId}
                   onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
-                  className="rounded-lg border border-blue-500/30 bg-slate-950 px-2.5 py-1 text-xs font-bold text-white outline-none focus:border-blue-400 cursor-pointer"
+                  className="rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm"
                 >
                   {sucursales.map((s) => (
-                    <option key={s._id} value={s._id} className="bg-slate-900 text-white">
+                    <option key={s._id} value={s._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
                       📍 {s.nombre} ({s.codigo}) {s.esAlmacenPrincipal ? "★ Almacén Principal" : ""}
                     </option>
                   ))}
@@ -281,9 +281,9 @@ export default function VentaPOS({
           <CajaPosWidget sucursalId={sucursalSeleccionadaId} />
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          Seleccione los productos.
-          <div className="w-fit rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-slate-700 dark:text-slate-300">
+          <span>Seleccione los productos.</span>
+          <div className="w-fit rounded-full bg-cyan-100 dark:bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
             {fields.length} {fields.length === 1 ? "item" : "items"}
           </div>
         </div>
@@ -303,8 +303,8 @@ export default function VentaPOS({
               type="button"
               onClick={() => setCategoriaActiva(categoria)}
               className={`shrink-0 rounded-xl border px-4 py-2 text-xs font-bold transition sm:text-sm ${categoriaActiva === categoria
-                  ? "border-blue-500 bg-blue-600 text-white"
-                  : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
+                  ? "border-blue-500 bg-blue-600 text-white shadow-sm"
+                  : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10"
                 }`}
             >
               {categoria}
@@ -400,19 +400,19 @@ export default function VentaPOS({
 
       {listaCompleta && (
         <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="surface-card-strong absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col rounded-t-3xl p-3.5 shadow-2xl sm:p-5 border-t border-white/20 animate-in slide-in-from-bottom duration-200">
-            <div className="mb-3 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="surface-card-strong absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col rounded-t-3xl p-3.5 shadow-2xl sm:p-5 border-t border-slate-200 dark:border-white/20 animate-in slide-in-from-bottom duration-200">
+            <div className="mb-3 flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 pb-3">
               <div>
-                <h3 className="text-base font-bold sm:text-lg flex items-center gap-2">
+                <h3 className="text-base font-bold sm:text-lg flex items-center gap-2 text-slate-900 dark:text-white">
                   <span>🛒</span> Carrito de Venta POS
                 </h3>
-                <p className="text-[11px] text-gray-400 sm:text-xs">Revisa las prendas y confirma la transacción.</p>
+                <p className="text-[11px] text-slate-500 dark:text-gray-400 sm:text-xs">Revisa las prendas y confirma la transacción.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setListaCompleta(false)}
                 aria-label="Ocultar lista de venta"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-base font-bold text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-base font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition active:scale-95"
               >
                 ✕
               </button>
@@ -433,10 +433,10 @@ export default function VentaPOS({
 
             <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto text-xs sm:gap-4 sm:text-sm lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start">
               <div className="surface-subcard max-h-64 overflow-y-auto rounded-xl p-3 sm:max-h-[58vh] sm:p-4">
-                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:text-xs">Variantes agregadas</h4>
+                <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400 sm:text-xs">Variantes agregadas</h4>
                 <div className="space-y-2">
                   {fields.length === 0 && (
-                    <p className="rounded-lg border border-dashed border-white/10 p-4 text-center text-gray-400">
+                    <p className="rounded-lg border border-dashed border-slate-200 dark:border-white/10 p-4 text-center text-slate-500 dark:text-gray-400">
                       Todavia no agregaste variantes.
                     </p>
                   )}
@@ -459,7 +459,7 @@ export default function VentaPOS({
                     const precio = pricing.precioVenta;
 
                     return (
-                      <div key={field.id} className="rounded-lg border border-white/10 bg-white/5 p-2">
+                      <div key={field.id} className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-2">
                         <div className="flex items-start gap-2">
                           {image ? (
                             <CloudinaryImage
@@ -470,34 +470,34 @@ export default function VentaPOS({
                               className="h-14 w-14 shrink-0 rounded-lg object-cover"
                             />
                           ) : (
-                            <div className="h-14 w-14 shrink-0 rounded-lg bg-slate-800" />
+                            <div className="h-14 w-14 shrink-0 rounded-lg bg-slate-200 dark:bg-slate-800" />
                           )}
                           <div className="min-w-0">
-                            <p className="line-clamp-1 font-semibold">{producto?.nombre || "Producto"}</p>
-                            <p className="line-clamp-1 text-[11px] text-gray-400 sm:text-xs">{producto?.modelo || "-"}</p>
-                            <p className="mt-1 text-[11px] text-gray-400 sm:text-xs">
+                            <p className="line-clamp-1 font-semibold text-slate-900 dark:text-white">{producto?.nombre || "Producto"}</p>
+                            <p className="line-clamp-1 text-[11px] text-slate-500 dark:text-gray-400 sm:text-xs">{producto?.modelo || "-"}</p>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400 sm:text-xs">
                               {item.color}{item.colorSecundario ? ` / ${item.colorSecundario}` : ""} - Talla {item.talla}
                             </p>
                           </div>
                           <div className="ml-auto shrink-0 text-right">
-                            <p className="text-[11px] text-gray-400 sm:text-xs">Cant. {cantidad}</p>
-                            <p className="font-bold text-cyan-300">{formatMoney(precio * cantidad)}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-gray-400 sm:text-xs">Cant. {cantidad}</p>
+                            <p className="font-bold text-sky-700 dark:text-cyan-300">{formatMoney(precio * cantidad)}</p>
                           </div>
                         </div>
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <button
                             type="button"
                             onClick={() => remove(index)}
-                            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/10 sm:text-xs"
+                            className="rounded-lg px-2 py-1 text-[11px] font-semibold text-rose-600 dark:text-red-300 hover:bg-rose-50 dark:hover:bg-red-500/10 sm:text-xs"
                           >
                             Quitar
                           </button>
-                          <div className="flex h-8 items-center overflow-hidden rounded-lg border border-white/10">
+                          <div className="flex h-8 items-center overflow-hidden rounded-lg border border-slate-200 dark:border-white/10">
                             <button
                               type="button"
                               onClick={() => updateQuantity(index, cantidad - 1)}
                               disabled={cantidad <= 1}
-                              className="h-full px-3 text-sm text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="h-full px-3 text-sm text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               -
                             </button>
@@ -507,18 +507,18 @@ export default function VentaPOS({
                               min={1}
                               max={stockDisponible}
                               onChange={(event) => updateQuantity(index, Number(event.target.value) || 1)}
-                              className="h-full w-10 border-x border-white/10 bg-transparent text-center text-xs outline-none"
+                              className="h-full w-10 border-x border-slate-200 dark:border-white/10 bg-transparent text-center text-xs text-slate-900 dark:text-white outline-none"
                             />
                             <button
                               type="button"
                               onClick={() => updateQuantity(index, cantidad + 1)}
                               disabled={cantidad >= stockDisponible}
-                              className="h-full px-3 text-sm text-gray-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="h-full px-3 text-sm text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               +
                             </button>
                           </div>
-                          <span className="text-[10px] text-gray-500 sm:text-xs">Stock {stockDisponible}</span>
+                          <span className="text-[10px] text-slate-500 sm:text-xs">Stock {stockDisponible}</span>
                         </div>
                       </div>
                     );
@@ -528,11 +528,11 @@ export default function VentaPOS({
 
               <div className="space-y-3">
                 <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:text-xs">Descuento</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400 sm:text-xs">Descuento</label>
                   <div className="flex gap-2">
-                    <div className="flex overflow-hidden rounded-xl border border-white/10">
-                      <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>Bs</button>
-                      <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"}`}>%</button>
+                    <div className="flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+                      <button type="button" onClick={() => { setTipoDescuento("BS"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "BS" ? "bg-amber-500/20 text-amber-700 dark:text-amber-300" : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-gray-400"}`}>Bs</button>
+                      <button type="button" onClick={() => { setTipoDescuento("PORCENTAJE"); setValorDescuento(0); }} className={`px-3 text-xs font-bold sm:text-sm ${tipoDescuento === "PORCENTAJE" ? "bg-amber-500/20 text-amber-700 dark:text-amber-300" : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-gray-400"}`}>%</button>
                     </div>
                     <input
                       type="number"
@@ -548,17 +548,17 @@ export default function VentaPOS({
                 </div>
 
                 <div className="surface-subcard space-y-3 rounded-xl p-3 sm:p-4">
-                  <div className="flex justify-between text-xs text-gray-400 sm:text-sm">
+                  <div className="flex justify-between text-xs text-slate-600 dark:text-gray-400 sm:text-sm">
                     <span>Subtotal</span>
-                    <span>{formatMoney(subtotal)}</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatMoney(subtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-amber-300 sm:text-sm">
+                  <div className="flex justify-between text-xs text-amber-700 dark:text-amber-300 sm:text-sm font-medium">
                     <span>Descuento</span>
                     <span>-{formatMoney(montoDescuento)}</span>
                   </div>
-                  <div className="flex items-end justify-between border-t border-white/10 pt-3">
-                    <span className="font-semibold text-gray-300">Total</span>
-                    <span className="text-xl font-bold sm:text-2xl">{formatMoney(total)}</span>
+                  <div className="flex items-end justify-between border-t border-slate-200 dark:border-white/10 pt-3">
+                    <span className="font-semibold text-slate-700 dark:text-gray-300">Total</span>
+                    <span className="text-xl font-bold sm:text-2xl text-slate-900 dark:text-white">{formatMoney(total)}</span>
                   </div>
                   <button
                     type="button"

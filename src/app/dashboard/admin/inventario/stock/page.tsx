@@ -24,13 +24,13 @@ export default function AdminInventarioStockPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Stock e Inventario por Producto</h1>
-        <p className="text-sm text-gray-400">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Stock e Inventario por Producto</h1>
+        <p className="text-sm text-slate-500 dark:text-gray-400">
           Vista jerárquica: Producto ➔ Variantes, filtros por color/talla y análisis de costo CPP, tipo de cambio y stock por sucursal.
         </p>
       </div>
       {loading ? (
-        <div className="h-72 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+        <div className="h-72 animate-pulse rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/5" />
       ) : (
         <StockDisponibleTable productos={productos} />
       )}
