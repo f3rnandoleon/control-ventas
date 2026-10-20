@@ -4,34 +4,34 @@ import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
 import User from "@/models/user";
 import {
-  getDefaultWarehouseId,
-  getWebDispatchBranchId,
+    getDefaultWarehouseId,
+    getWebDispatchBranchId,
 } from "@/modules/inventory/application/branch-stock.service";
 import {
-  resolveDefaultAccountForPayment,
-  registrarMovimientoEnCuenta,
+    resolveDefaultAccountForPayment,
+    registrarMovimientoEnCuenta,
 } from "@/modules/finance/application/cash-account.service";
 import {
-  obtenerSesionCajaActiva,
-  acumularVentaEnSesion,
+    obtenerSesionCajaActiva,
+    acumularVentaEnSesion,
 } from "@/modules/finance/application/cash-register-session.service";
 
 import { getValidatedCartForCheckout, clearCartByUserId } from "@/modules/cart/application/cart.service";
 import {
-  obtenerDireccionClientePorUsuario,
-  obtenerContextoClientePorUsuario,
+    obtenerDireccionClientePorUsuario,
+    obtenerContextoClientePorUsuario,
 } from "@/modules/clientes/application/clientes.service";
 import {
-  getAvailableStockForVariant,
-  releaseReservedStockForOrder,
-  reserveStockForOrder,
-  consumeStockForSale
+    getAvailableStockForVariant,
+    releaseReservedStockForOrder,
+    reserveStockForOrder,
+    consumeStockForSale
 } from "@/modules/inventory/application/inventory.service";
 import { pedidosRepository } from "@/modules/orders/infrastructure/pedidos.repository";
 import { syncFulfillmentForOrder } from "@/modules/fulfillment/application/fulfillment.service";
 import {
-  recordAuditEventSafe,
-  type AuditActorRole,
+    recordAuditEventSafe,
+    type AuditActorRole,
 } from "@/modules/audit/application/audit.service";
 import { AppError } from "@/shared/errors/AppError";
 import { runInTransaction } from "@/shared/db/runTransaction";
@@ -45,790 +45,790 @@ import { getVariantPricing } from "@/utils/pricing";
 import type { SalesQueryInput } from "@/schemas/sales-query.schema";
 
 function createPedidoNumber() {
-  return generateOrderedId("P");
+    return generateOrderedId("P");
 }
 
 function createReservationExpirationDate(minutes = 15) {
-  const expiration = new Date();
-  expiration.setMinutes(expiration.getMinutes() + minutes);
-  return expiration;
+    const expiration = new Date();
+    expiration.setMinutes(expiration.getMinutes() + minutes);
+    return expiration;
 }
 
 async function releasePedidoReservation(pedido: {
-  _id?: string | mongoose.Types.ObjectId;
-  items: Array<{
-    productoId: string | mongoose.Types.ObjectId;
-    variante: {
-      varianteId?: string;
-      color: string;
-      colorSecundario?: string;
-      talla: string;
-    };
-    cantidad: number;
-  }>;
+    _id?: string | mongoose.Types.ObjectId;
+    items: Array<{
+        productoId: string | mongoose.Types.ObjectId;
+        variante: {
+            varianteId?: string;
+            color: string;
+            colorSecundario?: string;
+            talla: string;
+        };
+        cantidad: number;
+    }>;
 }, session?: mongoose.ClientSession) {
-  for (const item of pedido.items) {
-    const producto = await Producto.findById(item.productoId).session(session ?? null);
-    if (!producto) continue;
+    for (const item of pedido.items) {
+        const producto = await Producto.findById(item.productoId).session(session ?? null);
+        if (!producto) continue;
 
-    const variante = producto.variantes.find((candidate: {
-      varianteId?: string;
-      color: string;
-      colorSecundario?: string;
-      talla: string;
-    }) => {
-      if (item.variante.varianteId && candidate.varianteId) {
-        return candidate.varianteId === item.variante.varianteId;
-      }
-      return (
-        candidate.color === item.variante.color &&
-        (item.variante.colorSecundario === undefined ||
-          (candidate.colorSecundario || "") ===
-          (item.variante.colorSecundario || "")) &&
-        candidate.talla === item.variante.talla
-      );
-    });
+        const variante = producto.variantes.find((candidate: {
+            varianteId?: string;
+            color: string;
+            colorSecundario?: string;
+            talla: string;
+        }) => {
+            if (item.variante.varianteId && candidate.varianteId) {
+                return candidate.varianteId === item.variante.varianteId;
+            }
+            return (
+                candidate.color === item.variante.color &&
+                (item.variante.colorSecundario === undefined ||
+                    (candidate.colorSecundario || "") ===
+                    (item.variante.colorSecundario || "")) &&
+                candidate.talla === item.variante.talla
+            );
+        });
 
-    if (!variante) continue;
+        if (!variante) continue;
 
-    await releaseReservedStockForOrder({
-      producto,
-      variante,
-      cantidad: item.cantidad,
-      sucursalId: (pedido as unknown as { sucursalId?: mongoose.Types.ObjectId }).sucursalId,
-    }, session);
-  }
+        await releaseReservedStockForOrder({
+            producto,
+            variante,
+            cantidad: item.cantidad,
+            sucursalId: (pedido as unknown as { sucursalId?: mongoose.Types.ObjectId }).sucursalId,
+        }, session);
+    }
 }
 
 async function acquireCronLease(name: string, leaseMs: number) {
-  const now = new Date();
-  const leaseUntil = new Date(now.getTime() + leaseMs);
-  try {
-    const lock = await CronLock.findOneAndUpdate(
-      {
-        name,
-        $or: [{ leaseUntil: { $lte: now } }, { leaseUntil: { $exists: false } }],
-      },
-      { $set: { leaseUntil } },
-      { upsert: true, new: true, includeResultMetadata: true }
-    );
+    const now = new Date();
+    const leaseUntil = new Date(now.getTime() + leaseMs);
+    try {
+        const lock = await CronLock.findOneAndUpdate(
+            {
+                name,
+                $or: [{ leaseUntil: { $lte: now } }, { leaseUntil: { $exists: false } }],
+            },
+            { $set: { leaseUntil } },
+            { upsert: true, new: true, includeResultMetadata: true }
+        );
 
-    return Boolean(lock.lastErrorObject?.updatedExisting || lock.lastErrorObject?.upserted);
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === 11000
-    ) {
-      return false;
+        return Boolean(lock.lastErrorObject?.updatedExisting || lock.lastErrorObject?.upserted);
+    } catch (error) {
+        if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === 11000
+        ) {
+            return false;
+        }
+
+        throw error;
     }
-
-    throw error;
-  }
 }
 
 async function releaseCronLease(name: string) {
-  await CronLock.updateOne(
-    { name },
-    { $set: { leaseUntil: new Date(0) } }
-  );
+    await CronLock.updateOne(
+        { name },
+        { $set: { leaseUntil: new Date(0) } }
+    );
 }
 
 export async function releaseExpiredReservations(limit = 100) {
-  await connectDB();
-  const lockName = "release-expired-reservations";
-  const lockAcquired = await acquireCronLease(lockName, 10 * 60 * 1000);
-  if (!lockAcquired) {
-    return {
-      releasedCount: 0,
-      failedCount: 0,
-      remainingExpiredCount: await pedidosRepository.countExpiredReserved(),
-      details: [],
-      locked: true,
-    };
-  }
-
-  const startedAt = Date.now();
-  const maxDurationMs = 50 * 1000;
-  let releasedCount = 0;
-  let failedCount = 0;
-  const details: string[] = [];
-
-  try {
-    while (Date.now() - startedAt < maxDurationMs) {
-      const expiredPedidos = await pedidosRepository.findExpiredReserved(limit);
-      if (expiredPedidos.length === 0) break;
-
-      for (const expiredPedido of expiredPedidos) {
-        try {
-          const wasReleased = await runInTransaction(async (session) => {
-            const pedido = await pedidosRepository.findById(
-              expiredPedido._id.toString(),
-              session
-            );
-
-            if (
-              !pedido ||
-              pedido.estadoReservaStock !== "RESERVED" ||
-              !pedido.reservaExpiraEn ||
-              pedido.reservaExpiraEn >= new Date()
-            ) {
-              return false;
-            }
-
-            await releasePedidoReservation(pedido, session);
-
-            pedido.estadoReservaStock = "RELEASED";
-            pedido.estadoPedido = "CANCELLED";
-            pedido.estadoPago = "FAILED";
-            pedido.estadoEntrega = "CANCELLED";
-            pedido.reservadoEn = null;
-            pedido.reservaExpiraEn = null;
-            await pedido.save({ session });
-
-            return true;
-          });
-
-          if (wasReleased) {
-            releasedCount += 1;
-            details.push(expiredPedido._id.toString());
-          }
-        } catch {
-          failedCount += 1;
-        }
-      }
+    await connectDB();
+    const lockName = "release-expired-reservations";
+    const lockAcquired = await acquireCronLease(lockName, 10 * 60 * 1000);
+    if (!lockAcquired) {
+        return {
+            releasedCount: 0,
+            failedCount: 0,
+            remainingExpiredCount: await pedidosRepository.countExpiredReserved(),
+            details: [],
+            locked: true,
+        };
     }
 
-    return {
-      releasedCount,
-      failedCount,
-      remainingExpiredCount: await pedidosRepository.countExpiredReserved(),
-      details,
-      locked: false,
-    };
-  } finally {
-    await releaseCronLease(lockName);
-  }
+    const startedAt = Date.now();
+    const maxDurationMs = 50 * 1000;
+    let releasedCount = 0;
+    let failedCount = 0;
+    const details: string[] = [];
+
+    try {
+        while (Date.now() - startedAt < maxDurationMs) {
+            const expiredPedidos = await pedidosRepository.findExpiredReserved(limit);
+            if (expiredPedidos.length === 0) break;
+
+            for (const expiredPedido of expiredPedidos) {
+                try {
+                    const wasReleased = await runInTransaction(async (session) => {
+                        const pedido = await pedidosRepository.findById(
+                            expiredPedido._id.toString(),
+                            session
+                        );
+
+                        if (
+                            !pedido ||
+                            pedido.estadoReservaStock !== "RESERVED" ||
+                            !pedido.reservaExpiraEn ||
+                            pedido.reservaExpiraEn >= new Date()
+                        ) {
+                            return false;
+                        }
+
+                        await releasePedidoReservation(pedido, session);
+
+                        pedido.estadoReservaStock = "RELEASED";
+                        pedido.estadoPedido = "CANCELLED";
+                        pedido.estadoPago = "FAILED";
+                        pedido.estadoEntrega = "CANCELLED";
+                        pedido.reservadoEn = null;
+                        pedido.reservaExpiraEn = null;
+                        await pedido.save({ session });
+
+                        return true;
+                    });
+
+                    if (wasReleased) {
+                        releasedCount += 1;
+                        details.push(expiredPedido._id.toString());
+                    }
+                } catch {
+                    failedCount += 1;
+                }
+            }
+        }
+
+        return {
+            releasedCount,
+            failedCount,
+            remainingExpiredCount: await pedidosRepository.countExpiredReserved(),
+            details,
+            locked: false,
+        };
+    } finally {
+        await releaseCronLease(lockName);
+    }
 }
 
 export async function crearPedidoDesdeCarrito(
-  customerId: string,
-  payload: CheckoutCartInput
+    customerId: string,
+    payload: CheckoutCartInput
 ) {
-  assertObjectId(customerId, "Usuario no valido");
-  await connectDB();
+    assertObjectId(customerId, "Usuario no valido");
+    await connectDB();
 
-  const customer = await obtenerContextoClientePorUsuario(customerId, {
-    ensureProfile: true,
-  });
-
-  const metodoEntrega = payload.entrega?.metodo ?? null;
-  let snapshotEntrega: Record<string, unknown> | null = null;
-
-  if (metodoEntrega === "WHATSAPP") {
-    snapshotEntrega = { metodo: "WHATSAPP" };
-  } else if (metodoEntrega === "PICKUP_POINT") {
-    snapshotEntrega = {
-      metodo: "PICKUP_POINT",
-      puntoRecojo: payload.entrega?.direccion ?? null,
-      telefono: payload.entrega?.telefono ?? null,
-      nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
-      programadoPara: payload.entrega?.programadoPara ?? null,
-    };
-  } else if (metodoEntrega === "SHIPPING_NATIONAL") {
-    snapshotEntrega = {
-      metodo: "SHIPPING_NATIONAL",
-      departamento: payload.entrega?.departamento ?? null,
-      ciudad: payload.entrega?.ciudad ?? null,
-      empresaEnvio: payload.entrega?.empresaEnvio ?? null,
-      sucursal: payload.entrega?.sucursal ?? null,
-      nombreRemitente: payload.entrega?.nombreRemitente ?? null,
-      ciRemitente: payload.entrega?.ciRemitente ?? null,
-      telefonoRemitente: payload.entrega?.telefonoRemitente ?? null,
-      nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
-    };
-  } else if (payload.direccionId) {
-    const address = await obtenerDireccionClientePorUsuario(customerId, payload.direccionId);
-    snapshotEntrega = {
-      metodo: "PICKUP_POINT",
-      puntoRecojo: payload.entrega?.direccion || address.direccion,
-      telefono: payload.entrega?.telefono || address.telefono,
-      nombreDestinatario: payload.entrega?.nombreDestinatario || address.nombreDestinatario,
-    };
-  } else if (customer.defaultAddress) {
-    snapshotEntrega = {
-      metodo: "PICKUP_POINT",
-      puntoRecojo: customer.defaultAddress.direccion,
-      telefono: customer.defaultAddress.telefono,
-      nombreDestinatario: customer.defaultAddress.nombreDestinatario,
-    };
-  }
-
-  const reservationMinutes =
-    (metodoEntrega === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
-
-  const pedido = await runInTransaction(async (session) => {
-    const { validatedItems } = await getValidatedCartForCheckout(
-      customerId,
-      session
-    );
-    const subtotal = validatedItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const total = subtotal;
-
-    const webDispatchBranchId = await getWebDispatchBranchId(session);
-
-    for (const { producto, variante, cartItem } of validatedItems) {
-      if (getAvailableStockForVariant(variante) < cartItem.cantidad) {
-        throw new AppError(
-          `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
-          400
-        );
-      }
-      await reserveStockForOrder(
-        {
-          producto,
-          variante,
-          cantidad: cartItem.cantidad,
-          sucursalId: webDispatchBranchId,
-        },
-        session
-      );
-    }
-
-    const estadoEntrega = metodoEntrega === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
-
-    const itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
-      const pricing = getVariantPricing(producto, variante);
-      const effectivePrecioCosto = pricing.precioCosto;
-      const ganancia = (precioUnitario - effectivePrecioCosto) * cartItem.cantidad;
-      return {
-        productoId: producto._id,
-        variante: {
-          varianteId: variante.varianteId,
-          color: variante.color,
-          colorSecundario: variante.colorSecundario,
-          talla: variante.talla,
-          codigoBarra: variante.codigoBarra,
-          qrCode: variante.qrCode,
-        },
-        productoSnapshot: {
-          nombre: producto.nombre,
-          modelo: producto.modelo,
-          sku: producto.sku,
-          imagen: cartItem.productoSnapshot.imagen,
-        },
-        cantidad: cartItem.cantidad,
-        precioUnitario,
-        totalLinea: precioUnitario * cartItem.cantidad,
-        precioCosto: effectivePrecioCosto,
-        ganancia
-      };
+    const customer = await obtenerContextoClientePorUsuario(customerId, {
+        ensureProfile: true,
     });
 
-    const gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
+    const metodoEntrega = payload.entrega?.metodo ?? null;
+    let snapshotEntrega: Record<string, unknown> | null = null;
 
-    const pedido = await pedidosRepository.create({
-      numeroPedido: createPedidoNumber(),
-      canal: "WEB",
-      sucursalId: webDispatchBranchId,
-      estadoPedido: "PENDING_PAYMENT",
-      estadoPago: "PENDING",
-      estadoEntrega,
-      estadoReservaStock: "RESERVED",
-      reservadoEn: new Date(),
-      reservaExpiraEn: createReservationExpirationDate(reservationMinutes),
-      metodoPago: payload.metodoPago,
-      cliente: customerId,
-      vendedor: null,
-      snapshotCliente: {
-        usuarioId: customer.user._id,
-        nombreCompleto: customer.user.nombreCompleto,
-        email: customer.user.email,
-        telefono: (snapshotEntrega?.telefono as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
-        tipoDocumento: customer.profile?.tipoDocumento || null,
-        numeroDocumento: customer.profile?.numeroDocumento || null,
-      },
-      snapshotEntrega,
-      items: itemsProcesados,
-      subtotal,
-      descuento: 0,
-      total,
-      gananciaTotal,
-      notas: payload.notas || null,
-    }, session);
+    if (metodoEntrega === "WHATSAPP") {
+        snapshotEntrega = { metodo: "WHATSAPP" };
+    } else if (metodoEntrega === "PICKUP_POINT") {
+        snapshotEntrega = {
+            metodo: "PICKUP_POINT",
+            puntoRecojo: payload.entrega?.direccion ?? null,
+            telefono: payload.entrega?.telefono ?? null,
+            nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
+            programadoPara: payload.entrega?.programadoPara ?? null,
+        };
+    } else if (metodoEntrega === "SHIPPING_NATIONAL") {
+        snapshotEntrega = {
+            metodo: "SHIPPING_NATIONAL",
+            departamento: payload.entrega?.departamento ?? null,
+            ciudad: payload.entrega?.ciudad ?? null,
+            empresaEnvio: payload.entrega?.empresaEnvio ?? null,
+            sucursal: payload.entrega?.sucursal ?? null,
+            nombreRemitente: payload.entrega?.nombreRemitente ?? null,
+            ciRemitente: payload.entrega?.ciRemitente ?? null,
+            telefonoRemitente: payload.entrega?.telefonoRemitente ?? null,
+            nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
+        };
+    } else if (payload.direccionId) {
+        const address = await obtenerDireccionClientePorUsuario(customerId, payload.direccionId);
+        snapshotEntrega = {
+            metodo: "PICKUP_POINT",
+            puntoRecojo: payload.entrega?.direccion || address.direccion,
+            telefono: payload.entrega?.telefono || address.telefono,
+            nombreDestinatario: payload.entrega?.nombreDestinatario || address.nombreDestinatario,
+        };
+    } else if (customer.defaultAddress) {
+        snapshotEntrega = {
+            metodo: "PICKUP_POINT",
+            puntoRecojo: customer.defaultAddress.direccion,
+            telefono: customer.defaultAddress.telefono,
+            nombreDestinatario: customer.defaultAddress.nombreDestinatario,
+        };
+    }
 
-    // Sync fulfillment will be updated to use Pedido in its own phase, but we keep the call assuming it will adapt
-    await syncFulfillmentForOrder(pedido, session);
+    const reservationMinutes =
+        (metodoEntrega === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
 
-    await clearCartByUserId(customerId, session);
+    const pedido = await runInTransaction(async (session) => {
+        const { validatedItems } = await getValidatedCartForCheckout(
+            customerId,
+            session
+        );
+        const subtotal = validatedItems.reduce((sum, item) => sum + item.subtotal, 0);
+        const total = subtotal;
 
-    await recordAuditEventSafe(
-      {
-        accion: "PEDIDO_CHECKOUT",
-        tipoEntidad: "PEDIDO",
-        idEntidad: pedido._id.toString(),
-        idActor: customerId,
-        rolActor: "CLIENTE",
-        estado: "SUCCESS",
-        metadata: {
-          canal: pedido.canal,
-          metodoEntrega,
-          total: pedido.total,
-          items: pedido.items.length,
-          sucursalId: webDispatchBranchId.toString(),
-        },
-      },
+        const webDispatchBranchId = await getWebDispatchBranchId(session);
 
-      session
-    );
+        for (const { producto, variante, cartItem } of validatedItems) {
+            if (getAvailableStockForVariant(variante) < cartItem.cantidad) {
+                throw new AppError(
+                    `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
+                    400
+                );
+            }
+            await reserveStockForOrder(
+                {
+                    producto,
+                    variante,
+                    cantidad: cartItem.cantidad,
+                    sucursalId: webDispatchBranchId,
+                },
+                session
+            );
+        }
+
+        const estadoEntrega = metodoEntrega === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
+
+        const itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
+            const pricing = getVariantPricing(producto, variante);
+            const effectivePrecioCosto = pricing.precioCosto;
+            const ganancia = (precioUnitario - effectivePrecioCosto) * cartItem.cantidad;
+            return {
+                productoId: producto._id,
+                variante: {
+                    varianteId: variante.varianteId,
+                    color: variante.color,
+                    colorSecundario: variante.colorSecundario,
+                    talla: variante.talla,
+                    codigoBarra: variante.codigoBarra,
+                    qrCode: variante.qrCode,
+                },
+                productoSnapshot: {
+                    nombre: producto.nombre,
+                    modelo: producto.modelo,
+                    sku: producto.sku,
+                    imagen: cartItem.productoSnapshot.imagen,
+                },
+                cantidad: cartItem.cantidad,
+                precioUnitario,
+                totalLinea: precioUnitario * cartItem.cantidad,
+                precioCosto: effectivePrecioCosto,
+                ganancia
+            };
+        });
+
+        const gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
+
+        const pedido = await pedidosRepository.create({
+            numeroPedido: createPedidoNumber(),
+            canal: "WEB",
+            sucursalId: webDispatchBranchId,
+            estadoPedido: "PENDING_PAYMENT",
+            estadoPago: "PENDING",
+            estadoEntrega,
+            estadoReservaStock: "RESERVED",
+            reservadoEn: new Date(),
+            reservaExpiraEn: createReservationExpirationDate(reservationMinutes),
+            metodoPago: payload.metodoPago,
+            cliente: customerId,
+            vendedor: null,
+            snapshotCliente: {
+                usuarioId: customer.user._id,
+                nombreCompleto: customer.user.nombreCompleto,
+                email: customer.user.email,
+                telefono: (snapshotEntrega?.telefono as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
+                tipoDocumento: customer.profile?.tipoDocumento || null,
+                numeroDocumento: customer.profile?.numeroDocumento || null,
+            },
+            snapshotEntrega,
+            items: itemsProcesados,
+            subtotal,
+            descuento: 0,
+            total,
+            gananciaTotal,
+            notas: payload.notas || null,
+        }, session);
+
+        // Sync fulfillment will be updated to use Pedido in its own phase, but we keep the call assuming it will adapt
+        await syncFulfillmentForOrder(pedido, session);
+
+        await clearCartByUserId(customerId, session);
+
+        await recordAuditEventSafe(
+            {
+                accion: "PEDIDO_CHECKOUT",
+                tipoEntidad: "PEDIDO",
+                idEntidad: pedido._id.toString(),
+                idActor: customerId,
+                rolActor: "CLIENTE",
+                estado: "SUCCESS",
+                metadata: {
+                    canal: pedido.canal,
+                    metodoEntrega,
+                    total: pedido.total,
+                    items: pedido.items.length,
+                    sucursalId: webDispatchBranchId.toString(),
+                },
+            },
+
+            session
+        );
+
+        return pedido;
+    });
 
     return pedido;
-  });
-
-  return pedido;
 }
 
 export async function crearVentaDirecta(
-  actor: { id: string; rol: "ADMIN" | "VENDEDOR" },
-  payload: CreatePedidoInput
+    actor: { id: string; rol: "ADMIN" | "VENDEDOR" },
+    payload: CreatePedidoInput
 ) {
-  await connectDB();
+    await connectDB();
 
-  return runInTransaction(async (session) => {
-    // Determinar sucursal: payload -> usuario asignado -> almacén por defecto
-    let targetSucursalId: mongoose.Types.ObjectId;
-    if (payload.sucursalId && mongoose.Types.ObjectId.isValid(payload.sucursalId)) {
-      targetSucursalId = new mongoose.Types.ObjectId(payload.sucursalId);
-    } else {
-      const user = await User.findById(actor.id).session(session);
-      if (user?.sucursalAsignadaId) {
-        targetSucursalId = user.sucursalAsignadaId as mongoose.Types.ObjectId;
-      } else {
-        targetSucursalId = await getDefaultWarehouseId(session);
-      }
-    }
+    return runInTransaction(async (session) => {
+        // Determinar sucursal: payload -> usuario asignado -> almacén por defecto
+        let targetSucursalId: mongoose.Types.ObjectId;
+        if (payload.sucursalId && mongoose.Types.ObjectId.isValid(payload.sucursalId)) {
+            targetSucursalId = new mongoose.Types.ObjectId(payload.sucursalId);
+        } else {
+            const user = await User.findById(actor.id).session(session);
+            if (user?.sucursalAsignadaId) {
+                targetSucursalId = user.sucursalAsignadaId as mongoose.Types.ObjectId;
+            } else {
+                targetSucursalId = await getDefaultWarehouseId(session);
+            }
+        }
 
-    // Si la venta es de mostrador (POS), validar obligatoriedad de sesión de caja abierta
-    if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
-      const sesionActiva = await obtenerSesionCajaActiva(targetSucursalId.toString(), session);
-      if (!sesionActiva) {
-        throw new AppError(
-          "Apertura de caja obligatoria: No existe una sesión de caja abierta en esta tienda. Debe realizar la apertura de caja antes de registrar ventas.",
-          400
-        );
-      }
-    }
+        // Si la venta es de mostrador (POS), validar obligatoriedad de sesión de caja abierta
+        if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
+            const sesionActiva = await obtenerSesionCajaActiva(targetSucursalId.toString(), session);
+            if (!sesionActiva) {
+                throw new AppError(
+                    "Apertura de caja obligatoria: No existe una sesión de caja abierta en esta tienda. Debe realizar la apertura de caja antes de registrar ventas.",
+                    400
+                );
+            }
+        }
 
-    let subtotal = 0;
-    let gananciaTotal = 0;
-    const itemsProcesados = [];
+        let subtotal = 0;
+        let gananciaTotal = 0;
+        const itemsProcesados = [];
 
-    for (const item of payload.items) {
-      const producto = await Producto.findById(item.productoId).session(session);
-      if (!producto) throw new AppError(`Producto no encontrado`, 404);
+        for (const item of payload.items) {
+            const producto = await Producto.findById(item.productoId).session(session);
+            if (!producto) throw new AppError(`Producto no encontrado`, 404);
 
-      const variante = findVariantByIdentity(producto.variantes as Variante[], {
-        varianteId: item.varianteId,
-        color: item.color,
-        colorSecundario: item.colorSecundario,
-        talla: item.talla,
-      });
+            const variante = findVariantByIdentity(producto.variantes as Variante[], {
+                varianteId: item.varianteId,
+                color: item.color,
+                colorSecundario: item.colorSecundario,
+                talla: item.talla,
+            });
 
-      if (!variante) throw new AppError(`Variante no encontrada`, 404);
-      if (getAvailableStockForVariant(variante) < item.cantidad) {
-        throw new AppError(`Stock insuficiente`, 400);
-      }
+            if (!variante) throw new AppError(`Variante no encontrada`, 404);
+            if (getAvailableStockForVariant(variante) < item.cantidad) {
+                throw new AppError(`Stock insuficiente`, 400);
+            }
 
-      await consumeStockForSale({
-        producto,
-        variante,
-        cantidad: item.cantidad,
-        userId: actor.id,
-        sucursalId: targetSucursalId,
-        motivo: `Venta directa ${payload.canal}`,
-        referencia: "VENTA_DIRECTA"
-      }, session);
+            await consumeStockForSale({
+                producto,
+                variante,
+                cantidad: item.cantidad,
+                userId: actor.id,
+                sucursalId: targetSucursalId,
+                motivo: `Venta directa ${payload.canal}`,
+                referencia: "VENTA_DIRECTA"
+            }, session);
 
-      const pricing = getVariantPricing(producto, variante);
-      const precioUnitario = pricing.precioVenta;
-      const precioCosto = pricing.precioCosto;
-      const totalLinea = precioUnitario * item.cantidad;
-      const ganancia = (precioUnitario - precioCosto) * item.cantidad;
+            const pricing = getVariantPricing(producto, variante);
+            const precioUnitario = pricing.precioVenta;
+            const precioCosto = pricing.precioCosto;
+            const totalLinea = precioUnitario * item.cantidad;
+            const ganancia = (precioUnitario - precioCosto) * item.cantidad;
 
-      subtotal += totalLinea;
-      gananciaTotal += ganancia;
+            subtotal += totalLinea;
+            gananciaTotal += ganancia;
 
-      itemsProcesados.push({
-        productoId: producto._id,
-        variante: {
-          varianteId: variante.varianteId,
-          color: variante.color,
-          colorSecundario: variante.colorSecundario,
-          talla: variante.talla,
-          codigoBarra: variante.codigoBarra,
-          qrCode: variante.qrCode,
-        },
-        productoSnapshot: {
-          nombre: producto.nombre,
-          modelo: producto.modelo,
-          sku: producto.sku,
-          imagen: variante.imagenes?.[0] || producto.imagenes?.[0],
-        },
-        cantidad: item.cantidad,
-        precioUnitario,
-        totalLinea,
-        precioCosto,
-        ganancia
-      });
-    }
+            itemsProcesados.push({
+                productoId: producto._id,
+                variante: {
+                    varianteId: variante.varianteId,
+                    color: variante.color,
+                    colorSecundario: variante.colorSecundario,
+                    talla: variante.talla,
+                    codigoBarra: variante.codigoBarra,
+                    qrCode: variante.qrCode,
+                },
+                productoSnapshot: {
+                    nombre: producto.nombre,
+                    modelo: producto.modelo,
+                    sku: producto.sku,
+                    imagen: variante.imagenes?.[0] || producto.imagenes?.[0],
+                },
+                cantidad: item.cantidad,
+                precioUnitario,
+                totalLinea,
+                precioCosto,
+                ganancia
+            });
+        }
 
-    const descuentoAplicado = payload.descuento || 0;
-    const total = Math.max(0, subtotal - descuentoAplicado);
+        const descuentoAplicado = payload.descuento || 0;
+        const total = Math.max(0, subtotal - descuentoAplicado);
 
-    const pedido = await pedidosRepository.create({
-      numeroPedido: createPedidoNumber(),
-      canal: payload.canal,
-      sucursalId: targetSucursalId,
-      estadoPedido: "DELIVERED",
-      estadoPago: "PAID",
-      estadoEntrega: "NOT_APPLICABLE",
-      estadoReservaStock: "CONSUMED",
-      metodoPago: payload.metodoPago,
-      cliente: null,
-      vendedor: actor.id,
-      items: itemsProcesados,
-      subtotal,
-      descuento: descuentoAplicado,
-      total,
-      gananciaTotal,
-    }, session);
-
-    // Registrar ingreso automático en la cuenta de dinero correspondiente (Caja física o Banco/QR)
-    if (total > 0) {
-      const cuentaDestino = await resolveDefaultAccountForPayment(
-        payload.metodoPago as "EFECTIVO" | "QR" | "TRANSFERENCIA" | "TARJETA",
-        targetSucursalId,
-        session
-      );
-      if (cuentaDestino) {
-        await registrarMovimientoEnCuenta(
-          {
-            cuentaId: cuentaDestino._id,
-            tipo: "INGRESO",
-            monto: total,
-            concepto: `Cobro Venta ${pedido.numeroPedido} (${payload.canal} - ${payload.metodoPago})`,
-            origenTipo: "VENTA_PEDIDO",
-            origenId: pedido._id.toString(),
+        const pedido = await pedidosRepository.create({
+            numeroPedido: createPedidoNumber(),
+            canal: payload.canal,
             sucursalId: targetSucursalId,
-            usuarioId: actor.id,
-          },
-          session
-        );
-      }
-    }
+            estadoPedido: "DELIVERED",
+            estadoPago: "PAID",
+            estadoEntrega: "NOT_APPLICABLE",
+            estadoReservaStock: "CONSUMED",
+            metodoPago: payload.metodoPago,
+            cliente: null,
+            vendedor: actor.id,
+            items: itemsProcesados,
+            subtotal,
+            descuento: descuentoAplicado,
+            total,
+            gananciaTotal,
+        }, session);
 
-    // Acumular venta en la sesión de caja si aplica
-    if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
-      await acumularVentaEnSesion(
-        {
-          sucursalId: targetSucursalId,
-          total: pedido.total,
-          metodoPago: payload.metodoPago,
-        },
-        session
-      );
-    }
+        // Registrar ingreso automático en la cuenta de dinero correspondiente (Caja física o Banco/QR)
+        if (total > 0) {
+            const cuentaDestino = await resolveDefaultAccountForPayment(
+                payload.metodoPago as "EFECTIVO" | "QR" | "TRANSFERENCIA" | "TARJETA",
+                targetSucursalId,
+                session
+            );
+            if (cuentaDestino) {
+                await registrarMovimientoEnCuenta(
+                    {
+                        cuentaId: cuentaDestino._id,
+                        tipo: "INGRESO",
+                        monto: total,
+                        concepto: `Cobro Venta ${pedido.numeroPedido} (${payload.canal} - ${payload.metodoPago})`,
+                        origenTipo: "VENTA_PEDIDO",
+                        origenId: pedido._id.toString(),
+                        sucursalId: targetSucursalId,
+                        usuarioId: actor.id,
+                    },
+                    session
+                );
+            }
+        }
 
-    await recordAuditEventSafe({
-      accion: "VENTA_DIRECTA_CREADA",
-      tipoEntidad: "PEDIDO",
-      idEntidad: pedido._id.toString(),
-      idActor: actor.id,
-      rolActor: actor.rol,
-      estado: "SUCCESS",
-      metadata: { total: pedido.total, canal: pedido.canal, sucursalId: targetSucursalId.toString() }
-    }, session);
+        // Acumular venta en la sesión de caja si aplica
+        if (payload.canal === "TIENDA" || payload.canal === "APP_QR") {
+            await acumularVentaEnSesion(
+                {
+                    sucursalId: targetSucursalId,
+                    total: pedido.total,
+                    metodoPago: payload.metodoPago,
+                },
+                session
+            );
+        }
 
-    return pedido;
-  });
+        await recordAuditEventSafe({
+            accion: "VENTA_DIRECTA_CREADA",
+            tipoEntidad: "PEDIDO",
+            idEntidad: pedido._id.toString(),
+            idActor: actor.id,
+            rolActor: actor.rol,
+            estado: "SUCCESS",
+            metadata: { total: pedido.total, canal: pedido.canal, sucursalId: targetSucursalId.toString() }
+        }, session);
+
+        return pedido;
+    });
 }
 
 function sanitizePedidoForCustomer(pedido: Record<string, unknown>) {
-  const sanitized = { ...pedido };
-  if (Array.isArray(sanitized.items)) {
-    sanitized.items = sanitized.items.map((item: Record<string, unknown>) => {
-      const rest = { ...item };
-      delete rest.precioCosto;
-      delete rest.ganancia;
-      return rest;
-    });
-  }
-  delete sanitized.gananciaTotal;
-  return sanitized;
+    const sanitized = { ...pedido };
+    if (Array.isArray(sanitized.items)) {
+        sanitized.items = sanitized.items.map((item: Record<string, unknown>) => {
+            const rest = { ...item };
+            delete rest.precioCosto;
+            delete rest.ganancia;
+            return rest;
+        });
+    }
+    delete sanitized.gananciaTotal;
+    return sanitized;
 }
 
 export async function listPedidosForActor(role: string, userId: string) {
-  await connectDB();
+    await connectDB();
 
-  if (role === "CLIENTE") {
-    const pedidos = await pedidosRepository.listByCustomer(userId);
-    return pedidos.map(p => sanitizePedidoForCustomer(p.toObject()));
-  }
+    if (role === "CLIENTE") {
+        const pedidos = await pedidosRepository.listByCustomer(userId);
+        return pedidos.map(p => sanitizePedidoForCustomer(p.toObject()));
+    }
 
-  if (["ADMIN", "VENDEDOR"].includes(role)) {
-    return pedidosRepository.listAll();
-  }
+    if (["ADMIN", "VENDEDOR"].includes(role)) {
+        return pedidosRepository.listAll();
+    }
 
-  throw new AppError("No autorizado", 403);
+    throw new AppError("No autorizado", 403);
 }
 
 export async function listRecognizedSalesForActor(role: string, userId: string) {
-  await connectDB();
+    await connectDB();
 
-  if (role === "ADMIN") {
-    return pedidosRepository.listRecognizedSales();
-  }
+    if (role === "ADMIN") {
+        return pedidosRepository.listRecognizedSales();
+    }
 
-  if (role === "VENDEDOR") {
-    return pedidosRepository.listRecognizedSalesBySeller(userId);
-  }
+    if (role === "VENDEDOR") {
+        return pedidosRepository.listRecognizedSalesBySeller(userId);
+    }
 
-  throw new AppError("No autorizado", 403);
+    throw new AppError("No autorizado", 403);
 }
 
 const boliviaDayBoundaryUtc = (date: string, addDay = false) => {
-  const boundary = new Date(`${date}T04:00:00.000Z`);
-  if (addDay) boundary.setUTCDate(boundary.getUTCDate() + 1);
-  return boundary;
+    const boundary = new Date(`${date}T04:00:00.000Z`);
+    if (addDay) boundary.setUTCDate(boundary.getUTCDate() + 1);
+    return boundary;
 };
 
 export async function listRecognizedSalesPageForActor(
-  role: string,
-  userId: string,
-  query: SalesQueryInput
+    role: string,
+    userId: string,
+    query: SalesQueryInput
 ) {
-  await connectDB();
-  const filters = {
-    page: query.page,
-    limit: query.limit,
-    from: query.from ? boliviaDayBoundaryUtc(query.from) : undefined,
-    toExclusive: query.to ? boliviaDayBoundaryUtc(query.to, true) : undefined,
-    customer: query.customer,
-    seller: query.seller,
-    paymentMethod: query.paymentMethod,
-  };
-  const result = role === "ADMIN"
-    ? await pedidosRepository.listRecognizedSales(filters)
-    : role === "VENDEDOR"
-      ? await pedidosRepository.listRecognizedSalesBySeller(userId, filters)
-      : null;
-  if (!result || !("items" in result)) throw new AppError("No autorizado", 403);
-  return {
-    items: result.items,
-    page: query.page,
-    limit: query.limit,
-    total: result.total,
-    totalPages: Math.max(1, Math.ceil(result.total / query.limit)),
-  };
+    await connectDB();
+    const filters = {
+        page: query.page,
+        limit: query.limit,
+        from: query.from ? boliviaDayBoundaryUtc(query.from) : undefined,
+        toExclusive: query.to ? boliviaDayBoundaryUtc(query.to, true) : undefined,
+        customer: query.customer,
+        seller: query.seller,
+        paymentMethod: query.paymentMethod,
+    };
+    const result = role === "ADMIN"
+        ? await pedidosRepository.listRecognizedSales(filters)
+        : role === "VENDEDOR"
+            ? await pedidosRepository.listRecognizedSalesBySeller(userId, filters)
+            : null;
+    if (!result || !("items" in result)) throw new AppError("No autorizado", 403);
+    return {
+        items: result.items,
+        page: query.page,
+        limit: query.limit,
+        total: result.total,
+        totalPages: Math.max(1, Math.ceil(result.total / query.limit)),
+    };
 }
 
 export async function getPedidoForActor(role: string, userId: string, id: string) {
-  assertObjectId(id, "ID de pedido invalido");
-  await connectDB();
+    assertObjectId(id, "ID de pedido invalido");
+    await connectDB();
 
-  const pedido =
-    role === "CLIENTE"
-      ? await pedidosRepository.findByIdForCustomer(id, userId)
-      : await pedidosRepository.findById(id);
+    const pedido =
+        role === "CLIENTE"
+            ? await pedidosRepository.findByIdForCustomer(id, userId)
+            : await pedidosRepository.findById(id);
 
-  if (!pedido) {
-    throw new AppError("Pedido no encontrado", 404);
-  }
+    if (!pedido) {
+        throw new AppError("Pedido no encontrado", 404);
+    }
 
-  return role === "CLIENTE" ? sanitizePedidoForCustomer(pedido.toObject()) : pedido;
+    return role === "CLIENTE" ? sanitizePedidoForCustomer(pedido.toObject()) : pedido;
 }
 
 export async function updateEstadoPedidoForStaff(
-  id: string,
-  payload: UpdateEstadoPedidoInput
+    id: string,
+    payload: UpdateEstadoPedidoInput
 ) {
-  assertObjectId(id, "ID de pedido invalido");
-  await connectDB();
+    assertObjectId(id, "ID de pedido invalido");
+    await connectDB();
 
-  return runInTransaction(async (session) => {
-    const currentPedido = await pedidosRepository.findById(id, session);
+    return runInTransaction(async (session) => {
+        const currentPedido = await pedidosRepository.findById(id, session);
 
-    if (!currentPedido) {
-      throw new AppError("Pedido no encontrado", 404);
-    }
+        if (!currentPedido) {
+            throw new AppError("Pedido no encontrado", 404);
+        }
 
-    const nextPayload: Record<string, unknown> = { ...payload };
+        const nextPayload: Record<string, unknown> = { ...payload };
 
-    if (payload.estadoPedido === "CANCELLED") {
-      if (!payload.estadoEntrega) {
-        nextPayload.estadoEntrega = "CANCELLED";
-      }
+        if (payload.estadoPedido === "CANCELLED") {
+            if (!payload.estadoEntrega) {
+                nextPayload.estadoEntrega = "CANCELLED";
+            }
 
-      if (
-        currentPedido.estadoReservaStock === "RESERVED" &&
-        currentPedido.estadoPago !== "PAID"
-      ) {
-        await releasePedidoReservation(currentPedido, session);
-        nextPayload.estadoReservaStock = "RELEASED";
-        nextPayload.estadoPago = payload.estadoPago || "FAILED";
-        nextPayload.reservadoEn = null;
-        nextPayload.reservaExpiraEn = null;
-      }
-    }
+            if (
+                currentPedido.estadoReservaStock === "RESERVED" &&
+                currentPedido.estadoPago !== "PAID"
+            ) {
+                await releasePedidoReservation(currentPedido, session);
+                nextPayload.estadoReservaStock = "RELEASED";
+                nextPayload.estadoPago = payload.estadoPago || "FAILED";
+                nextPayload.reservadoEn = null;
+                nextPayload.reservaExpiraEn = null;
+            }
+        }
 
-    Object.assign(currentPedido, nextPayload);
-    await currentPedido.save({ session });
-    await syncFulfillmentForOrder(currentPedido, session);
+        Object.assign(currentPedido, nextPayload);
+        await currentPedido.save({ session });
+        await syncFulfillmentForOrder(currentPedido, session);
 
-    await recordAuditEventSafe(
-      {
-        accion: "PEDIDO_STATUS_UPDATED",
-        tipoEntidad: "PEDIDO",
-        idEntidad: currentPedido._id.toString(),
-        estado: "SUCCESS",
-        metadata: {
-          estadoPedido: currentPedido.estadoPedido,
-          estadoPago: currentPedido.estadoPago,
-          estadoEntrega: currentPedido.estadoEntrega,
-        },
-      },
-      session
-    );
+        await recordAuditEventSafe(
+            {
+                accion: "PEDIDO_STATUS_UPDATED",
+                tipoEntidad: "PEDIDO",
+                idEntidad: currentPedido._id.toString(),
+                estado: "SUCCESS",
+                metadata: {
+                    estadoPedido: currentPedido.estadoPedido,
+                    estadoPago: currentPedido.estadoPago,
+                    estadoEntrega: currentPedido.estadoEntrega,
+                },
+            },
+            session
+        );
 
-    return currentPedido;
-  });
+        return currentPedido;
+    });
 }
 
 export async function cancelPedidoForCustomer(id: string, customerId: string) {
-  assertObjectId(id, "ID de pedido invalido");
-  await connectDB();
+    assertObjectId(id, "ID de pedido invalido");
+    await connectDB();
 
-  return runInTransaction(async (session) => {
-    const pedido = await pedidosRepository.findByIdForCustomer(id, customerId, session);
+    return runInTransaction(async (session) => {
+        const pedido = await pedidosRepository.findByIdForCustomer(id, customerId, session);
 
-    if (!pedido) {
-      throw new AppError("Pedido no encontrado o no pertenece al cliente", 404);
-    }
+        if (!pedido) {
+            throw new AppError("Pedido no encontrado o no pertenece al cliente", 404);
+        }
 
-    if (pedido.estadoPedido !== "PENDING_PAYMENT") {
-      throw new AppError("Solo se pueden cancelar pedidos pendientes de pago", 400);
-    }
+        if (pedido.estadoPedido !== "PENDING_PAYMENT") {
+            throw new AppError("Solo se pueden cancelar pedidos pendientes de pago", 400);
+        }
 
-    if (pedido.estadoReservaStock === "RESERVED") {
-      await releasePedidoReservation(pedido, session);
-    }
+        if (pedido.estadoReservaStock === "RESERVED") {
+            await releasePedidoReservation(pedido, session);
+        }
 
-    pedido.estadoPedido = "CANCELLED";
-    pedido.estadoPago = "FAILED";
-    pedido.estadoEntrega = "CANCELLED";
-    pedido.estadoReservaStock = "RELEASED";
-    pedido.reservadoEn = null;
-    pedido.reservaExpiraEn = null;
+        pedido.estadoPedido = "CANCELLED";
+        pedido.estadoPago = "FAILED";
+        pedido.estadoEntrega = "CANCELLED";
+        pedido.estadoReservaStock = "RELEASED";
+        pedido.reservadoEn = null;
+        pedido.reservaExpiraEn = null;
 
-    await pedido.save({ session });
+        await pedido.save({ session });
 
-    await recordAuditEventSafe({
-      accion: "PEDIDO_CANCELLED_BY_CUSTOMER",
-      tipoEntidad: "PEDIDO",
-      idEntidad: pedido._id.toString(),
-      idActor: customerId,
-      rolActor: "CLIENTE",
-      estado: "SUCCESS",
-    }, session);
+        await recordAuditEventSafe({
+            accion: "PEDIDO_CANCELLED_BY_CUSTOMER",
+            tipoEntidad: "PEDIDO",
+            idEntidad: pedido._id.toString(),
+            idActor: customerId,
+            rolActor: "CLIENTE",
+            estado: "SUCCESS",
+        }, session);
 
-    return pedido;
-  });
+        return pedido;
+    });
 }
 
 export async function updatePedidoEntregaForCustomer(
-  id: string,
-  customerId: string,
-  deliveryData: UpdatePedidoEntregaInput
+    id: string,
+    customerId: string,
+    deliveryData: UpdatePedidoEntregaInput
 ) {
-  assertObjectId(id, "ID de pedido invalido");
-  await connectDB();
+    assertObjectId(id, "ID de pedido invalido");
+    await connectDB();
 
-  return runInTransaction(async (session) => {
-    const pedido = await pedidosRepository.findByIdForCustomer(id, customerId, session);
+    return runInTransaction(async (session) => {
+        const pedido = await pedidosRepository.findByIdForCustomer(id, customerId, session);
 
-    if (!pedido) {
-      throw new AppError("Pedido no encontrado o no pertenece al cliente", 404);
-    }
+        if (!pedido) {
+            throw new AppError("Pedido no encontrado o no pertenece al cliente", 404);
+        }
 
-    if (pedido.estadoPedido !== "PENDING_PAYMENT") {
-      throw new AppError("Solo se pueden editar pedidos pendientes de pago", 400);
-    }
+        if (pedido.estadoPedido !== "PENDING_PAYMENT") {
+            throw new AppError("Solo se pueden editar pedidos pendientes de pago", 400);
+        }
 
-    const now = new Date();
-    const createdAt = new Date(pedido.createdAt);
-    const diffMs = now.getTime() - createdAt.getTime();
-    const diffMins = diffMs / (1000 * 60);
+        const now = new Date();
+        const createdAt = new Date(pedido.createdAt);
+        const diffMs = now.getTime() - createdAt.getTime();
+        const diffMins = diffMs / (1000 * 60);
 
-    if (diffMins > 30) {
-      throw new AppError("El plazo para editar el pedido (30 min) ha expirado", 403);
-    }
+        if (diffMins > 30) {
+            throw new AppError("El plazo para editar el pedido (30 min) ha expirado", 403);
+        }
 
-    pedido.snapshotEntrega = {
-      ...pedido.snapshotEntrega,
-      ...deliveryData,
-    };
+        pedido.snapshotEntrega = {
+            ...pedido.snapshotEntrega,
+            ...deliveryData,
+        };
 
-    await pedido.save({ session });
+        await pedido.save({ session });
 
-    await recordAuditEventSafe({
-      accion: "PEDIDO_DELIVERY_UPDATED_BY_CUSTOMER",
-      tipoEntidad: "PEDIDO",
-      idEntidad: pedido._id.toString(),
-      idActor: customerId,
-      rolActor: "CLIENTE",
-      estado: "SUCCESS",
-    }, session);
+        await recordAuditEventSafe({
+            accion: "PEDIDO_DELIVERY_UPDATED_BY_CUSTOMER",
+            tipoEntidad: "PEDIDO",
+            idEntidad: pedido._id.toString(),
+            idActor: customerId,
+            rolActor: "CLIENTE",
+            estado: "SUCCESS",
+        }, session);
 
-    return pedido;
-  });
+        return pedido;
+    });
 }
 
 export async function confirmPedidoForDelivery(
-  id: string,
-  actor: { id: string; rol: AuditActorRole }
+    id: string,
+    actor: { id: string; rol: AuditActorRole }
 ) {
-  assertObjectId(id, "ID de pedido invalido");
-  await connectDB();
+    assertObjectId(id, "ID de pedido invalido");
+    await connectDB();
 
-  return runInTransaction(async (session) => {
-    const pedido = await pedidosRepository.findById(id, session);
+    return runInTransaction(async (session) => {
+        const pedido = await pedidosRepository.findById(id, session);
 
-    if (!pedido) {
-      throw new AppError("Pedido no encontrado", 404);
-    }
+        if (!pedido) {
+            throw new AppError("Pedido no encontrado", 404);
+        }
 
-    if (pedido.estadoPedido !== "PENDING_PAYMENT") {
-      throw new AppError("El pedido ya no esta pendiente de pago", 400);
-    }
+        if (pedido.estadoPedido !== "PENDING_PAYMENT") {
+            throw new AppError("El pedido ya no esta pendiente de pago", 400);
+        }
 
-    pedido.estadoPedido = "CONFIRMED";
-    pedido.reservaExpiraEn = null;
+        pedido.estadoPedido = "CONFIRMED";
+        pedido.reservaExpiraEn = null;
 
-    await pedido.save({ session });
+        await pedido.save({ session });
 
-    await recordAuditEventSafe(
-      {
-        accion: "PEDIDO_CONFIRMED_FOR_DELIVERY",
-        tipoEntidad: "PEDIDO",
-        idEntidad: pedido._id.toString(),
-        idActor: actor.id,
-        rolActor: actor.rol,
-        estado: "SUCCESS",
-      },
-      session
-    );
+        await recordAuditEventSafe(
+            {
+                accion: "PEDIDO_CONFIRMED_FOR_DELIVERY",
+                tipoEntidad: "PEDIDO",
+                idEntidad: pedido._id.toString(),
+                idActor: actor.id,
+                rolActor: actor.rol,
+                estado: "SUCCESS",
+            },
+            session
+        );
 
-    return pedido;
-  });
+        return pedido;
+    });
 }

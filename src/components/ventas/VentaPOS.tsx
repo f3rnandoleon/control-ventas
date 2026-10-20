@@ -163,15 +163,8 @@ export default function VentaPOS({
     setValue(`items.${index}.cantidad`, nextQuantity, { shouldValidate: true });
   };
 
-  const [cajaAbierta, setCajaAbierta] = useState(false);
-
   const onSubmit = async (data: VentaFormSubmitValues) => {
     try {
-      if (!cajaAbierta) {
-        toast.error("Apertura de caja obligatoria: Debes abrir la caja física de la tienda antes de registrar ventas.");
-        return;
-      }
-
       if (data.items.length === 0) {
         toast.error("Agrega al menos un producto");
         return;
@@ -205,7 +198,7 @@ export default function VentaPOS({
   return (
     <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
       <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
-        <CajaPosWidget onCajaStatusChange={setCajaAbierta} />
+        <CajaPosWidget />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           Seleccione los productos.
@@ -228,11 +221,10 @@ export default function VentaPOS({
               key={categoria}
               type="button"
               onClick={() => setCategoriaActiva(categoria)}
-              className={`shrink-0 rounded-xl border px-4 py-2 text-xs font-bold transition sm:text-sm ${
-                categoriaActiva === categoria
+              className={`shrink-0 rounded-xl border px-4 py-2 text-xs font-bold transition sm:text-sm ${categoriaActiva === categoria
                   ? "border-blue-500 bg-blue-600 text-white"
                   : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
-              }`}
+                }`}
             >
               {categoria}
             </button>
@@ -252,9 +244,8 @@ export default function VentaPOS({
                 key={producto._id}
                 type="button"
                 onClick={() => setProductoActivo(producto)}
-                className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${
-                  disabled ? "border-white/5 opacity-55" : "border-white/10 hover:border-blue-400/70"
-                }`}
+                className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${disabled ? "border-white/5 opacity-55" : "border-white/10 hover:border-blue-400/70"
+                  }`}
               >
                 {image ? (
                   <CloudinaryImage

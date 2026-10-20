@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   obtenerCompraPorId,
   anularCompra,
+  actualizarCompra,
 } from "@/modules/purchases/application/compras.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 import { requireStaffApiAuth } from "@/libs/requireApiAuth";
@@ -21,6 +22,30 @@ export async function GET(
     return handleRouteError(error, {
       fallbackMessage: "Error al obtener detalle de la compra",
       logLabel: "COMPRA DETAIL GET ERROR:",
+    });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireStaffApiAuth(request);
+    if (auth.response) return auth.response;
+
+    const { id } = await params;
+    const body = await request.json();
+
+    const compraActualizada = await actualizarCompra(id, body, auth.userAuth.id);
+    return NextResponse.json({
+      message: "Compra actualizada exitosamente",
+      compra: compraActualizada,
+    });
+  } catch (error) {
+    return handleRouteError(error, {
+      fallbackMessage: "Error al actualizar compra",
+      logLabel: "COMPRA PATCH ERROR:",
     });
   }
 }

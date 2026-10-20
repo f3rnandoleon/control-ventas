@@ -420,7 +420,7 @@ export default function CuentasFinanzasPage() {
                   <input
                     type="number"
                     disabled={!!editingCuenta}
-                    step="0.5"
+                    step="0.01"
                     min="0"
                     value={saldoInicialNueva}
                     onChange={(e) => setSaldoInicialNueva(parseFloat(e.target.value) || 0)}
@@ -548,8 +548,8 @@ export default function CuentasFinanzasPage() {
                 <label className="block text-xs font-semibold text-gray-300 mb-1">Monto a Transferir (Bs) *</label>
                 <input
                   type="number"
-                  step="0.5"
-                  min="0.1"
+                  step="0.01"
+                  min="0.01"
                   required
                   value={montoTransf || ""}
                   onChange={(e) => setMontoTransf(parseFloat(e.target.value) || 0)}

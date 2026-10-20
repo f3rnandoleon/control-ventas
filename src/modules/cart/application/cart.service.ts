@@ -10,7 +10,6 @@ import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import { AppError } from "@/shared/errors/AppError";
 import { cartRepository } from "@/modules/cart/infrastructure/cart.repository";
-import { getAvailableStockForVariant } from "@/modules/inventory/application/inventory.service";
 import { getAvailableWebStockForVariant } from "@/modules/inventory/application/branch-stock.service";
 import { getVariantPricing } from "@/utils/pricing";
 
