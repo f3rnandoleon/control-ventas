@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +9,10 @@ import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import CajaPosWidget from "@/components/pos/CajaPosWidget";
 import { createPedidoSchema } from "@/schemas/pedido.schema";
 import { createVenta } from "@/services/pedidos.service";
+import { getSucursales } from "@/services/sucursales.service";
 import type { Producto } from "@/types/producto";
+import type { Sucursal } from "@/types/sucursal";
+import { useAuth } from "@/context/AuthContext";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import { getVariantPricing, formatProductPriceDisplay } from "@/utils/pricing";
 
@@ -18,7 +21,20 @@ type VentaFormSubmitValues = z.output<typeof createPedidoSchema>;
 type VentaFormItem = VentaFormValues["items"][number];
 type VentaVariant = Producto["variantes"][number];
 
-const getStockDisponible = (variant: VentaVariant) => variant.stockDisponible ?? variant.stock ?? 0;
+const getStockEnSucursal = (variant: VentaVariant, targetSucursalId?: string): number => {
+  if (targetSucursalId && variant.sucursalesStock && variant.sucursalesStock.length > 0) {
+    const nivel = variant.sucursalesStock.find((s) => s.sucursalId === targetSucursalId);
+    return nivel ? Math.max(0, nivel.stockDisponible) : 0;
+  }
+  return Math.max(0, variant.stockDisponible ?? variant.stock ?? 0);
+};
+
+const getOtrasSucursalesConStock = (variant: VentaVariant, targetSucursalId?: string) => {
+  if (!variant.sucursalesStock) return [];
+  return variant.sucursalesStock.filter(
+    (s) => s.sucursalId !== targetSucursalId && s.stockDisponible > 0
+  );
+};
 
 const getVariantKey = (variant: Pick<VentaVariant, "varianteId" | "color" | "colorSecundario" | "talla">) =>
   variant.varianteId || [variant.color, variant.colorSecundario || "", variant.talla].join("|");
@@ -53,6 +69,32 @@ export default function VentaPOS({
   productos: Producto[];
   onSuccess: () => void;
 }) {
+  const { user } = useAuth();
+
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [sucursalSeleccionadaId, setSucursalSeleccionadaId] = useState<string>("");
+
+  useEffect(() => {
+    getSucursales()
+      .then((data) => {
+        const activas = data.filter((s) => s.activa);
+        setSucursales(activas);
+
+        // Preseleccionar sucursal: 1) asignada al usuario si existe, 2) principal o primera activa
+        if (activas.length > 0) {
+          const userBranchId = user?.sucursalAsignadaId;
+          const matchUserBranch = activas.find((s) => s._id === userBranchId);
+          if (matchUserBranch) {
+            setSucursalSeleccionadaId(matchUserBranch._id);
+          } else {
+            const principal = activas.find((s) => s.esAlmacenPrincipal) || activas[0];
+            setSucursalSeleccionadaId(principal._id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+
   const {
     register,
     control,
@@ -120,9 +162,15 @@ export default function VentaPOS({
   };
 
   const addVariant = (producto: Producto, variant: VentaVariant) => {
-    const stockDisponible = getStockDisponible(variant);
+    const stockDisponible = getStockEnSucursal(variant, sucursalSeleccionadaId);
     if (stockDisponible <= 0) {
-      toast.error("Esta variante no tiene stock disponible");
+      const otras = getOtrasSucursalesConStock(variant, sucursalSeleccionadaId);
+      if (otras.length > 0) {
+        const detalle = otras.map((o) => `${o.nombre}: ${o.stockDisponible} u.`).join(", ");
+        toast.error(`Sin existencias en esta sucursal. Hay disponible en: ${detalle}`);
+      } else {
+        toast.error("Esta variante no tiene stock disponible");
+      }
       return;
     }
 
@@ -133,7 +181,7 @@ export default function VentaPOS({
     if (existingIndex >= 0) {
       const nextQuantity = (watchedItems[existingIndex].cantidad || 0) + 1;
       if (nextQuantity > stockDisponible) {
-        toast.error("No hay mas stock disponible para esta variante");
+        toast.error(`No hay más stock disponible en esta sucursal (Máx: ${stockDisponible})`);
         return;
       }
 
@@ -157,7 +205,7 @@ export default function VentaPOS({
     const item = watchedItems[index];
     const producto = productos.find((p) => p._id === item?.productoId);
     const variant = producto?.variantes.find((v) => matchesVariant(v, item));
-    const stockDisponible = variant ? getStockDisponible(variant) : 0;
+    const stockDisponible = variant ? getStockEnSucursal(variant, sucursalSeleccionadaId) : 0;
     const nextQuantity = Math.max(1, Math.min(quantity, stockDisponible || 1));
 
     setValue(`items.${index}.cantidad`, nextQuantity, { shouldValidate: true });
@@ -167,6 +215,11 @@ export default function VentaPOS({
     try {
       if (data.items.length === 0) {
         toast.error("Agrega al menos un producto");
+        return;
+      }
+
+      if (!sucursalSeleccionadaId) {
+        toast.error("Por favor seleccione una sucursal para registrar la venta");
         return;
       }
 
@@ -182,6 +235,7 @@ export default function VentaPOS({
         metodoPago: data.metodoPago,
         canal: "TIENDA",
         descuento: montoDescuento,
+        sucursalId: sucursalSeleccionadaId,
       });
 
       reset({ items: [], metodoPago: "EFECTIVO", canal: "TIENDA", descuento: 0 });
@@ -198,7 +252,34 @@ export default function VentaPOS({
   return (
     <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
       <div className="shrink-0 space-y-3 border-b border-white/10 p-4 sm:p-5">
-        <CajaPosWidget />
+        {/* CABECERA POS CON SELECTOR DE SUCURSAL Y ESTADO DE CAJA */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-3.5 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 text-lg">
+              🏢
+            </span>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                Sucursal de Venta POS:
+              </label>
+              <div className="flex items-center gap-2 mt-0.5">
+                <select
+                  value={sucursalSeleccionadaId}
+                  onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
+                  className="rounded-lg border border-blue-500/30 bg-slate-950 px-2.5 py-1 text-xs font-bold text-white outline-none focus:border-blue-400 cursor-pointer"
+                >
+                  {sucursales.map((s) => (
+                    <option key={s._id} value={s._id} className="bg-slate-900 text-white">
+                      📍 {s.nombre} ({s.codigo}) {s.esAlmacenPrincipal ? "★ Almacén Principal" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <CajaPosWidget sucursalId={sucursalSeleccionadaId} />
+        </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           Seleccione los productos.
@@ -236,16 +317,28 @@ export default function VentaPOS({
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
           {productosFiltrados.map((producto) => {
             const image = getProductoImage(producto);
-            const stockDisponible = producto.variantes.reduce((sum, variant) => sum + getStockDisponible(variant), 0);
-            const disabled = stockDisponible <= 0;
+            const stockDisponible = producto.variantes.reduce(
+              (sum, variant) => sum + getStockEnSucursal(variant, sucursalSeleccionadaId),
+              0
+            );
+            const otrasSucursalesTotal = producto.variantes.reduce((sum, variant) => {
+              const otras = getOtrasSucursalesConStock(variant, sucursalSeleccionadaId);
+              return sum + otras.reduce((s2, o) => s2 + o.stockDisponible, 0);
+            }, 0);
+            const disabled = stockDisponible <= 0 && otrasSucursalesTotal <= 0;
 
             return (
               <button
                 key={producto._id}
                 type="button"
                 onClick={() => setProductoActivo(producto)}
-                className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${disabled ? "border-white/5 opacity-55" : "border-white/10 hover:border-blue-400/70"
-                  }`}
+                className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${
+                  disabled
+                    ? "border-white/5 opacity-55"
+                    : stockDisponible <= 0
+                    ? "border-amber-500/30 hover:border-amber-400/70"
+                    : "border-white/10 hover:border-blue-400/70"
+                }`}
               >
                 {image ? (
                   <CloudinaryImage
@@ -268,9 +361,19 @@ export default function VentaPOS({
                   <p className="line-clamp-1 text-[11px] !text-white/80 sm:text-xs">{producto.modelo}</p>
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-base font-bold !text-white drop-shadow sm:text-lg">{formatProductPriceDisplay(producto)}</p>
-                    <p className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold !text-white">
-                      Stock {stockDisponible}
-                    </p>
+                    {stockDisponible > 0 ? (
+                      <p className="rounded-full bg-emerald-500/30 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-semibold !text-white">
+                        Stock {stockDisponible}
+                      </p>
+                    ) : otrasSucursalesTotal > 0 ? (
+                      <p className="rounded-full bg-amber-500/30 border border-amber-400/40 px-2 py-0.5 text-[9px] font-semibold !text-amber-200">
+                        0 ({otrasSucursalesTotal} en otra suc.)
+                      </p>
+                    ) : (
+                      <p className="rounded-full bg-rose-500/30 border border-rose-400/40 px-2 py-0.5 text-[10px] font-semibold !text-rose-200">
+                        Agotado
+                      </p>
+                    )}
                   </div>
                 </div>
               </button>
@@ -348,7 +451,7 @@ export default function VentaPOS({
                       );
                     });
                     const image = variant ? getVarianteImagenPrincipal(variant) || (producto ? getProductoImage(producto) : undefined) : undefined;
-                    const stockDisponible = variant ? getStockDisponible(variant) : 0;
+                    const stockDisponible = variant ? getStockEnSucursal(variant, sucursalSeleccionadaId) : 0;
                     const cantidad = item?.cantidad || 1;
                     const pricing = producto ? getVariantPricing(producto, variant) : { precioVenta: 0 };
                     const precio = pricing.precioVenta;
@@ -490,7 +593,8 @@ export default function VentaPOS({
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {productoActivo.variantes.map((variant, index) => {
                   const image = getVarianteImagenPrincipal(variant) || getProductoImage(productoActivo);
-                  const stockDisponible = getStockDisponible(variant);
+                  const stockDisponible = getStockEnSucursal(variant, sucursalSeleccionadaId);
+                  const otras = getOtrasSucursalesConStock(variant, sucursalSeleccionadaId);
                   const disabled = stockDisponible <= 0;
                   const variantPricing = getVariantPricing(productoActivo, variant);
 
@@ -500,7 +604,7 @@ export default function VentaPOS({
                       type="button"
                       onClick={() => addVariant(productoActivo, variant)}
                       disabled={disabled}
-                      className="surface-subcard flex gap-3 rounded-xl p-3 text-left transition hover:border-blue-400/60 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="surface-subcard flex gap-3 rounded-xl p-3 text-left transition hover:border-blue-400/60 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {image ? (
                         <CloudinaryImage
@@ -526,9 +630,26 @@ export default function VentaPOS({
                             </span>
                           )}
                         </p>
-                        <p className="mt-1 text-xs font-semibold text-cyan-300">Stock {stockDisponible}</p>
+                        {stockDisponible > 0 ? (
+                          <p className="mt-1 text-xs font-semibold text-emerald-400">
+                            Stock en esta sucursal: {stockDisponible} u.
+                          </p>
+                        ) : otras.length > 0 ? (
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-[11px] font-semibold text-rose-400">Sin stock aquí</p>
+                            <p className="text-[10px] text-amber-300 font-medium leading-tight">
+                              Hay {otras.map((o) => `${o.stockDisponible} en ${o.nombre}`).join(", ")}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-xs font-semibold text-rose-400">Sin existencias (0 u.)</p>
+                        )}
                       </div>
-                      <span className="self-center rounded-full bg-blue-600 px-3 py-1 text-lg leading-none text-white">+</span>
+                      <span className={`self-center rounded-full px-3 py-1 text-lg leading-none text-white ${
+                        stockDisponible > 0 ? "bg-blue-600" : "bg-gray-600"
+                      }`}>
+                        +
+                      </span>
                     </button>
                   );
                 })}

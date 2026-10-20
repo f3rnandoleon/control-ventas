@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import type { ProductoInventario } from "@/types/inventario";
 import type { Variante } from "@/types/producto";
+import type { Sucursal } from "@/types/sucursal";
+import { getSucursales } from "@/services/sucursales.service";
 import { formatMoney } from "@/utils/pricing";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
@@ -29,6 +31,10 @@ export default function StockJerarquicoView({
   const [estadoStockFiltro, setEstadoStockFiltro] = useState<"TODOS" | "NORMAL" | "BAJO" | "AGOTADO">("TODOS");
   const [ordenarPor, setOrdenarPor] = useState<"nombre" | "stockDesc" | "stockAsc">("nombre");
 
+  // Filtro de sucursal
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [sucursalSeleccionadaId, setSucursalSeleccionadaId] = useState<string>("TODAS");
+
   // Expandir / colapsar productos
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
 
@@ -49,6 +55,10 @@ export default function StockJerarquicoView({
           setTipoCambioOficial(data.tipoCambioOficial);
         }
       })
+      .catch(() => {});
+
+    getSucursales()
+      .then((data) => setSucursales(data.filter((s) => s.activa)))
       .catch(() => {});
   }, []);
 
@@ -77,6 +87,27 @@ export default function StockJerarquicoView({
     };
   }, [productos]);
 
+  // Función helper para obtener stock físico y disponible de una variante según la sucursal elegida
+  const getStockVarianteSegunSucursal = (v: Variante, sId: string) => {
+    if (sId === "TODAS" || !v.sucursalesStock || v.sucursalesStock.length === 0) {
+      const fisico = Number(v.stock || 0);
+      const reservado = Number(v.stockReservado || 0);
+      return {
+        fisico,
+        reservado,
+        disponible: Math.max(0, fisico - reservado),
+      };
+    }
+    const sInfo = v.sucursalesStock.find((s) => s.sucursalId === sId);
+    const fisico = sInfo ? Math.max(0, Number(sInfo.stockFisico || 0)) : 0;
+    const reservado = sInfo ? Math.max(0, Number(sInfo.stockReservado || 0)) : 0;
+    return {
+      fisico,
+      reservado,
+      disponible: Math.max(0, fisico - reservado),
+    };
+  };
+
   // Función de estado de stock para una variante o producto
   const calcularEstadoStock = (stock: number, stockMinimo: number = 2) => {
     if (stock <= 0) return "AGOTADO";
@@ -84,7 +115,7 @@ export default function StockJerarquicoView({
     return "NORMAL";
   };
 
-  // Filtrado Jerárquico: Producto -> Variantes
+  // Filtrado Jerárquico: Producto -> Variantes (considerando la sucursal activa)
   const productosFiltrados = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -95,7 +126,7 @@ export default function StockJerarquicoView({
           return null;
         }
 
-        // Filtrar variantes internas del producto según color, talla y estado
+        // Filtrar variantes internas del producto según color, talla, estado y sucursal
         const variantesCoincidentes = (producto.variantes || []).filter((v) => {
           // Filtro Color
           if (colorSeleccionado !== "TODOS" && v.color.toLowerCase() !== colorSeleccionado.toLowerCase()) {
@@ -105,9 +136,9 @@ export default function StockJerarquicoView({
           if (tallaSeleccionada !== "TODAS" && v.talla.toLowerCase() !== tallaSeleccionada.toLowerCase()) {
             return false;
           }
-          // Filtro Estado de Stock
-          const stockFisico = Number(v.stock || 0);
-          const estado = calcularEstadoStock(stockFisico, producto.stockMinimo || 2);
+          // Filtro Estado de Stock con base en la sucursal elegida
+          const stockData = getStockVarianteSegunSucursal(v, sucursalSeleccionadaId);
+          const estado = calcularEstadoStock(stockData.disponible, producto.stockMinimo || 2);
           if (estadoStockFiltro !== "TODOS" && estado !== estadoStockFiltro) {
             return false;
           }
@@ -131,9 +162,9 @@ export default function StockJerarquicoView({
           return null;
         }
 
-        // Stock total de las variantes filtradas
+        // Stock total de las variantes filtradas para la sucursal seleccionada
         const stockFiltrado = variantesCoincidentes.reduce(
-          (acc, v) => acc + Number(v.stock || 0),
+          (acc, v) => acc + getStockVarianteSegunSucursal(v, sucursalSeleccionadaId).fisico,
           0
         );
 
@@ -160,10 +191,18 @@ export default function StockJerarquicoView({
     colorSeleccionado,
     tallaSeleccionada,
     estadoStockFiltro,
+    sucursalSeleccionadaId,
     ordenarPor,
   ]);
 
-  // Métricas Consolidadas para KPIs
+  // Nombre de la sucursal seleccionada para el badge en KPIs
+  const sucursalNombreActual = useMemo(() => {
+    if (sucursalSeleccionadaId === "TODAS") return "Consolidado Global";
+    const s = sucursales.find((item) => item._id === sucursalSeleccionadaId);
+    return s ? `${s.nombre} (${s.codigo})` : "Sucursal";
+  }, [sucursalSeleccionadaId, sucursales]);
+
+  // Métricas Consolidadas para KPIs según la sucursal activa
   const metricas = useMemo(() => {
     let totalPrendas = 0;
     let totalVariantesCount = 0;
@@ -171,12 +210,16 @@ export default function StockJerarquicoView({
     let variantesAgotadas = 0;
     let capitalInvertidoCPP = 0;
     let valorPotencialVenta = 0;
+    let productosConStock = 0;
 
     for (const p of productos) {
+      let prodTieneStock = false;
       for (const v of p.variantes || []) {
         totalVariantesCount += 1;
-        const stock = Number(v.stock || 0);
+        const stockData = getStockVarianteSegunSucursal(v, sucursalSeleccionadaId);
+        const stock = stockData.fisico;
         totalPrendas += stock;
+        if (stock > 0) prodTieneStock = true;
 
         const cpp = Number(v.precioCosto || p.precioCosto || 0);
         const pv = Number(v.precioVenta || p.precioVenta || 0);
@@ -184,16 +227,18 @@ export default function StockJerarquicoView({
         capitalInvertidoCPP += stock * cpp;
         valorPotencialVenta += stock * pv;
 
-        if (stock === 0) {
+        if (stockData.disponible === 0) {
           variantesAgotadas += 1;
-        } else if (stock <= (p.stockMinimo || 2)) {
+        } else if (stockData.disponible <= (p.stockMinimo || 2)) {
           variantesBajoStock += 1;
         }
       }
+      if (prodTieneStock) productosConStock += 1;
     }
 
     return {
       totalProductos: productos.length,
+      productosConStock,
       totalVariantes: totalVariantesCount,
       totalPrendas,
       variantesBajoStock,
@@ -201,7 +246,7 @@ export default function StockJerarquicoView({
       capitalInvertidoCPP,
       valorPotencialVenta,
     };
-  }, [productos]);
+  }, [productos, sucursalSeleccionadaId]);
 
   const toggleExpand = (prodId: string) => {
     setExpandedProducts((prev) => ({
@@ -222,6 +267,27 @@ export default function StockJerarquicoView({
   return (
     <div className="space-y-6">
       {/* 1. BARRA DE MÉTRICAS / KPIS */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-cyan-500/10 text-cyan-400 text-xs">
+            🏢
+          </span>
+          <span className="text-xs text-gray-400 font-medium">Existencias calculadas para:</span>
+          <span className="rounded-full bg-cyan-500/15 border border-cyan-500/30 px-3 py-0.5 text-xs font-bold text-cyan-300 shadow-sm">
+            {sucursalNombreActual}
+          </span>
+        </div>
+        {sucursalSeleccionadaId !== "TODAS" && (
+          <button
+            type="button"
+            onClick={() => setSucursalSeleccionadaId("TODAS")}
+            className="text-xs text-cyan-400 hover:text-cyan-300 underline font-medium cursor-pointer"
+          >
+            Ver consolidado global
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_15px_rgba(0,180,255,0.06)]">
           <span className="text-xs text-gray-400 block">Productos Activos</span>
@@ -229,7 +295,7 @@ export default function StockJerarquicoView({
             {metricas.totalProductos}
           </span>
           <span className="text-[11px] text-gray-400">
-            en {categorias.length - 1} categorías
+            {metricas.productosConStock} con stock en esta sucursal
           </span>
         </div>
 
@@ -246,7 +312,7 @@ export default function StockJerarquicoView({
           <span className="text-2xl font-extrabold text-emerald-400 mt-1 block">
             {metricas.totalPrendas} u.
           </span>
-          <span className="text-[11px] text-gray-400">existencia física total</span>
+          <span className="text-[11px] text-gray-400">existencia física en {sucursalSeleccionadaId === "TODAS" ? "todas las sucursales" : "esta sucursal"}</span>
         </div>
 
         <div className="rounded-2xl border border-amber-500/20 bg-amber-950/10 p-4">
@@ -262,7 +328,7 @@ export default function StockJerarquicoView({
             </span>
             <span className="text-xs text-rose-300/80">agotadas</span>
           </div>
-          <span className="text-[11px] text-amber-400/80">requieren reposición</span>
+          <span className="text-[11px] text-amber-400/80">en la sucursal activa</span>
         </div>
 
         {isAdmin && (
@@ -319,8 +385,26 @@ export default function StockJerarquicoView({
           </div>
         </div>
 
-        {/* FILTROS POR CARACTERÍSTICAS (CATEGORÍA, COLOR, TALLA, ESTADO) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-white/10 text-xs">
+        {/* FILTROS POR CARACTERÍSTICAS (SUCURSAL, CATEGORÍA, COLOR, TALLA, ESTADO) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-3 border-t border-white/10 text-xs">
+          <div>
+            <label className="block text-[11px] font-semibold text-cyan-300 uppercase tracking-wider mb-1">
+              🏢 Sucursal
+            </label>
+            <select
+              value={sucursalSeleccionadaId}
+              onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
+              className="w-full rounded-lg border border-cyan-500/30 bg-slate-900 p-2 text-cyan-200 font-bold outline-none focus:border-cyan-400"
+            >
+              <option value="TODAS">🌐 Todas las Sucursales</option>
+              {sucursales.map((s) => (
+                <option key={s._id} value={s._id}>
+                  📍 {s.nombre} ({s.codigo})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
               Categoría
@@ -527,9 +611,10 @@ export default function StockJerarquicoView({
                         <tbody className="divide-y divide-white/5">
                           {producto.variantesFiltradas.map((variante, idx) => {
                             const varImg = getVarianteImagenPrincipal(variante) || imagenPrincipal;
-                            const stockFis = Number(variante.stock || 0);
-                            const stockRes = Number(variante.stockReservado || 0);
-                            const stockDisp = Math.max(0, stockFis - stockRes);
+                            const stockData = getStockVarianteSegunSucursal(variante, sucursalSeleccionadaId);
+                            const stockFis = stockData.fisico;
+                            const stockRes = stockData.reservado;
+                            const stockDisp = stockData.disponible;
                             const estado = calcularEstadoStock(stockDisp, producto.stockMinimo || 2);
 
                             return (
@@ -580,8 +665,29 @@ export default function StockJerarquicoView({
                                   {stockRes > 0 ? `${stockRes} u.` : "-"}
                                 </td>
 
-                                <td className="px-3 py-2.5 text-center font-extrabold text-cyan-300 font-mono text-sm">
-                                  {stockDisp} u.
+                                <td className="px-3 py-2.5 text-center">
+                                  <span className="font-extrabold text-cyan-300 font-mono text-sm block">
+                                    {stockDisp} u.
+                                  </span>
+                                  {variante.sucursalesStock && variante.sucursalesStock.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 justify-center max-w-[200px] mx-auto">
+                                      {variante.sucursalesStock.map((s) => (
+                                        <span
+                                          key={s.sucursalId}
+                                          className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold transition ${
+                                            s.sucursalId === sucursalSeleccionadaId
+                                              ? "bg-cyan-500/25 text-cyan-200 border border-cyan-400/50 shadow-sm"
+                                              : s.stockDisponible > 0
+                                              ? "bg-blue-500/10 text-blue-300 border border-blue-500/20"
+                                              : "bg-white/5 text-gray-500"
+                                          }`}
+                                          title={`${s.nombre}: ${s.stockDisponible} disp. (${s.stockFisico} fís / ${s.stockReservado} res)`}
+                                        >
+                                          {s.codigo}: {s.stockDisponible}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                 </td>
 
                                 <td className="px-3 py-2.5 text-center">

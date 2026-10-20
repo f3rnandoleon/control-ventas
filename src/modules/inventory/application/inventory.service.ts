@@ -2,6 +2,7 @@ import mongoose, { type ClientSession } from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import Producto from "@/models/producto";
 import NivelStock from "@/models/nivelStock";
+import Sucursal from "@/models/sucursal";
 import { getDefaultWarehouseId } from "@/modules/inventory/application/branch-stock.service";
 import type { Variante } from "@/types/producto";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
@@ -486,19 +487,68 @@ export async function consumeStockForSale({
     sucursalId || (await getDefaultWarehouseId(session));
 
   // Verificar y descontar en NivelStock de la sucursal correspondiente
-  const nivelEnSucursal = await NivelStock.findOne(
+  let nivelEnSucursal = await NivelStock.findOne(
     { sucursalId: targetSucursalId, varianteId: variante.varianteId },
     null,
     session ? { session } : undefined
   );
+
+  // Salvaguarda Legacy: si no existe registro en la sucursal pero tampoco existe ningún otro registro de NivelStock
+  // para esta variante en todo el sistema (producto importado o anterior a migración) y la variante tiene stock físico
+  if (!nivelEnSucursal) {
+    const totalNivelesVariante = await NivelStock.countDocuments(
+      { varianteId: variante.varianteId },
+      session ? { session } : undefined
+    );
+
+    if (totalNivelesVariante === 0 && Number(variante.stock || 0) >= cantidad) {
+      const nuevoNivel = new NivelStock({
+        sucursalId: targetSucursalId,
+        productoId: producto._id,
+        varianteId: variante.varianteId,
+        stockFisico: Math.max(0, Number(variante.stock || 0)),
+        stockReservado: 0,
+        stockMinimo: 2,
+      });
+      await nuevoNivel.save(session ? { session } : undefined);
+      nivelEnSucursal = nuevoNivel;
+    }
+  }
 
   const stockSucursalDisponible = nivelEnSucursal
     ? Math.max(0, Number(nivelEnSucursal.stockFisico || 0) - Number(nivelEnSucursal.stockReservado || 0))
     : 0;
 
   if (stockSucursalDisponible < cantidad) {
+    // Buscar en qué otras sucursales sí hay existencias para orientar al vendedor
+    const otrosNiveles = await NivelStock.find(
+      { varianteId: variante.varianteId, stockFisico: { $gt: 0 } },
+      null,
+      session ? { session } : undefined
+    ).populate("sucursalId", "nombre codigo");
+
+    const sucursalTargetDoc = await Sucursal.findById(targetSucursalId)
+      .select("nombre")
+      .session(session ? session : null);
+    const nombreSucursal = sucursalTargetDoc?.nombre || "la sucursal seleccionada";
+
+    if (otrosNiveles.length > 0) {
+      const listaDisponibles = otrosNiveles
+        .map((n) => {
+          const disp = Math.max(0, Number(n.stockFisico || 0) - Number(n.stockReservado || 0));
+          const sNom = (n.sucursalId as { nombre?: string })?.nombre || "Otra sucursal";
+          return `${sNom} (${disp} disp.)`;
+        })
+        .join(", ");
+
+      throw new AppError(
+        `Stock insuficiente en ${nombreSucursal} para ${producto.nombre} (${variante.color}/${variante.talla}). Disponible aquí: ${stockSucursalDisponible}. Hay existencias en: ${listaDisponibles}. Por favor seleccione en la cabecera del POS la sucursal que posee el stock o efectúe un traspaso de mercadería.`,
+        400
+      );
+    }
+
     throw new AppError(
-      `Stock insuficiente en la sucursal para ${producto.nombre} (${variante.color}/${variante.talla}). Disponible: ${stockSucursalDisponible}`,
+      `Stock insuficiente en ${nombreSucursal} para ${producto.nombre} (${variante.color}/${variante.talla}). Disponible: ${stockSucursalDisponible}`,
       400
     );
   }

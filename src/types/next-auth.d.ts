@@ -8,6 +8,7 @@ declare module "next-auth" {
             email: string;
             nombreCompleto: string;
             rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
+            sucursalAsignadaId?: string | null;
         };
     }
 
@@ -16,6 +17,7 @@ declare module "next-auth" {
         email: string;
         nombreCompleto: string;
         rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
+        sucursalAsignadaId?: string | null;
     }
 }
 
@@ -25,5 +27,6 @@ declare module "next-auth/jwt" {
         rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
         email?: string;
         nombreCompleto?: string;
+        sucursalAsignadaId?: string | null;
     }
 }

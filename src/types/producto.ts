@@ -6,6 +6,18 @@ export interface MedidasPrenda {
   largoMangaHombro?: number; // Largo de manga (hombro a manga) en cm
 }
 
+export interface SucursalStockInfo {
+  sucursalId: string;
+  nombre: string;
+  codigo: string;
+  tipo?: string;
+  permiteVentaPOS?: boolean;
+  esAlmacenPrincipal?: boolean;
+  stockFisico: number;
+  stockReservado: number;
+  stockDisponible: number;
+}
+
 export interface Variante {
   varianteId?: string;
   color: string;
@@ -14,6 +26,7 @@ export interface Variante {
   stock: number;
   stockReservado?: number;
   stockDisponible?: number;
+  sucursalesStock?: SucursalStockInfo[];
   imagenes?: string[];
   imagen?: string;
   descripcion?: string;

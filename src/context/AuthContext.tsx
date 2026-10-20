@@ -9,6 +9,7 @@ interface User {
   email: string;
   nombreCompleto: string;
   rol: "ADMIN" | "VENDEDOR" | "CLIENTE";
+  sucursalAsignadaId?: string | null;
 }
 
 interface AuthContextType {
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: session.user.email,
         nombreCompleto: session.user.nombreCompleto,
         rol: session.user.rol,
+        sucursalAsignadaId: session.user.sucursalAsignadaId,
       }
     : null;
 

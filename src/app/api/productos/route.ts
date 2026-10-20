@@ -20,8 +20,9 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const withStock = searchParams.get("withStock") === "true";
+    const sucursalId = searchParams.get("sucursalId") || undefined;
 
-    const productos = await listCatalog(withStock);
+    const productos = await listCatalog(withStock, sucursalId);
     return NextResponse.json(productos);
   } catch (error) {
     return handleRouteError(error, {

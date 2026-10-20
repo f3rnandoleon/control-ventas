@@ -58,6 +58,7 @@ export const authOptions: AuthOptions = {
           email: user.email,
           nombreCompleto: user.nombreCompleto,
           rol: user.rol,
+          sucursalAsignadaId: user.sucursalAsignadaId ? user.sucursalAsignadaId.toString() : null,
         };
       },
     }),
@@ -69,6 +70,7 @@ export const authOptions: AuthOptions = {
         token.rol = user.rol;
         token.email = user.email;
         token.nombreCompleto = user.nombreCompleto;
+        token.sucursalAsignadaId = user.sucursalAsignadaId;
       }
 
       if (trigger === "update") {
@@ -78,6 +80,10 @@ export const authOptions: AuthOptions = {
 
         if (session?.nombreCompleto) {
           token.nombreCompleto = session.nombreCompleto;
+        }
+
+        if (session?.sucursalAsignadaId !== undefined) {
+          token.sucursalAsignadaId = session.sucursalAsignadaId;
         }
       }
 
@@ -90,6 +96,7 @@ export const authOptions: AuthOptions = {
         session.user.email = (token.email as string) || session.user.email;
         session.user.nombreCompleto =
           (token.nombreCompleto as string) || session.user.nombreCompleto;
+        session.user.sucursalAsignadaId = token.sucursalAsignadaId as string | null | undefined;
       }
       return session;
     },

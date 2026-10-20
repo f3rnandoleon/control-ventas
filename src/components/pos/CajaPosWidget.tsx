@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { SesionCaja } from "@/types/sesionCaja";
 
 interface CajaPosWidgetProps {
+    sucursalId?: string;
     onCajaStatusChange?: (abierta: boolean) => void;
 }
 
@@ -14,7 +15,7 @@ interface SucursalCajaInfo {
     requiereAperturaCaja: boolean;
 }
 
-export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps) {
+export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPosWidgetProps) {
     const [sesionActiva, setSesionActiva] = useState<SesionCaja | null>(null);
     const [sucursalInfo, setSucursalInfo] = useState<SucursalCajaInfo | null>(null);
     const [loading, setLoading] = useState(true);
@@ -39,7 +40,8 @@ export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps
     const cargarSesionActiva = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await fetch("/api/pos/caja/activa");
+            const query = sucursalId ? `?sucursalId=${encodeURIComponent(sucursalId)}` : "";
+            const res = await fetch(`/api/pos/caja/activa${query}`);
             if (res.ok) {
                 const data = await res.json();
                 const sesion = data && "sesion" in data ? data.sesion : data;
@@ -62,7 +64,7 @@ export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps
         } finally {
             setLoading(false);
         }
-    }, [onCajaStatusChange]);
+    }, [sucursalId, onCajaStatusChange]);
 
     useEffect(() => {
         cargarSesionActiva();
@@ -80,6 +82,7 @@ export default function CajaPosWidget({ onCajaStatusChange }: CajaPosWidgetProps
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    sucursalId: sucursalId || sucursalInfo?._id,
                     montoApertura,
                     observacionesApertura: obsApertura,
                 }),

@@ -21,6 +21,7 @@ import {
   getDefaultWarehouseId,
 } from "@/modules/inventory/application/branch-stock.service";
 import NivelStock from "@/models/nivelStock";
+import Sucursal from "@/models/sucursal";
 import type { Variante, Producto } from "@/types/producto";
 
 import { getVariantPricing } from "@/utils/pricing";
@@ -30,8 +31,11 @@ type ProductoPayload = Partial<Producto> & {
 };
 
 type CatalogVariantLike = Record<string, unknown> & {
+  varianteId?: string;
   stock?: number | null;
   stockReservado?: number | null;
+  stockDisponible?: number | null;
+  sucursalesStock?: unknown[];
 };
 
 type CatalogProductLike = Record<string, unknown> & {
@@ -40,7 +44,7 @@ type CatalogProductLike = Record<string, unknown> & {
   stockMinimo?: number;
 };
 
-export async function listCatalog(withStock: boolean) {
+export async function listCatalog(withStock: boolean, sucursalId?: string) {
   await connectDB();
   const productos = await catalogRepository.listAll();
 
@@ -50,7 +54,76 @@ export async function listCatalog(withStock: boolean) {
     );
   }
 
-  return productos.map((producto) =>
+  // Cargar sucursales activas y niveles de stock para enriquecer las variantes
+  const sucursales = await Sucursal.find({ activa: true })
+    .select("_id nombre codigo tipo permiteVentaPOS esAlmacenPrincipal")
+    .sort({ esAlmacenPrincipal: -1, nombre: 1 })
+    .lean();
+
+  const niveles = await NivelStock.find({}).lean();
+  const nivelMap = new Map<string, { stockFisico: number; stockReservado: number }>();
+  for (const n of niveles) {
+    if (n.sucursalId && n.varianteId) {
+      nivelMap.set(`${n.sucursalId.toString()}_${n.varianteId}`, {
+        stockFisico: Number(n.stockFisico || 0),
+        stockReservado: Number(n.stockReservado || 0),
+      });
+    }
+  }
+
+  const productosConSucursales = productos.map((prod) => {
+    const rawProd = prod as CatalogProductLike;
+    const variantesOriginales = (rawProd.variantes || []) as (CatalogVariantLike & Record<string, unknown>)[];
+
+    const variantesEnriquecidas = variantesOriginales.map((v) => {
+      const varId = (v.varianteId as string) || "";
+      const sucursalesStock = sucursales.map((s) => {
+        const sId = String(s._id);
+        const nivel = varId ? nivelMap.get(`${sId}_${varId}`) : undefined;
+        const stockFisico = nivel ? Math.max(0, nivel.stockFisico) : 0;
+        const stockReservado = nivel ? Math.max(0, nivel.stockReservado) : 0;
+        return {
+          sucursalId: sId,
+          nombre: s.nombre as string,
+          codigo: s.codigo as string,
+          tipo: s.tipo as string,
+          permiteVentaPOS: Boolean(s.permiteVentaPOS),
+          esAlmacenPrincipal: Boolean(s.esAlmacenPrincipal),
+          stockFisico,
+          stockReservado,
+          stockDisponible: Math.max(0, stockFisico - stockReservado),
+        };
+      });
+
+      // Si se especificó una sucursal destino, el stock principal de la variante refleja esa sucursal
+      if (sucursalId) {
+        const branchMatch = sucursalesStock.find((b) => b.sucursalId === sucursalId);
+        const stock = branchMatch ? branchMatch.stockFisico : 0;
+        const stockReservado = branchMatch ? branchMatch.stockReservado : 0;
+        const stockDisponible = branchMatch ? branchMatch.stockDisponible : 0;
+        return {
+          ...v,
+          stock,
+          stockReservado,
+          stockDisponible,
+          sucursalesStock,
+        };
+      }
+
+      // Consolidado global: mantiene v.stock pero incluye sucursalesStock
+      return {
+        ...v,
+        sucursalesStock,
+      };
+    });
+
+    return {
+      ...rawProd,
+      variantes: variantesEnriquecidas,
+    };
+  });
+
+  return productosConSucursales.map((producto) =>
     withVariantAvailability(
       withComputedStock(producto as CatalogProductLike)
     )
