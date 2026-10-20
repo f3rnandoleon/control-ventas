@@ -102,25 +102,26 @@ export default function StockSucursalesModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-5xl rounded-3xl border border-white/20 bg-slate-950/95 p-6 md:p-8 shadow-[0_0_50px_rgba(0,180,255,0.25)] backdrop-blur-2xl my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+      <div className="relative w-full max-w-5xl max-h-[92dvh] flex flex-col rounded-2xl sm:rounded-3xl border border-white/20 bg-slate-950/95 p-4 sm:p-6 md:p-8 shadow-[0_0_50px_rgba(0,180,255,0.25)] backdrop-blur-2xl my-auto overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Encabezado */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-white/10 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 sm:pb-6 border-b border-white/10 gap-3 shrink-0">
           <div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🏬</span>
-              <h2 className="text-xl font-bold text-white tracking-wide">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-xl sm:text-2xl">🏬</span>
+              <h2 className="text-base sm:text-xl font-bold text-white tracking-wide">
                 Desglose de Stock por Tienda / Almacén
               </h2>
             </div>
-            <p className="mt-1 text-sm text-sky-400 font-medium">
+            <p className="mt-1 text-xs sm:text-sm text-sky-400 font-medium">
               {producto.nombre} <span className="text-gray-400">({producto.modelo || "Sin modelo"})</span> — SKU: {producto.sku}
             </p>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="self-end md:self-auto rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/10 transition"
+            className="self-end sm:self-auto rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-white/10 transition active:scale-95"
           >
             ✕ Cerrar
           </button>
@@ -180,7 +181,7 @@ export default function StockSucursalesModal({
             No se encontraron variantes que coincidan.
           </div>
         ) : (
-          <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2">
+          <div className="space-y-4 sm:space-y-6 flex-1 max-h-[55vh] overflow-y-auto pr-1 sm:pr-2">
             {filteredVariantes.map((variante) => {
               const img = getVarianteImagenPrincipal(variante);
 

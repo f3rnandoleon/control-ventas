@@ -247,16 +247,17 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
                 {/* MODAL DE APERTURA */}
                 {modalAperturaOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fadeIn">
-                        <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                        <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
                             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                                     <span>🏪</span> Apertura de Caja Diaria
                                 </h3>
                                 <button
                                     type="button"
                                     onClick={() => setModalAperturaOpen(false)}
-                                    className="text-gray-400 hover:text-white text-lg font-bold"
+                                    aria-label="Cerrar modal"
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white"
                                 >
                                     ✕
                                 </button>
@@ -276,7 +277,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                             required
                                             value={montoApertura}
                                             onChange={(e) => setMontoApertura(parseFloat(e.target.value) || 0)}
-                                            className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-3 py-2 text-white font-bold text-lg focus:border-amber-400 focus:outline-none"
+                                            className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-3 py-2.5 text-white font-bold text-lg focus:border-amber-400 focus:outline-none"
                                             placeholder="0.00"
                                         />
                                     </div>
@@ -298,18 +299,18 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                     />
                                 </div>
 
-                                <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+                                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-white/10">
                                     <button
                                         type="button"
                                         onClick={() => setModalAperturaOpen(false)}
-                                        className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5"
+                                        className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 active:scale-98"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isSubmitting}
-                                        className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                                        className="flex min-h-[42px] items-center justify-center rounded-xl bg-amber-500 px-5 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50 active:scale-98 shadow-md"
                                     >
                                         {isSubmitting ? "Abriendo..." : "Confirmar Apertura"}
                                     </button>
@@ -375,14 +376,17 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
             {/* MODAL DE MOVIMIENTO MANUAL */}
             {modalMovimientoOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
                         <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                            <h3 className="text-base font-bold text-white">Registrar Movimiento en Caja</h3>
+                            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                                <span>💸</span> Registrar Movimiento en Caja
+                            </h3>
                             <button
                                 type="button"
                                 onClick={() => setModalMovimientoOpen(false)}
-                                className="text-gray-400 hover:text-white"
+                                aria-label="Cerrar modal"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white"
                             >
                                 ✕
                             </button>
@@ -395,22 +399,22 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                     <button
                                         type="button"
                                         onClick={() => setTipoMov("EGRESO_MANUAL")}
-                                        className={`rounded-xl p-2 text-xs font-bold border transition ${tipoMov === "EGRESO_MANUAL"
+                                        className={`rounded-xl p-2.5 text-xs font-bold border transition ${tipoMov === "EGRESO_MANUAL"
                                                 ? "bg-rose-600/30 border-rose-500 text-rose-200"
                                                 : "bg-slate-800 border-white/10 text-gray-400"
                                             }`}
                                     >
-                                        Egreso (Salida / Gasto menor)
+                                        Egreso (Salida)
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setTipoMov("INGRESO_MANUAL")}
-                                        className={`rounded-xl p-2 text-xs font-bold border transition ${tipoMov === "INGRESO_MANUAL"
+                                        className={`rounded-xl p-2.5 text-xs font-bold border transition ${tipoMov === "INGRESO_MANUAL"
                                                 ? "bg-emerald-600/30 border-emerald-500 text-emerald-200"
                                                 : "bg-slate-800 border-white/10 text-gray-400"
                                             }`}
                                     >
-                                        Ingreso (Aporte adicional)
+                                        Ingreso (Aporte)
                                     </button>
                                 </div>
                             </div>
@@ -441,20 +445,20 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-white/10">
                                 <button
                                     type="button"
                                     onClick={() => setModalMovimientoOpen(false)}
-                                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300"
+                                    className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 active:scale-98"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="rounded-xl bg-cyan-600 px-5 py-2 text-xs font-bold text-white hover:bg-cyan-500 disabled:opacity-50"
+                                    className="flex min-h-[42px] items-center justify-center rounded-xl bg-cyan-600 px-5 py-2 text-xs font-bold text-white hover:bg-cyan-500 disabled:opacity-50 active:scale-98 shadow-md"
                                 >
-                                    {isSubmitting ? "Registrando..." : "Confirmar"}
+                                    {isSubmitting ? "Registrando..." : "Confirmar Movimiento"}
                                 </button>
                             </div>
                         </form>
@@ -464,16 +468,17 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
             {/* MODAL DE CIERRE / ARQUEO */}
             {modalCierreOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
                         <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                                 <span>🔒</span> Arqueo y Cierre de Caja
                             </h3>
                             <button
                                 type="button"
                                 onClick={() => setModalCierreOpen(false)}
-                                className="text-gray-400 hover:text-white"
+                                aria-label="Cerrar modal"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:text-white"
                             >
                                 ✕
                             </button>
@@ -481,19 +486,19 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
                         <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-800/80 p-3 text-xs">
                             <div>
-                                <p className="text-gray-400">Fondo Inicial:</p>
+                                <p className="text-gray-400 text-[10px] uppercase">Fondo Inicial:</p>
                                 <p className="font-bold text-white">Bs {sesionActiva.montoApertura.toFixed(2)}</p>
                             </div>
                             <div>
-                                <p className="text-gray-400">Ventas Efectivo:</p>
+                                <p className="text-gray-400 text-[10px] uppercase">Ventas Efectivo:</p>
                                 <p className="font-bold text-emerald-300">Bs {sesionActiva.totalVentasEfectivo.toFixed(2)}</p>
                             </div>
                             <div>
-                                <p className="text-gray-400">Ventas QR / Banco:</p>
+                                <p className="text-gray-400 text-[10px] uppercase">Ventas QR / Banco:</p>
                                 <p className="font-bold text-cyan-300">Bs {sesionActiva.totalVentasQR.toFixed(2)}</p>
                             </div>
                             <div>
-                                <p className="text-gray-400">Efectivo Sistema Esperado:</p>
+                                <p className="text-gray-400 text-[10px] uppercase">Efectivo Gaveta Esperado:</p>
                                 <p className="font-bold text-amber-300 text-sm">Bs {totalEsperadoEfectivo.toFixed(2)}</p>
                             </div>
                         </div>
@@ -554,18 +559,18 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-white/10">
                                 <button
                                     type="button"
                                     onClick={() => setModalCierreOpen(false)}
-                                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300"
+                                    className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-white/5 active:scale-98"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white hover:bg-rose-500 disabled:opacity-50 shadow-lg shadow-rose-900/30"
+                                    className="flex min-h-[42px] items-center justify-center rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white hover:bg-rose-500 disabled:opacity-50 shadow-lg shadow-rose-900/30 active:scale-98"
                                 >
                                     {isSubmitting ? "Cerrando..." : "Confirmar Cierre de Caja"}
                                 </button>

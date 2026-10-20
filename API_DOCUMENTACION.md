@@ -1,6 +1,6 @@
 # Documentación API - Control Ventas (Fit Andes)
 
-**Estado del documento:** Actualizado al 14 de octubre de 2026.  
+**Estado del documento:** Actualizado a Octubre de 2026.  
 **Referencia de implementación:** `src/app/api/**/route.ts`  
 **Validaciones de entrada:** Esquemas Zod en `src/schemas/*.ts`  
 **Capa de datos y persistencia:** Modelos Mongoose en `src/models/*.ts` y módulos de dominio en `src/modules/*`
@@ -14,6 +14,11 @@
 3. [Autenticación, Roles y Seguridad](#3-autenticación-roles-y-seguridad)
 4. [Rate Limiting y Convenciones de Error](#4-rate-limiting-y-convenciones-de-error)
 5. [Modelos Principales en Respuestas de API](#5-modelos-principales-en-respuestas-de-api)
+   - [5.1 Producto Público Sanitizado](#51-producto-público-sanitizado)
+   - [5.2 Producto Interno Enriquecido con Stock Multisucursal](#52-producto-interno-enriquecido-con-stock-multisucursal)
+   - [5.3 Pedido Unificado](#53-pedido-unificado)
+   - [5.4 Sucursal y Configuración de Caja](#54-sucursal-y-configuración-de-caja)
+   - [5.5 Compra a Proveedor y Costo Promedio Ponderado (CPP)](#55-compra-a-proveedor-y-costo-promedio-ponderado-cpp)
 6. [Catálogo de Endpoints por Dominio](#6-catálogo-de-endpoints-por-dominio)
    - [6.1 Salud y Estado Técnico](#61-salud-y-estado-técnico)
    - [6.2 Catálogo Público y Opciones de Entrega](#62-catálogo-público-y-opciones-de-entrega)
@@ -31,7 +36,7 @@
    - [6.14 Inventario y Kárdex](#614-inventario-y-kárdex)
    - [6.15 Sucursales y Stock Multitienda](#615-sucursales-y-stock-multitienda)
    - [6.16 Traspasos entre Sucursales](#616-traspasos-entre-sucursales)
-   - [6.17 Compras de Proveedores (CPP)](#617-compras-de-proveedores-cpp)
+   - [6.17 Compras de Proveedores (CPP) y Reemplazo Atómico](#617-compras-de-proveedores-cpp-y-reemplazo-atómico)
    - [6.18 Tesorería y Cuentas de Dinero](#618-tesorería-y-cuentas-de-dinero)
    - [6.19 Gastos Operativos](#619-gastos-operativos)
    - [6.20 Devoluciones y Cambios](#620-devoluciones-y-cambios)
@@ -157,8 +162,14 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
   "sku": "CH-ALP-001",
   "categoria": "Chompas",
   "precioVenta": 135.00,
+  "precioMinimo": 135.00,
+  "precioMaximo": 150.00,
+  "tieneRangoPrecios": true,
+  "precioDisplay": "Bs 135.00 - Bs 150.00",
   "descuento": 0,
   "stockTotal": 14,
+  "stockReservadoTotal": 1,
+  "stockDisponible": 13,
   "estado": "ACTIVO",
   "variantes": [
     {
@@ -166,6 +177,7 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
       "color": "Negro",
       "colorSecundario": "Gris",
       "talla": "M",
+      "precioVenta": 135.00,
       "stock": 8,
       "stockReservado": 1,
       "stockDisponible": 7,
@@ -180,7 +192,51 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
 }
 ```
 
-### 5.2 Pedido Unificado
+### 5.2 Producto Interno Enriquecido con Stock Multisucursal
+En endpoints administrativos (`/api/productos` y `/api/productos/:id`), cada variante incluye costos (`precioCosto`, `costoOrigen`, `monedaOrigen`) y el desglose en tiempo real por cada sucursal (`sucursalesStock`):
+```json
+{
+  "_id": "670e10a2f1b4c90012345678",
+  "nombre": "Chompa Alpaca Andina",
+  "sku": "CH-ALP-001",
+  "precioVenta": 135.00,
+  "precioCosto": 70.00,
+  "stockTotal": 14,
+  "variantes": [
+    {
+      "varianteId": "var-alp-neg-m",
+      "color": "Negro",
+      "talla": "M",
+      "codigoBarra": "7771234567890",
+      "qrCode": "QR-CH-ALP-NEG-M",
+      "precioCosto": 70.00,
+      "stock": 8,
+      "stockReservado": 1,
+      "stockDisponible": 7,
+      "sucursalesStock": [
+        {
+          "sucursalId": "670e1000f1b4c90011000001",
+          "nombre": "Almacén Central",
+          "codigo": "ALM-CENTRAL",
+          "stockFisico": 6,
+          "stockReservado": 1,
+          "stockDisponible": 5
+        },
+        {
+          "sucursalId": "670e1000f1b4c90011000002",
+          "nombre": "Tienda 1 - San Miguel",
+          "codigo": "TDA-SM",
+          "stockFisico": 2,
+          "stockReservado": 0,
+          "stockDisponible": 2
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 5.3 Pedido Unificado
 ```json
 {
   "_id": "670e3001f1b4c90011223344",
@@ -207,9 +263,75 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
   "items": [
     {
       "productoId": "670e10a2f1b4c90012345678",
+      "varianteId": "var-alp-neg-m",
       "cantidad": 1,
       "precioUnitario": 135.00,
       "totalLinea": 135.00
+    }
+  ]
+}
+```
+
+### 5.4 Sucursal y Configuración de Caja
+Define las propiedades operativas de cada local o almacén, controlando si el personal de caja debe abrir turno formalmente o puede operar con caja libre:
+```json
+{
+  "_id": "670e1000f1b4c90011000001",
+  "nombre": "Tienda 1 - San Miguel",
+  "codigo": "TDA-SM",
+  "tipo": "TIENDA_FISICA",
+  "direccion": "Av. Montenegro #1234",
+  "ciudad": "La Paz",
+  "telefono": "59170123456",
+  "permiteVentaPOS": true,
+  "permiteDespachoWeb": false,
+  "permiteRetiroCliente": true,
+  "requiereAperturaCaja": true,
+  "activa": true,
+  "esAlmacenPrincipal": false
+}
+```
+
+### 5.5 Compra a Proveedor y Costo Promedio Ponderado (CPP)
+Documento de adquisición que incrementa inventario y recalcula atómicamente el CPP por cada variante, guardando snapshots inmutables para posibilitar reversiones y reemplazos exactos:
+```json
+{
+  "_id": "670e5000f1b4c90011990011",
+  "numeroCompra": "COM-261020-001",
+  "fecha": "2026-10-20T10:00:00.000Z",
+  "proveedor": "Textiles del Valle S.R.L.",
+  "comprobanteReferencia": "FAC-9842",
+  "monedaOrigen": "PEN",
+  "tipoCambio": 1.95,
+  "totalMonedaOrigen": 1000.00,
+  "totalBOB": 1950.00,
+  "sucursalDestinoId": "670e1000f1b4c90011000001",
+  "cuentaDineroId": "670e2000f1b4c90011440022",
+  "estado": "COMPLETADA",
+  "reemplazaACompraId": null,
+  "reemplazadaPorCompraId": null,
+  "items": [
+    {
+      "productoId": "670e10a2f1b4c90012345678",
+      "varianteId": "var-alp-neg-m",
+      "productoSnapshot": {
+        "nombre": "Chompa Alpaca Andina",
+        "modelo": "Invierno 2026",
+        "sku": "CH-ALP-001"
+      },
+      "varianteSnapshot": {
+        "color": "Negro",
+        "talla": "M",
+        "codigoBarra": "7771234567890"
+      },
+      "cantidad": 20,
+      "costoUnitarioOrigen": 50.00,
+      "costoUnitarioBOB": 97.50,
+      "totalLineaBOB": 1950.00,
+      "stockAnterior": 8,
+      "costoAnteriorBOB": 70.00,
+      "nuevoStock": 28,
+      "nuevoCostoPromedioBOB": 89.64
     }
   ]
 }
@@ -326,15 +448,15 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
 ### 6.11 Punto de Venta (POS) y Turnos de Caja
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/pos/scan/:code` | `ADMIN`, `VENDEDOR` | Escaneo rápido por código de barras o QR de etiqueta de prenda |
-| `POST` | `/api/pos/sales` | `ADMIN`, `VENDEDOR` | Venta directa en mostrador con descuento automático de stock y registro en caja |
-| `GET` | `/api/pos/my-sales` | `ADMIN`, `VENDEDOR` | Lista las ventas directas del vendedor autenticado |
-| `GET` | `/api/pos/summary` | `ADMIN`, `VENDEDOR` | Resumen de ventas, ingresos, ganancias y desglose efectivo vs QR |
-| `GET` | `/api/pos/caja/activa` | `ADMIN`, `VENDEDOR` | Consulta si existe turno de caja abierto en la sucursal |
-| `POST` | `/api/pos/caja/apertura` | `ADMIN`, `VENDEDOR` | Abre turno de caja con monto de fondo inicial |
-| `POST` | `/api/pos/caja/cierre` | `ADMIN`, `VENDEDOR` | Cierra turno con arqueo de efectivo y cálculo automático de descuadre |
-| `POST` | `/api/pos/caja/movimiento-manual` | `ADMIN`, `VENDEDOR` | Registra egreso menor (ej. almuerzo, limpieza) o ingreso manual |
-| `GET` | `/api/admin/pos/cajas` | `ADMIN` | Historial administrativo de sesiones de caja de todas las sucursales |
+| `GET` | `/api/pos/scan/:code` | `ADMIN`, `VENDEDOR` | Escaneo rápido por código de barras o QR de etiqueta de prenda. Acepta query opcional `?sucursalId=` para consultar stock físico local |
+| `POST` | `/api/pos/sales` | `ADMIN`, `VENDEDOR` | Venta directa en mostrador. Requiere `sucursalId`. Valida y descuenta existencias físicas en la sucursal (`NivelStock`), asienta Kárdex `SALIDA` y suma a la sesión de caja si está abierta |
+| `GET` | `/api/pos/my-sales` | `ADMIN`, `VENDEDOR` | Lista las ventas directas registradas por el vendedor autenticado en el día |
+| `GET` | `/api/pos/summary` | `ADMIN`, `VENDEDOR` | Resumen de ventas, ingresos, ganancias y desglose de cobros en efectivo vs QR |
+| `GET` | `/api/pos/caja/activa` | `ADMIN`, `VENDEDOR` | Consulta el turno de caja de la sucursal (`?sucursalId=`). Devuelve `{ sesion, sucursal: { _id, nombre, requiereAperturaCaja, permiteVentaPOS } }`. Si `sesion` es null pero `requiereAperturaCaja` es false, la venta libre está permitida |
+| `POST` | `/api/pos/caja/apertura` | `ADMIN`, `VENDEDOR` | Abre turno de caja. Body: `{ sucursalId, montoApertura, notasApertura? }` |
+| `POST` | `/api/pos/caja/cierre` | `ADMIN`, `VENDEDOR` | Cierra turno y arquea efectivo. Body: `{ sesionId, montoDeclaradoEfectivo, notasCierre? }`. Calcula descuadre de efectivo (`diferenciaEfectivo`) |
+| `POST` | `/api/pos/caja/movimiento-manual` | `ADMIN`, `VENDEDOR` | Registra movimientos no comerciales. Body: `{ sesionId, tipo: "INGRESO_MANUAL" \| "EGRESO_MANUAL", monto, motivo }` |
+| `GET` | `/api/admin/pos/cajas` | `ADMIN` | Historial administrativo de turnos de caja de todas las sucursales |
 
 ---
 
@@ -343,62 +465,65 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
 |---|---|---|---|
 | `POST` | `/api/integrations/whatsapp/orders` | API Key Bot | Creación de pedido con idempotencia, reserva hasta fin de día (La Paz UTC-4) e instrucciones de BancoSol |
 | `POST` | `/api/integrations/whatsapp/payments/:id/proof`| API Key Bot | Subida de captura de comprobante enviada por el cliente, prórroga de reserva 48h y notificación a Telegram |
-| `GET` | `/api/integrations/whatsapp/orders/:nro` | API Key Bot | Consulta de estado de orden filtrada por número de teléfono del cliente |
+| `GET` | `/api/integrations/whatsapp/orders/:nro` | API Key Bot | Consulta de estado de orden filtrada por número de teléfono del cliente (`?phone=`) |
 
 ---
 
 ### 6.13 Catálogo Interno de Productos
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/productos` | `ADMIN`, `VENDEDOR` | Listado completo con stock de variantes y costos |
-| `POST` | `/api/productos` | `ADMIN` | Alta de nueva prenda con sus variantes |
-| `GET` | `/api/productos/:id` | `ADMIN`, `VENDEDOR` | Ficha técnica interna de producto |
-| `PUT` | `/api/productos/:id` | `ADMIN` | Edición de producto, variantes, precios y categorías |
-| `DELETE` | `/api/productos/:id` | `ADMIN` | Baja de producto |
-| `GET` | `/api/productos/by-code/:code` | `ADMIN`, `VENDEDOR` | Búsqueda por código de barras o QR interno |
+| `GET` | `/api/productos` | `ADMIN`, `VENDEDOR` | Listado completo de prendas. Cada variante incluye costos internos y el desglose de existencias por sucursal en `sucursalesStock` |
+| `POST` | `/api/productos` | `ADMIN` | Alta de nueva prenda con sus variantes, medidas y precios base |
+| `GET` | `/api/productos/:id` | `ADMIN`, `VENDEDOR` | Ficha técnica interna de producto con histórico y variantes enriquecidas con `sucursalesStock` |
+| `PUT` | `/api/productos/:id` | `ADMIN` | Edición integral de producto, variantes, precios y categorías |
+| `DELETE` | `/api/productos/:id` | `ADMIN` | Baja lógica de producto |
+| `GET` | `/api/productos/by-code/:code` | `ADMIN`, `VENDEDOR` | Búsqueda directa por código de barras o QR interno |
 
 ---
 
 ### 6.14 Inventario y Kárdex
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/inventario` | `ADMIN`, `VENDEDOR` | Movimientos generales de inventario |
-| `POST` | `/api/inventario` | `ADMIN` | Registro manual de ajuste de stock |
-| `GET` | `/api/inventario/:productoId` | `ADMIN`, `VENDEDOR` | Kárdex específico por producto |
-| `GET` | `/api/inventario/kardex/consolidado` | `ADMIN` | Kárdex físico y valorado consolidado del negocio |
+| `GET` | `/api/inventario` | `ADMIN`, `VENDEDOR` | Historial de movimientos de inventario con filtros por fecha, tipo de movimiento y producto |
+| `POST` | `/api/inventario` | `ADMIN` | Registro manual de ajuste de inventario (`AJUSTE_POSITIVO` o `AJUSTE_NEGATIVO`) con afectación a Kárdex |
+| `GET` | `/api/inventario/:productoId` | `ADMIN`, `VENDEDOR` | Kárdex cronológico específico de un producto (entradas, salidas, traspasos, ajustes) |
+| `GET` | `/api/inventario/kardex/consolidado` | `ADMIN` | Kárdex físico y valorado consolidado del negocio con cálculo de stock actual y costo total valorado |
 
 ---
 
 ### 6.15 Sucursales y Stock Multitienda
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/admin/sucursales` | `ADMIN`, `VENDEDOR` | Listado de tiendas físicas y almacenes centrales |
-| `POST` | `/api/admin/sucursales` | `ADMIN` | Alta de nueva sucursal |
-| `GET` | `/api/admin/sucursales/:id` | `ADMIN` | Detalle de sucursal |
-| `PUT` | `/api/admin/sucursales/:id` | `ADMIN` | Modificación de sucursal |
-| `DELETE` | `/api/admin/sucursales/:id` | `ADMIN` | Desactivación de sucursal |
-| `GET` | `/api/admin/productos/:id/stock-sucursales` | `ADMIN`, `VENDEDOR` | Desglose de existencias físicas y reservadas por sucursal para un producto |
+| `GET` | `/api/admin/sucursales` | `ADMIN`, `VENDEDOR` | Listado de sucursales (tiendas físicas, almacenes y puntos de retiro) con flags de venta POS, despacho web y requerimiento de caja |
+| `POST` | `/api/admin/sucursales` | `ADMIN` | Alta de nueva sucursal (`nombre`, `codigo`, `tipo`, `permiteVentaPOS`, `permiteDespachoWeb`, `permiteRetiroCliente`, `requiereAperturaCaja`) |
+| `GET` | `/api/admin/sucursales/:id` | `ADMIN` | Detalle de sucursal y configuración operativa |
+| `PUT` | `/api/admin/sucursales/:id` | `ADMIN` | Modificación de datos y políticas de la sucursal (ej. activar o desactivar `requiereAperturaCaja`) |
+| `DELETE` | `/api/admin/sucursales/:id` | `ADMIN` | Desactivación lógica de la sucursal |
+| `GET` | `/api/admin/productos/:id/stock-sucursales` | `ADMIN`, `VENDEDOR` | Desglose pormenorizado de niveles de stock (`stockFisico`, `stockReservado`, `stockDisponible`) por cada sucursal para el producto |
 
 ---
 
 ### 6.16 Traspasos entre Sucursales
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/admin/traspasos` | `ADMIN`, `VENDEDOR` | Listado de solicitudes de traspaso de mercadería |
-| `POST` | `/api/admin/traspasos` | `ADMIN`, `VENDEDOR` | Crear solicitud de traspaso (`SOLICITADA`) validando existencias en origen |
-| `GET` | `/api/admin/traspasos/:id` | `ADMIN`, `VENDEDOR` | Detalle de un traspaso y sus ítems |
-| `POST` | `/api/admin/traspasos/:id/despachar` | `ADMIN`, `VENDEDOR` | Despacho: descuenta stock de origen y asienta `TRASPASO_SALIDA` |
-| `POST` | `/api/admin/traspasos/:id/recibir` | `ADMIN`, `VENDEDOR` | Recepción: ingresa stock a destino y asienta `TRASPASO_ENTRADA` |
+| `GET` | `/api/admin/traspasos` | `ADMIN`, `VENDEDOR` | Listado de traspasos con filtros por `estado` (`SOLICITADA`, `DESPACHADA`, `RECIBIDA`, `RECHAZADA`, `CANCELADA`) y `sucursalId` |
+| `POST` | `/api/admin/traspasos` | `ADMIN`, `VENDEDOR` | Crea solicitud de traspaso. Body: `{ sucursalOrigenId, sucursalDestinoId, items: [{ productoId, varianteId, cantidad }], notas? }`. Valida existencias en origen |
+| `GET` | `/api/admin/traspasos/:id` | `ADMIN`, `VENDEDOR` | Detalle completo de una solicitud de traspaso y sus líneas de mercadería |
+| `DELETE`| `/api/admin/traspasos/:id` | `ADMIN`, `VENDEDOR` | Cancela una solicitud en estado `SOLICITADA` sin afectar inventario |
+| `POST` | `/api/admin/traspasos/:id/despachar` | `ADMIN`, `VENDEDOR` | Despacho: descuenta stock físico de la sucursal origen y asienta `TRASPASO_SALIDA` en Kárdex |
+| `POST` | `/api/admin/traspasos/:id/recibir` | `ADMIN`, `VENDEDOR` | Recepción: ingresa stock a la sucursal destino y asienta `TRASPASO_ENTRADA` en Kárdex |
 
 ---
 
-### 6.17 Compras de Proveedores (CPP)
+### 6.17 Compras de Proveedores (CPP) y Reemplazo Atómico
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/compras` | `ADMIN`, `VENDEDOR` | Historial de compras registradas a proveedores |
-| `POST` | `/api/compras` | `ADMIN` | Registro de compra: incrementa stock, recalcula Costo Promedio Ponderado (CPP), genera asiento `ENTRADA` y egreso financiero |
-| `GET` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Detalle de compra y desglose de ítems |
-| `DELETE`| `/api/compras/:id` | `ADMIN` | Anulación de compra: revierte existencias y reembolsa a tesorería |
+| `GET` | `/api/compras` | `ADMIN`, `VENDEDOR` | Historial paginado de compras (`?page=&limit=`). Incluye snapshots de productos, proveedores y totales en BOB y moneda origen |
+| `POST` | `/api/compras` | `ADMIN` | Registra compra: incrementa existencias en la sucursal destino, recalcula el Costo Promedio Ponderado (CPP) por variante, asienta `ENTRADA` en Kárdex y descuenta fondos de la cuenta de tesorería |
+| `GET` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Detalle completo de una compra con snapshots inmutables de costos anteriores vs nuevos y stock resultante |
+| `PUT` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Reemplazo atómico / Corrección de compra. Revierte atómicamente la compra anterior en memoria y aplica la nueva versión corregida en una sola transacción ACID, vinculando `reemplazaACompraId` y `reemplazadaPorCompraId` |
+| `PATCH` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Actualización de metadatos informativos (`notas`, `comprobanteReferencia`, `proveedor`) sin alterar inventario ni contabilidad |
+| `DELETE`| `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Anulación de compra. Body opcional: `{ motivo?: string }`. Revierte el stock en la sucursal destino y en catálogo global, restituye el dinero a la cuenta de tesorería y marca la compra como `ANULADA` |
 
 ---
 

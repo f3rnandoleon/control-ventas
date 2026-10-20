@@ -44,9 +44,24 @@
 9. [Módulo POS y Escáner (App Móvil / Personal de Tienda)](#9-módulo-pos-y-escáner-app-móvil--personal-de-tienda)
    - [9.1 Escanear Código de Barras / QR (`GET /api/pos/scan/:code`)](#91-escanear-código-de-barras--qr-get-apiposscancode)
    - [9.2 Registrar Venta Directa en Mostrador (`POST /api/pos/sales`)](#92-registrar-venta-directa-en-mostrador-post-apipossales)
-   - [9.3 Sesión de Caja Activa (`GET /api/pos/caja/activa`)](#93-sesión-de-caja-activa-get-apiposcajaactiva)
+   - [9.3 Sesión de Caja Activa y Modo Libre (`GET /api/pos/caja/activa`)](#93-sesión-de-caja-activa-y-modo-libre-get-apiposcajaactiva)
    - [9.4 Apertura de Caja (`POST /api/pos/caja/apertura`)](#94-apertura-de-caja-post-apiposcajaapertura)
-   - [9.5 Cierre y Arqueo de Caja (`POST /api/pos/caja/cierre`)](#95-cierre-y-arqueo-de-caja-post-apiposcajacierre)
+   - [9.5 Movimientos Manuales de Caja (`POST /api/pos/caja/movimiento-manual`)](#95-movimientos-manuales-de-caja-post-apiposcajamovimiento-manual)
+   - [9.6 Cierre y Arqueo de Caja (`POST /api/pos/caja/cierre`)](#96-cierre-y-arqueo-de-caja-post-apiposcajacierre)
+10. [Sucursales y Stock por Tienda](#10-sucursales-y-stock-por-tienda)
+    - [10.1 Listado de Sucursales (`GET /api/admin/sucursales`)](#101-listado-de-sucursales-get-apiadminsucursales)
+    - [10.2 Desglose de Stock por Sucursal (`GET /api/admin/productos/:id/stock-sucursales`)](#102-desglose-de-stock-por-sucursal-get-apiadminproductosidstock-sucursales)
+11. [Compras de Proveedores y Reemplazo Atómico](#11-compras-de-proveedores-y-reemplazo-atómico)
+    - [11.1 Listar Compras (`GET /api/compras`)](#111-listar-compras-get-apicompras)
+    - [11.2 Registrar Compra con CPP (`POST /api/compras`)](#112-registrar-compra-con-cpp-post-apicompras)
+    - [11.3 Detalle de Compra y Snapshots (`GET /api/compras/:id`)](#113-detalle-de-compra-y-snapshots-get-apicomprasid)
+    - [11.4 Anular Compra con Reversión (`DELETE /api/compras/:id`)](#114-anular-compra-con-reversión-delete-apicomprasid)
+    - [11.5 Reemplazo Atómico / Clonación Corregida (`PUT /api/compras/:id`)](#115-reemplazo-atómico--clonación-corregida-put-apicomprasid)
+12. [Traspasos de Mercadería entre Sucursales](#12-traspasos-de-mercadería-entre-sucursales)
+    - [12.1 Listar Traspasos (`GET /api/admin/traspasos`)](#121-listar-traspasos-get-apiadmintraspasos)
+    - [12.2 Solicitar Traspaso (`POST /api/admin/traspasos`)](#122-solicitar-traspaso-post-apiadmintraspasos)
+    - [12.3 Despachar Traspaso (`POST /api/admin/traspasos/:id/despachar`)](#123-despachar-traspaso-post-apiadmintraspasosiddespachar)
+    - [12.4 Recibir Traspaso (`POST /api/admin/traspasos/:id/recibir`)](#124-recibir-traspaso-post-apiadmintraspasosidrecibir)
 
 ---
 
@@ -65,7 +80,9 @@
 5. **Realizar Checkout con Bloqueo de Stock:** Reserva inventario temporalmente evitando sobreventas (30 min web, 48 hrs WhatsApp).
 6. **Subir Comprobantes QR:** Envío de imágenes directamente a Cloudinary y generación de alertas inmediatas con enlace de verificación a Telegram.
 7. **Canal Dedicado de WhatsApp:** API especializada con validación de teléfono, idempotencia y cálculo de vencimiento en zona horaria de Bolivia (`America/La_Paz`).
-8. **Operar POS Móvil:** Vendedores pueden escanear prendas con la cámara, cobrar en efectivo o QR y cerrar turnos de caja con arqueo.
+8. **Operar POS Móvil y Cajas Flexibles:** Vendedores pueden escanear prendas con la cámara, cobrar en efectivo o QR, validar stock físico local y operar con turnos de caja formales o caja libre según la sucursal (`requiereAperturaCaja`).
+9. **Desglose de Stock Multisucursal y Traspasos:** Visualización pormenorizada por sucursal de existencias físicas y reservadas, y control de traspasos seguros en dos fases (despacho en origen y recepción en destino).
+10. **Reabastecimiento con CPP y Corrección Atómica:** Registro de compras con Costo Promedio Ponderado (CPP), anulación con reversión total de inventario/caja, y reemplazo atómico transaccional para corregir compras erradas.
 
 ---
 
@@ -1062,19 +1079,21 @@ Completa una venta inmediata en mostrador.
 
 ---
 
-### 9.3 Sesión de Caja Activa (`GET /api/pos/caja/activa`)
-Verifica si el vendedor tiene un turno de caja abierto en su sucursal antes de poder realizar cobros.
+### 9.3 Sesión de Caja Activa y Modo Libre (`GET /api/pos/caja/activa`)
+Verifica el estado del turno de caja para la sucursal del vendedor. Permite saber si existe una sesión abierta y si esa sucursal en particular exige apertura obligatoria de caja para cobrar.
 
 - **Método:** `GET`
 - **Ruta:** `/api/pos/caja/activa?sucursalId=670e1000f1b4c90011000001`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+- *Nota sobre `sucursalId`:* Si se omite en la query, el backend intentará resolver la sucursal asignada al perfil del usuario o, en su defecto, el almacén principal activo.
 
-#### Respuesta (Si hay caja abierta):
+#### Respuesta cuando hay caja abierta (HTTP 200):
 ```json
 {
-  "activa": true,
   "sesion": {
     "_id": "670e4100f1b4c90011889900",
     "sucursalId": "670e1000f1b4c90011000001",
+    "usuarioAperturaId": "670e0001f1b4c90011000099",
     "fechaApertura": "2026-10-14T08:00:00.000Z",
     "montoApertura": 100.00,
     "totalVentasEfectivo": 125.00,
@@ -1083,16 +1102,44 @@ Verifica si el vendedor tiene un turno de caja abierto en su sucursal antes de p
     "totalEgresosManuales": 15.00,
     "montoEsperadoEfectivo": 210.00,
     "estado": "ABIERTA"
+  },
+  "sucursal": {
+    "_id": "670e1000f1b4c90011000001",
+    "nombre": "Tienda 1 - San Miguel",
+    "requiereAperturaCaja": true,
+    "permiteVentaPOS": true
   }
 }
 ```
-*Si no hay caja abierta:* Retorna `{ "activa": false, "sesion": null }`. La app debe mostrar la pantalla de apertura.
+
+#### Respuesta cuando no hay caja abierta pero la sucursal opera en Caja Libre (HTTP 200):
+```json
+{
+  "sesion": null,
+  "sucursal": {
+    "_id": "670e1000f1b4c90011000002",
+    "nombre": "Almacén Central / Showroom",
+    "requiereAperturaCaja": false,
+    "permiteVentaPOS": true
+  }
+}
+```
+
+> [!IMPORTANT]
+> **Regla de Negocio (Apertura de Caja Opcional vs Obligatoria):**
+> 1. Si `sesion === null` y `sucursal.requiereAperturaCaja === true`: La app de POS **debe exigir** al dependiente abrir caja (`POST /api/pos/caja/apertura`) antes de cobrar ventas en mostrador.
+> 2. Si `sesion === null` y `sucursal.requiereAperturaCaja === false`: La tienda física o almacén opera en modo "Turno Opcional / Caja Libre". El POS permite registrar ventas de inmediato (`POST /api/pos/sales`) sin bloquear al usuario, asociando los ingresos a la tesorería general sin necesidad de un turno formal.
 
 ---
 
 ### 9.4 Apertura de Caja (`POST /api/pos/caja/apertura`)
-Inicia el turno de venta con el monto de cambio inicial.
+Inicia el turno de venta registrando el fondo inicial de cambio en efectivo.
 
+- **Método:** `POST`
+- **Ruta:** `/api/pos/caja/apertura`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Payload:
 ```json
 {
   "sucursalId": "670e1000f1b4c90011000001",
@@ -1101,14 +1148,75 @@ Inicia el turno de venta con el monto de cambio inicial.
 }
 ```
 
----
-
-### 9.5 Cierre y Arqueo de Caja (`POST /api/pos/caja/cierre`)
-Finaliza el turno. El vendedor cuenta los billetes físicos y envía `montoDeclaradoEfectivo`. El backend calcula automáticamente el descuadre (`diferenciaEfectivo = montoDeclaradoEfectivo - montoEsperadoEfectivo`).
-
+#### Respuesta Exitosa (HTTP 201):
 ```json
 {
+  "_id": "670e4100f1b4c90011889900",
   "sucursalId": "670e1000f1b4c90011000001",
+  "usuarioAperturaId": "670e0001f1b4c90011000099",
+  "fechaApertura": "2026-10-14T08:00:00.000Z",
+  "montoApertura": 100.00,
+  "totalVentasEfectivo": 0.00,
+  "totalVentasQR": 0.00,
+  "totalIngresosManuales": 0.00,
+  "totalEgresosManuales": 0.00,
+  "montoEsperadoEfectivo": 100.00,
+  "estado": "ABIERTA"
+}
+```
+
+---
+
+### 9.5 Movimientos Manuales de Caja (`POST /api/pos/caja/movimiento-manual`)
+Registra ingresos o egresos de dinero no comerciales ocurridos durante el turno (por ejemplo: retiro para almuerzo del personal, compra de suministros de limpieza o inyección adicional de cambio).
+
+- **Método:** `POST`
+- **Ruta:** `/api/pos/caja/movimiento-manual`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Payload:
+```json
+{
+  "sesionId": "670e4100f1b4c90011889900",
+  "tipo": "EGRESO_MANUAL", // Valores: "INGRESO_MANUAL" | "EGRESO_MANUAL"
+  "monto": 25.00,
+  "motivo": "Compra urgente de cinta de embalaje y bolsas para la tienda"
+}
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "_id": "670e4100f1b4c90011889900",
+  "sucursalId": "670e1000f1b4c90011000001",
+  "totalEgresosManuales": 25.00,
+  "montoEsperadoEfectivo": 75.00,
+  "movimientosManuales": [
+    {
+      "tipo": "EGRESO_MANUAL",
+      "monto": 25.00,
+      "motivo": "Compra urgente de cinta de embalaje y bolsas para la tienda",
+      "fecha": "2026-10-14T11:30:00.000Z",
+      "usuarioId": "670e0001f1b4c90011000099"
+    }
+  ],
+  "estado": "ABIERTA"
+}
+```
+
+---
+
+### 9.6 Cierre y Arqueo de Caja (`POST /api/pos/caja/cierre`)
+Finaliza el turno de caja. El dependiente cuenta físicamente el efectivo disponible en gaveta y envía `montoDeclaradoEfectivo`. El backend computa automáticamente el descuadre (`diferenciaEfectivo = montoDeclaradoEfectivo - montoEsperadoEfectivo`).
+
+- **Método:** `POST`
+- **Ruta:** `/api/pos/caja/cierre`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Payload:
+```json
+{
+  "sesionId": "670e4100f1b4c90011889900",
   "montoDeclaradoEfectivo": 210.00,
   "notasCierre": "Cuadre exacto al cierre de turno tarde"
 }
@@ -1117,14 +1225,416 @@ Finaliza el turno. El vendedor cuenta los billetes físicos y envía `montoDecla
 #### Respuesta Exitosa (HTTP 200):
 ```json
 {
-  "message": "Sesión de caja cerrada exitosamente",
-  "resumen": {
-    "_id": "670e4100f1b4c90011889900",
-    "montoApertura": 100.00,
-    "montoEsperadoEfectivo": 210.00,
-    "montoDeclaradoEfectivo": 210.00,
-    "diferenciaEfectivo": 0.00,
-    "estado": "CERRADA"
+  "_id": "670e4100f1b4c90011889900",
+  "sucursalId": "670e1000f1b4c90011000001",
+  "fechaApertura": "2026-10-14T08:00:00.000Z",
+  "fechaCierre": "2026-10-14T18:00:00.000Z",
+  "montoApertura": 100.00,
+  "totalVentasEfectivo": 125.00,
+  "totalVentasQR": 270.00,
+  "totalIngresosManuales": 0.00,
+  "totalEgresosManuales": 15.00,
+  "montoEsperadoEfectivo": 210.00,
+  "montoDeclaradoEfectivo": 210.00,
+  "diferenciaEfectivo": 0.00,
+  "notasCierre": "Cuadre exacto al cierre de turno tarde",
+  "estado": "CERRADA"
+}
+```
+
+---
+
+## 10. Sucursales y Stock por Tienda
+
+Permite a aplicaciones externas, terminales POS o dashboards satélites conocer la infraestructura física de tiendas y consultar el stock exacto desglosado por local.
+
+### 10.1 Listado de Sucursales (`GET /api/admin/sucursales`)
+Obtiene la lista de tiendas físicas, almacenes centrales y puntos de retiro registrados en el sistema.
+
+- **Método:** `GET`
+- **Ruta:** `/api/admin/sucursales`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+[
+  {
+    "_id": "670e1000f1b4c90011000001",
+    "nombre": "Almacén Central",
+    "codigo": "ALM-CENTRAL",
+    "tipo": "ALMACEN_CENTRAL",
+    "direccion": "Zona Industrial Calle 8 #450",
+    "ciudad": "La Paz",
+    "telefono": "59178901234",
+    "permiteVentaPOS": true,
+    "permiteDespachoWeb": true,
+    "permiteRetiroCliente": false,
+    "requiereAperturaCaja": false,
+    "activa": true,
+    "esAlmacenPrincipal": true
+  },
+  {
+    "_id": "670e1000f1b4c90011000002",
+    "nombre": "Tienda 1 - San Miguel",
+    "codigo": "TDA-SM",
+    "tipo": "TIENDA_FISICA",
+    "direccion": "Av. Montenegro #1234",
+    "ciudad": "La Paz",
+    "telefono": "59170123456",
+    "permiteVentaPOS": true,
+    "permiteDespachoWeb": false,
+    "permiteRetiroCliente": true,
+    "requiereAperturaCaja": true,
+    "activa": true,
+    "esAlmacenPrincipal": false
+  }
+]
+```
+
+---
+
+### 10.2 Desglose de Stock por Sucursal (`GET /api/admin/productos/:id/stock-sucursales`)
+Retorna los niveles de stock físico, reservado y disponible de todas las variantes de un producto específico, clasificados por cada sucursal activa.
+
+- **Método:** `GET`
+- **Ruta:** `/api/admin/productos/:id/stock-sucursales`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Ejemplo de Petición:
+```bash
+curl -X GET "https://control-ventas-azure.vercel.app/api/admin/productos/670e10a2f1b4c90012345678/stock-sucursales" \
+  -H "Authorization: Bearer <accessToken>"
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+[
+  {
+    "_id": "670e2200f1b4c90011334401",
+    "productoId": "670e10a2f1b4c90012345678",
+    "varianteId": "var-alp-neg-m",
+    "sucursalId": {
+      "_id": "670e1000f1b4c90011000001",
+      "nombre": "Almacén Central",
+      "codigo": "ALM-CENTRAL",
+      "tipo": "ALMACEN_CENTRAL",
+      "permiteVentaPOS": true,
+      "activa": true
+    },
+    "stockFisico": 6,
+    "stockReservado": 1,
+    "stockMinimo": 2
+  },
+  {
+    "_id": "670e2200f1b4c90011334402",
+    "productoId": "670e10a2f1b4c90012345678",
+    "varianteId": "var-alp-neg-m",
+    "sucursalId": {
+      "_id": "670e1000f1b4c90011000002",
+      "nombre": "Tienda 1 - San Miguel",
+      "codigo": "TDA-SM",
+      "tipo": "TIENDA_FISICA",
+      "permiteVentaPOS": true,
+      "activa": true
+    },
+    "stockFisico": 2,
+    "stockReservado": 0,
+    "stockMinimo": 1
+  }
+]
+```
+
+---
+
+## 11. Compras de Proveedores y Reemplazo Atómico
+
+Permite a los administradores registrar abastecimiento de mercadería con recálculo automático de Costo Promedio Ponderado (CPP), anular compras con reversión completa o corregir compras erróneas mediante reemplazo atómico en transacción.
+
+### 11.1 Listar Compras (`GET /api/compras`)
+Obtiene el historial paginado de compras registradas.
+
+- **Método:** `GET`
+- **Ruta:** `/api/compras?page=1&limit=20`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "compras": [
+    {
+      "_id": "670e5000f1b4c90011990011",
+      "numeroCompra": "COM-261020-001",
+      "fecha": "2026-10-20T10:00:00.000Z",
+      "proveedor": "Textiles del Valle S.R.L.",
+      "monedaOrigen": "PEN",
+      "tipoCambio": 1.95,
+      "totalMonedaOrigen": 1000.00,
+      "totalBOB": 1950.00,
+      "estado": "COMPLETADA",
+      "items": [
+        {
+          "productoId": "670e10a2f1b4c90012345678",
+          "varianteId": "var-alp-neg-m",
+          "cantidad": 20,
+          "costoUnitarioBOB": 97.50,
+          "totalLineaBOB": 1950.00
+        }
+      ]
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "totalPages": 1
+}
+```
+
+---
+
+### 11.2 Registrar Compra con CPP (`POST /api/compras`)
+Registra una adquisición formal de prendas.  
+**Efectos inmediatos en el sistema:**
+1. Incrementa el `stockFisico` en el `NivelStock` de la sucursal de destino y en el catálogo global de variantes.
+2. Recalcula el **Costo Promedio Ponderado (CPP)** de cada variante en moneda nacional (BOB).
+3. Genera el asiento de Kárdex de tipo `ENTRADA` con el costo unitario y total.
+4. Descuenta los fondos egresados de la cuenta de tesorería seleccionada (`CuentaDinero`).
+
+- **Método:** `POST`
+- **Ruta:** `/api/compras`
+- **Auth:** `Authorization: Bearer <accessToken>` (`ADMIN`)
+
+#### Payload:
+```json
+{
+  "sucursalDestinoId": "670e1000f1b4c90011000001",
+  "cuentaDineroId": "670e2000f1b4c90011440022",
+  "proveedor": "Textiles del Valle S.R.L.",
+  "comprobanteReferencia": "FAC-9842",
+  "monedaOrigen": "PEN",
+  "tipoCambio": 1.95,
+  "notas": "Lote de temporada invierno confeccionado en Puno",
+  "items": [
+    {
+      "productoId": "670e10a2f1b4c90012345678",
+      "varianteId": "var-alp-neg-m",
+      "color": "Negro",
+      "colorSecundario": "Gris",
+      "talla": "M",
+      "cantidad": 20,
+      "costoUnitarioOrigen": 50.00
+    }
+  ]
+}
+```
+
+#### Respuesta Exitosa (HTTP 201):
+```json
+{
+  "message": "Compra registrada correctamente",
+  "compra": {
+    "_id": "670e5000f1b4c90011990011",
+    "numeroCompra": "COM-261020-001",
+    "estado": "COMPLETADA",
+    "totalBOB": 1950.00,
+    "items": [
+      {
+        "productoId": "670e10a2f1b4c90012345678",
+        "varianteId": "var-alp-neg-m",
+        "cantidad": 20,
+        "costoUnitarioBOB": 97.50,
+        "nuevoCostoPromedioBOB": 89.64,
+        "nuevoStock": 28
+      }
+    ]
   }
 }
 ```
+
+---
+
+### 11.3 Detalle de Compra y Snapshots (`GET /api/compras/:id`)
+Permite consultar el comprobante de compra con snapshots de auditoría inmutables (costo anterior, costo nuevo, stock antes y después).
+
+- **Método:** `GET`
+- **Ruta:** `/api/compras/670e5000f1b4c90011990011`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+---
+
+### 11.4 Anular Compra con Reversión (`DELETE /api/compras/:id`)
+Anula una compra errónea o cancelada con el proveedor.  
+**Efectos de reversión atómica:**
+1. Descuenta las unidades del inventario de la sucursal de destino y del catálogo global.
+2. Reintegra el dinero egresado a la cuenta bancaria o caja física de tesorería (`CuentaDinero`).
+3. Registra una contra-anotación en Kárdex.
+4. Marca el estado de la compra como `ANULADA` guardando `anuladaPor`, `fechaAnulacion` y `motivoAnulacion`.
+
+- **Método:** `DELETE`
+- **Ruta:** `/api/compras/670e5000f1b4c90011990011`
+- **Auth:** `Authorization: Bearer <accessToken>` (`ADMIN` o `VENDEDOR`)
+
+#### Payload (Opcional):
+```json
+{
+  "motivo": "Mercadería devuelta por fallas de tejido en costuras"
+}
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "message": "Compra anulada exitosamente. Stock y egresos monetarios revertidos.",
+  "compra": {
+    "_id": "670e5000f1b4c90011990011",
+    "estado": "ANULADA",
+    "motivoAnulacion": "Mercadería devuelta por fallas de tejido en costuras"
+  }
+}
+```
+
+---
+
+### 11.5 Reemplazo Atómico / Clonación Corregida (`PUT /api/compras/:id`)
+Permite corregir una compra ya registrada cuando el usuario digitó cantidades incorrectas, costos equivocados o variantes erradas.  
+**Garantía Transaccional ACID:**
+En una única operación atómica de MongoDB, el sistema:
+1. Revierte la compra previa (liberando stocks y restituyendo saldos financieros en memoria/transacción).
+2. Registra la nueva versión corregida.
+3. Vincula las referencias cruzadas `reemplazaACompraId` y `reemplazadaPorCompraId` para una auditoría contable inalterable.
+
+- **Método:** `PUT`
+- **Ruta:** `/api/compras/670e5000f1b4c90011990011`
+- **Auth:** `Authorization: Bearer <accessToken>` (`ADMIN` o `VENDEDOR`)
+
+#### Payload:
+Envía el mismo esquema de registro de compra (`createCompraSchema`) con los datos corregidos, pudiendo adjuntar el campo opcional `motivo`:
+```json
+{
+  "sucursalDestinoId": "670e1000f1b4c90011000001",
+  "cuentaDineroId": "670e2000f1b4c90011440022",
+  "proveedor": "Textiles del Valle S.R.L.",
+  "comprobanteReferencia": "FAC-9842",
+  "monedaOrigen": "PEN",
+  "tipoCambio": 1.95,
+  "motivo": "Corrección de cantidad: llegaron 18 prendas en lugar de 20",
+  "items": [
+    {
+      "productoId": "670e10a2f1b4c90012345678",
+      "varianteId": "var-alp-neg-m",
+      "color": "Negro",
+      "colorSecundario": "Gris",
+      "talla": "M",
+      "cantidad": 18,
+      "costoUnitarioOrigen": 50.00
+    }
+  ]
+}
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "message": "Compra corregida y reemplazada exitosamente",
+  "compra": {
+    "_id": "670e5099f1b4c90011990099",
+    "numeroCompra": "COM-261020-002",
+    "estado": "COMPLETADA",
+    "reemplazaACompraId": "670e5000f1b4c90011990011",
+    "totalBOB": 1755.00
+  }
+}
+```
+
+---
+
+## 12. Traspasos de Mercadería entre Sucursales
+
+Permite mover existencias entre tiendas físicas y almacenes centrales con flujo de dos pasos (Despacho en origen $\to$ Recepción en destino) para prevenir pérdidas de inventario en tránsito.
+
+### 12.1 Listar Traspasos (`GET /api/admin/traspasos`)
+Consulta las solicitudes de traspaso de inventario.
+
+- **Método:** `GET`
+- **Ruta:** `/api/admin/traspasos?estado=SOLICITADA&sucursalId=670e1000f1b4c90011000001`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+---
+
+### 12.2 Solicitar Traspaso (`POST /api/admin/traspasos`)
+Crea una solicitud formal de traspaso de prendas entre sucursales en estado `SOLICITADA`. Valida que la sucursal de origen cuente con stock suficiente.
+
+- **Método:** `POST`
+- **Ruta:** `/api/admin/traspasos`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Payload:
+```json
+{
+  "sucursalOrigenId": "670e1000f1b4c90011000001",
+  "sucursalDestinoId": "670e1000f1b4c90011000002",
+  "notas": "Reposición de stock para fin de semana en Tienda San Miguel",
+  "items": [
+    {
+      "productoId": "670e10a2f1b4c90012345678",
+      "varianteId": "var-alp-neg-m",
+      "cantidad": 5
+    }
+  ]
+}
+```
+
+#### Respuesta Exitosa (HTTP 201):
+```json
+{
+  "_id": "670e6000f1b4c90011220033",
+  "numeroTraspaso": "TRS-261020-001",
+  "sucursalOrigenId": "670e1000f1b4c90011000001",
+  "sucursalDestinoId": "670e1000f1b4c90011000002",
+  "estado": "SOLICITADA",
+  "items": [
+    {
+      "productoId": "670e10a2f1b4c90012345678",
+      "varianteId": "var-alp-neg-m",
+      "cantidad": 5
+    }
+  ]
+}
+```
+
+---
+
+### 12.3 Despachar Traspaso (`POST /api/admin/traspasos/:id/despachar`)
+El encargado del almacén o sucursal de origen entrega la mercadería al transporte o chofer.  
+**Efecto:** Descuenta las existencias físicas de la sucursal de origen en `NivelStock` y asienta el movimiento `TRASPASO_SALIDA` en Kárdex. El traspaso pasa a estado `DESPACHADA`.
+
+- **Método:** `POST`
+- **Ruta:** `/api/admin/traspasos/670e6000f1b4c90011220033/despachar`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "_id": "670e6000f1b4c90011220033",
+  "estado": "DESPACHADA",
+  "fechaDespacho": "2026-10-20T11:00:00.000Z"
+}
+```
+
+---
+
+### 12.4 Recibir Traspaso (`POST /api/admin/traspasos/:id/recibir`)
+El encargado de la sucursal de destino verifica la mercadería física recibida y confirma la entrada.  
+**Efecto:** Incrementa las existencias físicas en la sucursal de destino en `NivelStock` y asienta el movimiento `TRASPASO_ENTRADA` en Kárdex. El traspaso pasa a estado `RECIBIDA`.
+
+- **Método:** `POST`
+- **Ruta:** `/api/admin/traspasos/670e6000f1b4c90011220033/recibir`
+- **Auth:** `Authorization: Bearer <accessToken>` (`VENDEDOR` o `ADMIN`)
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "_id": "670e6000f1b4c90011220033",
+  "estado": "RECIBIDA",
+  "fechaRecepcion": "2026-10-20T12:30:00.000Z"
+}
+```
+

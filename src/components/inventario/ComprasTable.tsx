@@ -65,10 +65,104 @@ export default function ComprasTable({
             </div>
         );
     }
-
     return (
         <>
-            <div className="rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_20px_rgba(0,180,255,0.08)] overflow-hidden">
+            {/* VISTA MÓVIL: TARJETAS COMPACTAS (md:hidden) */}
+            <div className="space-y-3 md:hidden">
+                {compras.map((compra) => {
+                    const totalPrendas = compra.items.reduce((acc, item) => acc + item.cantidad, 0);
+                    const fechaStr = new Date(compra.fecha).toLocaleDateString("es-BO", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                    });
+
+                    return (
+                        <div
+                            key={compra._id}
+                            className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg backdrop-blur-sm transition active:scale-[0.99]"
+                        >
+                            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                                <div>
+                                    <span className="font-mono text-sm font-bold text-cyan-400">
+                                        {compra.numeroCompra}
+                                    </span>
+                                    <span className="ml-2 text-xs text-gray-400">{fechaStr}</span>
+                                </div>
+                                <span
+                                    className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        compra.estado === "ANULADA"
+                                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                            : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                    }`}
+                                >
+                                    {compra.estado === "ANULADA" ? "ANULADA" : "COMPLETADA"}
+                                </span>
+                            </div>
+
+                            <div className="my-3 space-y-1.5 text-xs">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-400">Proveedor:</span>
+                                    <span className="font-medium text-gray-100 truncate max-w-[180px]">
+                                        {compra.proveedor || "Sin proveedor"}
+                                    </span>
+                                </div>
+                                {compra.comprobanteReferencia && (
+                                    <div className="flex justify-between text-[11px]">
+                                        <span className="text-gray-500">Ref / Factura:</span>
+                                        <span className="text-gray-400 font-mono">
+                                            {compra.comprobanteReferencia}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                                    <span className="text-gray-400">Prendas / Moneda:</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-gray-200">{totalPrendas} u.</span>
+                                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 border border-slate-700">
+                                            {compra.monedaOrigen} {compra.monedaOrigen !== "BOB" && `(TC: ${compra.tipoCambio})`}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-1">
+                                    <span className="text-gray-400 font-medium">Total Invertido:</span>
+                                    <div className="text-right">
+                                        <span className="text-base font-extrabold text-emerald-400">
+                                            {formatMoney(compra.totalBOB)}
+                                        </span>
+                                        {compra.monedaOrigen !== "BOB" && (
+                                            <div className="text-[10px] text-gray-400">
+                                                {compra.monedaOrigen} {compra.totalMonedaOrigen.toFixed(2)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedCompra(compra)}
+                                    className="flex-1 flex min-h-[38px] items-center justify-center rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition active:scale-95"
+                                >
+                                    🔍 Ver Detalle
+                                </button>
+                                {compra.estado !== "ANULADA" && (
+                                    <Link
+                                        href={`/dashboard/admin/inventario/compras/nueva?corregirId=${compra._id}`}
+                                        className="flex-1 flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold transition active:scale-95"
+                                    >
+                                        <span>✏️</span> Corregir
+                                    </Link>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* VISTA ESCRITORIO: TABLA COMPLETA (hidden md:block) */}
+            <div className="hidden md:block rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_20px_rgba(0,180,255,0.08)] overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-gray-300">
                         <thead className="bg-white/5 border-b border-white/10 text-xs text-gray-400 uppercase tracking-wider">
@@ -182,35 +276,36 @@ export default function ComprasTable({
 
             {/* MODAL DETALLE DE COMPRA */}
             {selectedCompra && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl bg-gray-900 border border-white/10 shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-gray-900/80">
-                            <div>
-                                <h3 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
-                                    <span>Detalle de Compra:</span>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+                    <div className="w-full max-w-4xl max-h-[92dvh] flex flex-col rounded-2xl sm:rounded-3xl bg-slate-900 border border-white/15 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
+                        {/* HEADER DEL MODAL */}
+                        <div className="p-4 sm:p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/90 shrink-0 gap-3">
+                            <div className="min-w-0">
+                                <h3 className="text-base sm:text-xl font-bold text-cyan-400 flex items-center gap-2 truncate">
+                                    <span>Compra:</span>
                                     <span className="font-mono text-white">
                                         {selectedCompra.numeroCompra}
                                     </span>
                                 </h3>
-                                <p className="text-xs text-gray-400 mt-1">
-                                    Fecha:{" "}
-                                    {new Date(selectedCompra.fecha).toLocaleString("es-BO")} |{" "}
-                                    Proveedor: {selectedCompra.proveedor || "No especificado"}
+                                <p className="text-[11px] sm:text-xs text-gray-400 mt-1 truncate">
+                                    {new Date(selectedCompra.fecha).toLocaleString("es-BO")} • Proveedor: {selectedCompra.proveedor || "No especificado"}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSelectedCompra(null)}
-                                className="text-gray-400 hover:text-white text-2xl font-bold p-1 leading-none"
+                                aria-label="Cerrar detalle de compra"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-white text-base font-bold transition active:scale-95"
                             >
-                                &times;
+                                ✕
                             </button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                        {/* CONTENIDO DEL MODAL */}
+                        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1">
                             {selectedCompra.estado === "ANULADA" && (
-                                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1">
-                                    <div className="font-bold flex items-center gap-1.5 text-sm">
+                                <div className="p-3.5 sm:p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1">
+                                    <div className="font-bold flex items-center gap-1.5 text-xs sm:text-sm">
                                         <span>⚠️</span> Esta compra fue ANULADA
                                     </div>
                                     <p className="text-[11px] text-rose-400">
@@ -225,47 +320,118 @@ export default function ComprasTable({
                             )}
 
                             {/* Tarjetas de Resumen */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <span className="text-xs text-gray-400">Moneda & TC</span>
-                                    <p className="text-sm font-semibold text-white mt-1">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+                                <div className="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <span className="text-[10px] sm:text-xs text-gray-400 block">Moneda & TC</span>
+                                    <p className="text-xs sm:text-sm font-semibold text-white mt-0.5 truncate">
                                         {selectedCompra.monedaOrigen} (TC: {selectedCompra.tipoCambio})
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <span className="text-xs text-gray-400">Total Moneda Origen</span>
-                                    <p className="text-sm font-semibold text-white mt-1">
+                                <div className="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <span className="text-[10px] sm:text-xs text-gray-400 block">Total Origen</span>
+                                    <p className="text-xs sm:text-sm font-semibold text-white mt-0.5 truncate">
                                         {selectedCompra.monedaOrigen}{" "}
                                         {selectedCompra.totalMonedaOrigen.toFixed(2)}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <span className="text-xs text-gray-400">Total en Bolivianos</span>
-                                    <p className="text-lg font-bold text-emerald-400 mt-0.5">
+                                <div className="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <span className="text-[10px] sm:text-xs text-gray-400 block">Total Bolivianos</span>
+                                    <p className="text-sm sm:text-lg font-bold text-emerald-400 mt-0.5 truncate">
                                         {formatMoney(selectedCompra.totalBOB)}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <span className="text-xs text-gray-400">Ítems / Modelos</span>
-                                    <p className="text-sm font-semibold text-white mt-1">
+                                <div className="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <span className="text-[10px] sm:text-xs text-gray-400 block">Ítems / Variantes</span>
+                                    <p className="text-xs sm:text-sm font-semibold text-white mt-0.5">
                                         {selectedCompra.items.length} variantes
                                     </p>
                                 </div>
                             </div>
 
                             {selectedCompra.notas && (
-                                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+                                <div className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
                                     <span className="font-semibold">Notas:</span>{" "}
                                     {selectedCompra.notas}
                                 </div>
                             )}
 
-                            {/* Tabla de ítems con impacto CPP */}
+                            {/* Prendas Reabastecidas y Cálculo de CPP */}
                             <div>
-                                <h4 className="text-sm font-bold text-gray-200 mb-3 uppercase tracking-wider">
+                                <h4 className="text-xs sm:text-sm font-bold text-gray-200 mb-3 uppercase tracking-wider">
                                     Prendas Reabastecidas y Cálculo de CPP
                                 </h4>
-                                <div className="rounded-xl border border-white/10 overflow-hidden">
+
+                                {/* LISTA EN MÓVIL: TARJETAS (block md:hidden) */}
+                                <div className="space-y-3 md:hidden">
+                                    {selectedCompra.items.map((item: CompraItem, idx: number) => (
+                                        <div
+                                            key={idx}
+                                            className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-2.5 text-xs"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                {item.varianteSnapshot.imagen ? (
+                                                    <CloudinaryImage
+                                                        src={item.varianteSnapshot.imagen}
+                                                        alt={`${item.varianteSnapshot.color} - ${item.varianteSnapshot.talla}`}
+                                                        width={48}
+                                                        height={48}
+                                                        className="w-12 h-12 rounded-xl object-cover border border-white/20 shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-lg shrink-0">
+                                                        👕
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-bold text-white text-sm truncate">
+                                                        {item.productoSnapshot.nombre}
+                                                    </p>
+                                                    <p className="text-gray-400 text-[11px] truncate">
+                                                        {item.productoSnapshot.modelo ? `Mod: ${item.productoSnapshot.modelo}` : "Sin modelo"}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="rounded-lg bg-cyan-950/40 px-2 py-0.5 text-cyan-300 font-semibold border border-cyan-500/20 text-[11px]">
+                                                            {item.varianteSnapshot.color} - Talla {item.varianteSnapshot.talla}
+                                                        </span>
+                                                        <span className="rounded-lg bg-emerald-500/20 px-2 py-0.5 text-emerald-300 font-bold text-[11px]">
+                                                            +{item.cantidad} u.
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                                                <div className="rounded-xl bg-slate-800/60 p-2">
+                                                    <span className="text-[10px] text-gray-400 block">Costo Compra:</span>
+                                                    <span className="font-semibold text-white">{formatMoney(item.costoUnitarioBOB)}</span>
+                                                    {selectedCompra.monedaOrigen !== "BOB" && (
+                                                        <span className="text-[10px] text-gray-400 block">
+                                                            {selectedCompra.monedaOrigen} {item.costoUnitarioOrigen.toFixed(2)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="rounded-xl bg-slate-800/60 p-2">
+                                                    <span className="text-[10px] text-gray-400 block">Subtotal Línea:</span>
+                                                    <span className="font-bold text-emerald-400">{formatMoney(item.totalLineaBOB)}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5 rounded-xl bg-cyan-950/30 p-2.5 border border-cyan-500/20 text-[11px]">
+                                                <div className="flex justify-between">
+                                                    <span className="text-cyan-200">Stock Previo ➔ Nuevo:</span>
+                                                    <span className="font-mono text-white font-bold">{item.stockAnterior} u. ➔ {item.nuevoStock} u.</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-cyan-200">Costo Base ➔ Nuevo CPP:</span>
+                                                    <span className="font-mono text-cyan-300 font-bold">{formatMoney(item.costoAnteriorBOB)} ➔ {formatMoney(item.nuevoCostoPromedioBOB)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* TABLA EN ESCRITORIO (hidden md:block) */}
+                                <div className="hidden md:block rounded-xl border border-white/10 overflow-hidden">
                                     <table className="w-full text-xs text-gray-300">
                                         <thead className="bg-white/5 border-b border-white/10 text-gray-400">
                                             <tr>
@@ -353,21 +519,22 @@ export default function ComprasTable({
                             </div>
                         </div>
 
-                        <div className="p-4 border-t border-white/10 bg-gray-900/80 flex items-center justify-between">
-                            <div>
+                        {/* FOOTER DEL MODAL */}
+                        <div className="p-3 sm:p-4 border-t border-white/10 bg-slate-900/90 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 shrink-0">
+                            <div className="w-full sm:w-auto">
                                 {selectedCompra.estado !== "ANULADA" && (
-                                    <div className="flex items-center gap-2.5">
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                         <button
                                             type="button"
                                             disabled={anulando}
                                             onClick={() => handleAnular(selectedCompra)}
-                                            className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50"
+                                            className="flex min-h-[42px] items-center justify-center px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50 active:scale-98"
                                         >
                                             {anulando ? "Anulando..." : "🗑️ Anular Compra"}
                                         </button>
                                         <Link
                                             href={`/dashboard/admin/inventario/compras/nueva?corregirId=${selectedCompra._id}`}
-                                            className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold transition inline-flex items-center gap-1.5"
+                                            className="flex min-h-[42px] items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold transition active:scale-98"
                                         >
                                             <span>✏️</span> Corregir / Reemplazar Compra
                                         </Link>
@@ -377,7 +544,7 @@ export default function ComprasTable({
                             <button
                                 type="button"
                                 onClick={() => setSelectedCompra(null)}
-                                className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition"
+                                className="flex min-h-[42px] items-center justify-center px-6 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold transition active:scale-98"
                             >
                                 Cerrar
                             </button>

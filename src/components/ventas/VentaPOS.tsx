@@ -391,28 +391,30 @@ export default function VentaPOS({
       <button
         type="button"
         onClick={() => setListaCompleta(true)}
-        className="fixed bottom-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-2xl shadow-sky-900/25 transition hover:bg-sky-500 sm:text-sm"
+        className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2.5 rounded-full border border-sky-400/40 bg-sky-600 px-5 py-3 text-xs font-bold text-white shadow-2xl shadow-sky-900/50 transition hover:bg-sky-500 active:scale-95 sm:text-sm"
       >
-        <span>Lista de venta</span>
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{fields.length}</span>
-        <span className="text-lg leading-none">^</span>
+        <span className="text-base">🛒</span>
+        <span>Ver Carrito ({fields.length})</span>
+        <span className="text-xs font-bold">▲</span>
       </button>
 
       {listaCompleta && (
-        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm">
-          <div className="surface-card-strong absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col rounded-t-2xl p-3 shadow-2xl sm:p-5">
-            <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="surface-card-strong absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col rounded-t-3xl p-3.5 shadow-2xl sm:p-5 border-t border-white/20 animate-in slide-in-from-bottom duration-200">
+            <div className="mb-3 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div>
-                <h3 className="text-base font-bold sm:text-lg">Lista de venta</h3>
-                <p className="text-[11px] text-gray-400 sm:text-xs">Variantes seleccionadas para confirmar.</p>
+                <h3 className="text-base font-bold sm:text-lg flex items-center gap-2">
+                  <span>🛒</span> Carrito de Venta POS
+                </h3>
+                <p className="text-[11px] text-gray-400 sm:text-xs">Revisa las prendas y confirma la transacción.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setListaCompleta(false)}
                 aria-label="Ocultar lista de venta"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-xl font-bold text-[var(--accent-strong)] hover:bg-white/10"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-base font-bold text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95"
               >
-                v
+                ✕
               </button>
             </div>
 
@@ -574,23 +576,24 @@ export default function VentaPOS({
       )}
 
       {productoActivo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 pt-24 backdrop-blur-sm md:pt-4">
-          <div className="surface-card-strong max-h-[82vh] w-full max-w-4xl overflow-hidden rounded-2xl md:max-h-[88vh]">
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-4">
-              <div>
-                <h3 className="text-xl font-bold">{productoActivo.nombre}</h3>
-                <p className="text-sm text-gray-400">{productoActivo.modelo}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-5 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="surface-card-strong max-h-[92dvh] w-full max-w-4xl flex flex-col overflow-hidden rounded-2xl border border-white/15 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
+              <div className="min-w-0">
+                <h3 className="truncate text-base sm:text-xl font-bold">{productoActivo.nombre}</h3>
+                <p className="truncate text-xs sm:text-sm text-gray-400">{productoActivo.modelo || "Sin modelo"}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setProductoActivo(null)}
-                className="rounded-full border border-white/10 px-3 py-1 text-sm text-gray-300 hover:bg-white/10"
+                aria-label="Cerrar selección de variante"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-bold text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95"
               >
-                Cerrar
+                ✕
               </button>
             </div>
-            <div className="max-h-[70vh] overflow-y-auto p-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+              <div className="grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {productoActivo.variantes.map((variant, index) => {
                   const image = getVarianteImagenPrincipal(variant) || getProductoImage(productoActivo);
                   const stockDisponible = getStockEnSucursal(variant, sucursalSeleccionadaId);

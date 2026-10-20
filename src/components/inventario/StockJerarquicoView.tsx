@@ -592,8 +592,121 @@ export default function StockJerarquicoView({
 
                 {/* SUB-NIVEL DETALLE: VARIANTES DEL PRODUCTO */}
                 {isExpanded && (
-                  <div className="border-t border-white/10 bg-black/30 p-4 sm:p-5 animate-in fade-in duration-150">
-                    <div className="overflow-x-auto">
+                  <div className="border-t border-white/10 bg-black/30 p-3.5 sm:p-5 animate-in fade-in duration-150">
+                    {/* VISTA MÓVIL: TARJETAS DE VARIANTES (sm:hidden) */}
+                    <div className="space-y-3 sm:hidden">
+                      {producto.variantesFiltradas.map((variante, idx) => {
+                        const varImg = getVarianteImagenPrincipal(variante) || imagenPrincipal;
+                        const stockData = getStockVarianteSegunSucursal(variante, sucursalSeleccionadaId);
+                        const stockFis = stockData.fisico;
+                        const stockRes = stockData.reservado;
+                        const stockDisp = stockData.disponible;
+                        const estado = calcularEstadoStock(stockDisp, producto.stockMinimo || 2);
+
+                        return (
+                          <div
+                            key={variante.varianteId || idx}
+                            className="rounded-xl border border-white/10 bg-slate-800/50 p-3 space-y-2.5 text-xs"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="h-11 w-11 overflow-hidden rounded-lg border border-white/10 bg-black/40 shrink-0">
+                                  {varImg ? (
+                                    <CloudinaryImage
+                                      src={varImg}
+                                      alt={variante.color}
+                                      width={50}
+                                      height={50}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+                                      👟
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-white capitalize">
+                                      {variante.color}
+                                      {variante.colorSecundario && ` / ${variante.colorSecundario}`}
+                                    </span>
+                                    <span className="rounded bg-cyan-950 px-1.5 py-0.5 text-[10px] font-bold text-cyan-300 border border-cyan-500/30 font-mono">
+                                      T.{variante.talla}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                    {variante.codigoBarra ? `Cód: ${variante.codigoBarra}` : "Sin código"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                                  estado === "AGOTADO"
+                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                    : estado === "BAJO"
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                }`}
+                              >
+                                {estado === "AGOTADO" ? "Sin Stock" : estado === "BAJO" ? "Bajo" : "Normal"}
+                              </span>
+                            </div>
+
+                            {/* Stock pills en móvil */}
+                            <div className="grid grid-cols-3 gap-1.5 text-center pt-1 border-t border-white/5">
+                              <div className="rounded-lg bg-black/30 p-1.5">
+                                <span className="text-[9px] text-gray-400 block uppercase">Físico</span>
+                                <span className="font-bold text-gray-200">{stockFis} u.</span>
+                              </div>
+                              <div className="rounded-lg bg-black/30 p-1.5">
+                                <span className="text-[9px] text-gray-400 block uppercase">Res.</span>
+                                <span className="font-bold text-amber-300">{stockRes > 0 ? `${stockRes} u.` : "0"}</span>
+                              </div>
+                              <div className="rounded-lg bg-cyan-950/40 p-1.5 border border-cyan-500/20">
+                                <span className="text-[9px] text-cyan-300 block uppercase">Disp.</span>
+                                <span className="font-extrabold text-cyan-300">{stockDisp} u.</span>
+                              </div>
+                            </div>
+
+                            {/* Sucursales breakdown */}
+                            {variante.sucursalesStock && variante.sucursalesStock.length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {variante.sucursalesStock.map((s) => (
+                                  <span
+                                    key={s.sucursalId}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold ${
+                                      s.sucursalId === sucursalSeleccionadaId
+                                        ? "bg-cyan-500/25 text-cyan-200 border border-cyan-400/50"
+                                        : s.stockDisponible > 0
+                                        ? "bg-blue-500/10 text-blue-300 border border-blue-500/20"
+                                        : "bg-white/5 text-gray-500"
+                                    }`}
+                                  >
+                                    {s.codigo}: {s.stockDisponible}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDrawerVariante({ producto, variante });
+                              }}
+                              className="w-full flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold transition active:scale-98"
+                            >
+                              <span>🔍</span> Ver Análisis & Costo
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* VISTA ESCRITORIO: TABLA (hidden sm:block) */}
+                    <div className="hidden sm:block overflow-x-auto">
                       <table className="w-full text-xs text-gray-300">
                         <thead className="text-gray-400 border-b border-white/10 uppercase tracking-wider text-[10px]">
                           <tr>

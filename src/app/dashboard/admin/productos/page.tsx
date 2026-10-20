@@ -286,7 +286,124 @@ export default function AdminProductosPage() {
       <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre, modelo, SKU o variante..." className="input" />
       <ProductoFilters value={filters} categorias={categorias} onChange={setFilters} />
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_20px_rgba(0,180,255,0.15)]">
+      {/* VISTA MÓVIL: TARJETAS DE PRODUCTO (md:hidden) */}
+      <div className="space-y-3 md:hidden">
+        {loading && (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+            ))}
+          </div>
+        )}
+        {!loading && filteredProductos.map((producto) => {
+          const imagen = producto.variantes.map(getVarianteImagenPrincipal).find(Boolean);
+          return (
+            <div
+              key={producto._id}
+              className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg backdrop-blur-sm space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  {imagen ? (
+                    <CloudinaryImage
+                      src={imagen}
+                      alt={producto.nombre}
+                      width={56}
+                      height={56}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xl text-gray-500">
+                      👕
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-white text-sm truncate">
+                    {producto.nombre}
+                  </h3>
+                  <p className="text-xs text-gray-400 truncate">
+                    {producto.modelo || "Sin modelo"}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <span className="rounded-lg bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-300">
+                      {formatProductPriceDisplay(producto)}
+                    </span>
+                    <span className="rounded-lg bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-gray-300 border border-white/5">
+                      Costo: Bs {producto.precioCosto}
+                    </span>
+                    {producto.costoOrigen && producto.costoOrigen.moneda === "PEN" && (
+                      <span className="text-[10px] text-sky-400 font-normal">
+                        S/ {producto.costoOrigen.montoOriginal}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de acción táctiles en móvil */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs font-semibold">
+                <button
+                  type="button"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 active:scale-95"
+                  onClick={() => setStockModalProduct(producto)}
+                >
+                  🏬 Stock Tiendas
+                </button>
+                <button
+                  type="button"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-white/5 text-gray-200 border border-white/10 hover:bg-white/10 active:scale-95"
+                  onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}
+                >
+                  ✏️ Editar
+                </button>
+                <button
+                  type="button"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 active:scale-95"
+                  onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}
+                >
+                  🏷️ Variantes
+                </button>
+                <button
+                  type="button"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-white/5 text-gray-200 border border-white/10 hover:bg-white/10 active:scale-95"
+                  onClick={() => generarReporteProductoPDF(producto)}
+                >
+                  📄 Reporte
+                </button>
+                <button
+                  type="button"
+                  disabled={downloadingImageId === producto._id}
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/25 active:scale-95 disabled:opacity-50"
+                  onClick={() => openTallaSelector(producto)}
+                >
+                  🖼️ {downloadingImageId === producto._id ? "Generando..." : "Imagen"}
+                </button>
+                <button
+                  type="button"
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 active:scale-95"
+                  onClick={() => void handleDelete(producto)}
+                >
+                  🗑️ Eliminar
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {!loading && productos.length === 0 && (
+          <div className="py-8 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+            No hay productos registrados
+          </div>
+        )}
+        {!loading && productos.length > 0 && filteredProductos.length === 0 && (
+          <div className="py-8 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+            No hay productos que coincidan con los filtros
+          </div>
+        )}
+      </div>
+
+      {/* VISTA ESCRITORIO: TABLA COMPLETA (hidden md:block) */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_20px_rgba(0,180,255,0.15)]">
         <table className="w-full text-sm text-gray-300">
           <thead className="border-b border-white/10 text-gray-400"><tr>
             <th className="px-4 py-4">Imagen</th><th className="px-4">Nombre</th><th>Modelo</th><th>Precio Venta</th><th>Precio Costo</th><th className="px-6 text-right">Acciones</th>

@@ -1,44 +1,58 @@
 "use client";
 
+interface ConfirmModalProps {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
 export default function ConfirmModal({
   open,
   title,
   description,
+  confirmText = "Confirmar",
+  cancelText = "Cancelar",
   onConfirm,
   onCancel,
-}: {
-  open: boolean;
-  title: string;
-  description?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
+}: ConfirmModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-sky-950/20 backdrop-blur-sm">
-      <div className="surface-card-strong w-full max-w-md rounded-2xl p-6">
-        <h2 className="mb-2 text-lg font-semibold text-red-700">{title}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6 shadow-2xl text-white animate-in zoom-in-95 duration-150">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400 text-lg border border-red-500/20">
+            ⚠️
+          </div>
+          <div className="flex-1">
+            <h2 className="text-base font-bold text-white sm:text-lg">{title}</h2>
+            {description && (
+              <p className="mt-1 text-xs text-slate-300 sm:text-sm">
+                {description}
+              </p>
+            )}
+          </div>
+        </div>
 
-        {description && (
-          <p className="mb-6 text-sm text-slate-600">
-            {description}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-3">
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
+            type="button"
             onClick={onCancel}
-            className="btn-secondary px-4 py-2 text-sm"
+            className="flex min-h-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 active:scale-98 sm:text-sm"
           >
-            Cancelar
+            {cancelText}
           </button>
 
           <button
+            type="button"
             onClick={onConfirm}
-            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+            className="flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-red-900/30 transition hover:bg-red-500 active:scale-98 sm:text-sm"
           >
-            Cerrar sesion
+            {confirmText}
           </button>
         </div>
       </div>
