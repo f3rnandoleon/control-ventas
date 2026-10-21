@@ -47,8 +47,16 @@ export const catalogRepository = {
   },
 
   findByVariantCode(code: string) {
+    const trimmed = code.trim();
+    const safeRegex = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return Producto.findOne({
-      $or: [{ "variantes.codigoBarra": code }, { "variantes.qrCode": code }],
+      $or: [
+        { "variantes.codigoBarra": trimmed },
+        { "variantes.qrCode": trimmed },
+        { "variantes.varianteId": trimmed },
+        { sku: trimmed },
+        { sku: { $regex: new RegExp(`^${safeRegex}$`, "i") } },
+      ],
     });
   },
 };

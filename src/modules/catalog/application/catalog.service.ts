@@ -484,10 +484,14 @@ export async function getPublicCatalog(filters: PublicCatalogFilters = {}) {
       .filter((producto) => producto.variantes.length > 0);
   }
 
-  if (filters.page && filters.page >= 1) {
+  const total = procesados.length;
+  const isPaged =
+    (filters.page !== undefined && filters.page >= 1) ||
+    (filters.limit !== undefined && filters.limit >= 1);
+
+  if (isPaged) {
+    const page = filters.page && filters.page >= 1 ? filters.page : 1;
     const limit = Math.max(1, Math.min(filters.limit || 20, 100));
-    const page = filters.page;
-    const total = procesados.length;
     const totalPages = Math.ceil(total / limit) || 1;
     const data = procesados.slice((page - 1) * limit, page * limit);
 
@@ -500,7 +504,13 @@ export async function getPublicCatalog(filters: PublicCatalogFilters = {}) {
     };
   }
 
-  return procesados;
+  return {
+    data: procesados,
+    total,
+    page: 1,
+    limit: total,
+    totalPages: 1,
+  };
 }
 
 export async function getPublicCatalogProductById(id: string) {
@@ -522,41 +532,88 @@ export async function getPublicCatalogProductById(id: string) {
   );
 }
 
-export async function findCatalogProductByCode(code: string) {
-  if (!code) {
+export async function findCatalogProductByCode(
+  code: string,
+  isPublicOrClient = true
+) {
+  if (!code || !code.trim()) {
     throw new AppError("Código no proporcionado", 400);
   }
 
   await connectDB();
-  const producto = await catalogRepository.findByVariantCode(code);
+  const cleanCode = code.trim();
+  const producto = await catalogRepository.findByVariantCode(cleanCode);
 
   if (!producto) {
     throw new AppError("Producto no encontrado", 404);
   }
 
-  const variante = producto.variantes.find(
-    (v: Variante) => v.codigoBarra === code || v.qrCode === code
+  if (isPublicOrClient && producto.estado === "INACTIVO") {
+    throw new AppError("Producto no encontrado", 404);
+  }
+
+  let variante = (producto.variantes as Variante[]).find(
+    (v: Variante) =>
+      v.codigoBarra === cleanCode ||
+      v.qrCode === cleanCode ||
+      v.varianteId === cleanCode
   );
+
+  // Si no se encontró por código de variante directo, pero el producto coincidió por SKU
+  if (!variante && Array.isArray(producto.variantes) && producto.variantes.length > 0) {
+    variante =
+      (producto.variantes as Variante[]).find(
+        (v: Variante) => getVariantAvailableStock(v) > 0
+      ) || (producto.variantes as Variante[])[0];
+  }
 
   if (!variante) {
     throw new AppError("Variante no encontrada", 404);
   }
 
-  const stockDisponible = getVariantAvailableStock(variante);
+  const stockDisponible = Math.max(0, getVariantAvailableStock(variante));
 
-  if (stockDisponible <= 0) {
+  if (!isPublicOrClient && stockDisponible <= 0) {
     throw new AppError("Stock insuficiente", 400);
   }
 
   const pricing = getVariantPricing(producto, variante);
 
+  if (isPublicOrClient) {
+    return {
+      _id: producto._id,
+      nombre: producto.nombre,
+      modelo: producto.modelo,
+      sku: producto.sku,
+      descripcion: producto.descripcion || "",
+      categoria: producto.categoria,
+      precioVenta: pricing.precioVenta,
+      variante: {
+        varianteId: variante.varianteId || "",
+        color: variante.color,
+        colorSecundario: variante.colorSecundario || null,
+        talla: variante.talla,
+        stockDisponible,
+        precioVenta: pricing.precioVenta,
+        medidas: variante.medidas || {},
+        imagen: getVarianteImagenPrincipal(variante) || null,
+        imagenes: getVarianteImagenes(variante) || [],
+        codigoBarra: variante.codigoBarra || null,
+        qrCode: variante.qrCode || null,
+      },
+    };
+  }
+
   return {
     _id: producto._id,
     nombre: producto.nombre,
     modelo: producto.modelo,
+    sku: producto.sku,
+    descripcion: producto.descripcion,
+    categoria: producto.categoria,
     precioVenta: pricing.precioVenta,
     variante: {
-      varianteId: variante.varianteId,
+      varianteId: variante.varianteId || "",
       color: variante.color,
       colorSecundario: variante.colorSecundario,
       talla: variante.talla,

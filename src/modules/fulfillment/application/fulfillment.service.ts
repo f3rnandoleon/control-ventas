@@ -167,16 +167,35 @@ export async function getFulfillmentByOrderForActor(
   assertObjectId(pedidoId, "ID de pedido invalido");
   await connectDB();
 
-  const pedido =
-    role === "CLIENTE"
-      ? await pedidosRepository.findByIdForCustomer(pedidoId, userId)
-      : await pedidosRepository.findById(pedidoId);
+  let pedido = await pedidosRepository.findById(pedidoId);
+  let existingEntrega = null;
+
+  if (!pedido) {
+    existingEntrega = await fulfillmentRepository.findById(pedidoId);
+    if (existingEntrega) {
+      pedido = await pedidosRepository.findById(existingEntrega.pedidoId.toString());
+    }
+  }
 
   if (!pedido) {
     throw new AppError("Pedido no encontrado", 404);
   }
 
-  const existing = await fulfillmentRepository.findByOrderId(pedidoId);
+  if (role === "CLIENTE") {
+    const pedidoClienteId = resolveRefId(pedido.cliente)?.toString();
+    if (pedidoClienteId !== userId) {
+      throw new AppError(
+        "No autorizado para consultar la entrega de este pedido",
+        403
+      );
+    }
+  }
+
+  if (existingEntrega) {
+    return existingEntrega;
+  }
+
+  const existing = await fulfillmentRepository.findByOrderId(pedido._id.toString());
   if (existing) {
     return existing;
   }

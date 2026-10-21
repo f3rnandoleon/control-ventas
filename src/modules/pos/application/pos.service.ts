@@ -30,7 +30,7 @@ function assertStaff(actor: SalesActor): asserts actor is StaffActor {
 import { getAvailableStockInBranch } from "@/modules/inventory/application/branch-stock.service";
 
 export async function scanVariantForPos(code: string, sucursalId?: string) {
-  const producto = await findCatalogProductByCode(code);
+  const producto = await findCatalogProductByCode(code, false);
 
   let stockSucursal = producto.variante.stockDisponible;
   if (sucursalId && mongoose.Types.ObjectId.isValid(sucursalId)) {
