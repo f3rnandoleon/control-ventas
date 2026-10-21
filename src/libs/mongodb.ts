@@ -37,7 +37,15 @@ const cached: MongooseCache = global.mongoose ?? {
 };
 
 export async function connectDB() {
-  if (cached.conn) return cached.conn;
+  if (cached.conn && cached.conn.connection.readyState === 1) {
+    return cached.conn;
+  }
+
+  if (cached.conn && cached.conn.connection.readyState !== 1) {
+    cached.conn = null;
+    cached.promise = null;
+    cached.runtimeInfo = null;
+  }
 
   if (!cached.promise) {
     cached.promise = mongoose

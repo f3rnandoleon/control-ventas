@@ -183,7 +183,28 @@ async function runTests() {
     headers: { authorization: "Bearer invalid_secret_token" },
   });
   assert(verifyWhatsAppApiKey(reqSearchValid) === true, "verifyWhatsAppApiKey autoriza petición de búsqueda con clave válida");
-  assert(verifyWhatsAppApiKey(reqSearchInvalid) === false, "verifyWhatsAppApiKey rechaza petición de búsqueda con clave incorrecta");
+  assert(verifyWhatsAppApiKey(reqSearchInvalid) === false, "verifyWhatsAppApiKey rechaza petición de búsqueda con clave inválida");
+  // Test 11: Optimización de URLs de Cloudinary
+  const { optimizeCloudinaryUrl } = await import(
+    "../src/modules/integrations/whatsapp/whatsapp.service"
+  );
+  const rawCloudinary = "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864000/chompa-azul-m.jpg";
+  const optimized = optimizeCloudinaryUrl(rawCloudinary);
+  assert(
+    optimized === "https://res.cloudinary.com/dq1jeikev/image/upload/f_auto,q_auto,w_800/v1728864000/chompa-azul-m.jpg",
+    "optimizeCloudinaryUrl inyecta f_auto,q_auto,w_800 en URLs de Cloudinary"
+  );
+
+  // Test 12: Idempotencia de optimización y no-alteración de URLs externas
+  const externalUrl = "https://example.com/imagen.jpg";
+  assert(
+    optimizeCloudinaryUrl(externalUrl) === externalUrl,
+    "optimizeCloudinaryUrl no altera URLs externas que no son de Cloudinary"
+  );
+  assert(
+    optimizeCloudinaryUrl(optimized) === optimized,
+    "optimizeCloudinaryUrl no duplica parámetros si la URL ya está optimizada"
+  );
 
   console.log(`\n📊 --- RESUMEN DE PRUEBAS ---`);
   console.log(`Pasaron: ${passed} | Fallaron: ${failed}`);

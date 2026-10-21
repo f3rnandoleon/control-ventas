@@ -628,6 +628,17 @@ export async function getWhatsAppOrderStatus(numeroPedido: string, phone: string
   };
 }
 
+export function optimizeCloudinaryUrl(url?: string): string | undefined {
+  if (!url || typeof url !== "string") return undefined;
+  if (!url.includes("res.cloudinary.com") || !url.includes("/upload/")) {
+    return url;
+  }
+  if (url.includes("/upload/f_auto,q_auto")) {
+    return url;
+  }
+  return url.replace("/upload/", "/upload/f_auto,q_auto,w_800/");
+}
+
 /**
  * Búsqueda de productos de alto rendimiento y bajo consumo de tokens para el Agente IA de WhatsApp.
  * Devuelve únicamente prendas activas con variantes que tienen stock web real disponible (> 0).
@@ -635,42 +646,48 @@ export async function getWhatsAppOrderStatus(numeroPedido: string, phone: string
 export async function searchWhatsAppProducts(filters: WhatsAppProductSearchInput) {
   await connectDB();
 
-  const query: Record<string, unknown> = { estado: "ACTIVO" };
+  const andConditions: Record<string, unknown>[] = [{ estado: "ACTIVO" }];
 
   if (filters.q?.trim()) {
     const safeQ = filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(safeQ, "i");
-    query.$or = [
-      { nombre: regex },
-      { modelo: regex },
-      { descripcion: regex },
-      { "variantes.color": regex },
-      { "variantes.talla": regex },
-    ];
+    andConditions.push({
+      $or: [
+        { nombre: regex },
+        { modelo: regex },
+        { descripcion: regex },
+        { "variantes.color": regex },
+        { "variantes.talla": regex },
+      ],
+    });
   }
 
   if (filters.color?.trim()) {
     const safeColor = filters.color.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const colorRegex = new RegExp(safeColor, "i");
-    const existingOr = (query.$or as Record<string, unknown>[]) || [];
-    query.$or = [
-      ...existingOr,
-      { "variantes.color": colorRegex },
-      { "variantes.colorSecundario": colorRegex },
-    ];
+    andConditions.push({
+      $or: [
+        { "variantes.color": colorRegex },
+        { "variantes.colorSecundario": colorRegex },
+      ],
+    });
   }
 
   if (filters.talla?.trim()) {
     const safeTalla = filters.talla.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    query["variantes.talla"] = new RegExp(`^${safeTalla}$`, "i");
+    andConditions.push({
+      "variantes.talla": new RegExp(`^${safeTalla}$`, "i"),
+    });
   }
 
   if (filters.minPrecio !== undefined || filters.maxPrecio !== undefined) {
     const precioFilter: Record<string, number> = {};
     if (filters.minPrecio !== undefined) precioFilter.$gte = filters.minPrecio;
     if (filters.maxPrecio !== undefined) precioFilter.$lte = filters.maxPrecio;
-    query.precioVenta = precioFilter;
+    andConditions.push({ precioVenta: precioFilter });
   }
+
+  const query = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
 
   const limit = Math.min(filters.limit || 5, 20);
 
@@ -760,10 +777,11 @@ export async function searchWhatsAppProducts(filters: WhatsAppProductSearchInput
         }
       }
 
-      const img =
+      const rawImg =
         (Array.isArray(v.imagenes) && v.imagenes.length > 0 ? v.imagenes[0] : undefined) ||
         v.imagen ||
         undefined;
+      const img = optimizeCloudinaryUrl(rawImg);
 
       variantesValidas.push({
         varianteId: varId,
