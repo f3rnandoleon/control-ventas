@@ -126,7 +126,7 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/integrations/whatsapp/p
           "talla": "M",
           "stockDisponible": 4,
           "precioVenta": 140,
-          "imagen": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864000/chompa-azul-m.jpg",
+          "imagen": "https://res.cloudinary.com/dq1jeikev/image/upload/f_auto,q_auto,w_800/v1728864000/chompa-azul-m.jpg",
           "medidasResumen": {
             "anchoPecho": 54,
             "largoTotal": 68
@@ -137,6 +137,9 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/integrations/whatsapp/p
   ]
 }
 ```
+
+> ⚡ **Optimización Automática de Imágenes:**  
+> Las URLs de imágenes en Cloudinary se transforman en el backend inyectando `f_auto,q_auto,w_800/`. Esto reduce el peso del archivo a menos de 80 KB manteniendo una nitidez impecable, asegurando una descarga inmediata en conexiones celulares en Bolivia.
 
 ---
 
@@ -452,6 +455,14 @@ Copia este bloque en tu motor de agente (OpenAI Function Calling, Gemini Tool Ca
         "phone": { "type": "string", "description": "Número de teléfono del cliente (obligatorio)" }
       },
       "required": ["numeroPedido", "phone"]
+    }
+  },
+  {
+    "name": "consultarOpcionesEntrega",
+    "description": "Consulta los puntos de recojo habilitados en La Paz (estaciones de teleférico, tiendas) con sus días y horarios, y las empresas de envío interdepartamental disponibles.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
     }
   }
 ]

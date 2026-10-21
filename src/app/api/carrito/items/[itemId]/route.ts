@@ -76,3 +76,5 @@ export async function DELETE(request: Request, context: Context) {
     });
   }
 }
+
+export const PATCH = PUT;

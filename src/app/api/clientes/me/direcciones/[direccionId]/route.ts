@@ -72,3 +72,5 @@ export async function DELETE(
     });
   }
 }
+
+export const PATCH = PUT;

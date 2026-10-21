@@ -362,7 +362,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 |---|---|---|---|
 | `GET` | `/api/public/politicas` | Pública | Políticas legales (devoluciones, privacidad, términos, cookies) |
 | `GET` | `/api/admin/ajustes` | `ADMIN` | Consulta configuración del sistema (tipo de cambio PEN/BOB, políticas) |
-| `PATCH` | `/api/admin/ajustes` | `ADMIN` | Modifica tipo de cambio o texto de políticas legales |
+| `PUT / PATCH` | `/api/admin/ajustes` | `ADMIN` | Modifica tipo de cambio o texto de políticas legales |
 
 ---
 
@@ -380,12 +380,12 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
 | `GET` | `/api/perfil` | Autenticado | Obtiene datos básicos del usuario autenticado |
-| `PUT` | `/api/perfil` | Autenticado | Actualiza nombre, email o contraseña del usuario |
+| `PUT / PATCH` | `/api/perfil` | Autenticado | Actualiza nombre, email o contraseña del usuario |
 | `GET` | `/api/clientes/me` | `CLIENTE` | Perfil del cliente, documento y dirección predeterminada |
-| `PUT` | `/api/clientes/me` | `CLIENTE` | Actualiza teléfono, tipo de documento o notas de cliente |
+| `PUT / PATCH` | `/api/clientes/me` | `CLIENTE` | Actualiza teléfono, tipo de documento o notas de cliente |
 | `GET` | `/api/clientes/me/direcciones` | `CLIENTE` | Lista libreta de direcciones guardadas del cliente |
 | `POST` | `/api/clientes/me/direcciones` | `CLIENTE` | Registra una nueva dirección guardada |
-| `PATCH` | `/api/clientes/me/direcciones/:id` | `CLIENTE` | Modifica una dirección existente |
+| `PUT / PATCH` | `/api/clientes/me/direcciones/:id` | `CLIENTE` | Modifica una dirección guardada existente |
 | `DELETE`| `/api/clientes/me/direcciones/:id` | `CLIENTE` | Elimina una dirección guardada |
 
 ---
@@ -396,7 +396,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `GET` | `/api/carrito` | `CLIENTE` | Obtiene el carrito sincronizado en base de datos con stock validado |
 | `DELETE` | `/api/carrito` | `CLIENTE` | Vacía todos los ítems del carrito |
 | `POST` | `/api/carrito/items` | `CLIENTE` | Agrega un producto y variante con validación atómica de existencias |
-| `PATCH` | `/api/carrito/items/:itemId` | `CLIENTE` | Actualiza la cantidad solicitada de un ítem |
+| `PUT / PATCH` | `/api/carrito/items/:itemId` | `CLIENTE` | Actualiza la cantidad solicitada de un ítem |
 | `DELETE` | `/api/carrito/items/:itemId` | `CLIENTE` | Elimina un ítem específico del carrito |
 
 ---
@@ -412,6 +412,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `PATCH` | `/api/pedidos/:id` | Staff o cliente | Staff: actualiza estados. Cliente: cancela orden pendiente |
 | `POST` | `/api/pedidos/:id/confirm-cash` | `ADMIN`, `VENDEDOR` | Confirma pago en efectivo y consume stock |
 | `POST` | `/api/pedidos/:id/confirm-for-delivery` | `ADMIN`, `VENDEDOR` | Aprueba pedido para pase a despacho |
+| `GET` | `/api/pedidos/:id/devoluciones` | `ADMIN`, `VENDEDOR` | Consulta el historial de devoluciones y cambios del pedido |
 | `POST` | `/api/pedidos/:id/devoluciones` | `ADMIN`, `VENDEDOR` | Registra devolución o cambio de prenda |
 
 ---
@@ -463,6 +464,8 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 ### 6.12 Integración Especializada WhatsApp
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
+| `GET` | `/api/integrations/whatsapp/products/search` | API Key Bot | Búsqueda ultra-rápida y compacta para IA (`?q=`, `?color=`, `?talla=`, `?minPrecio=`, `?maxPrecio=`, `?limit=`). Filtra prendas activas con variantes con stock vendible en sucursales de despacho web y aplica optimización Cloudinary (`f_auto,q_auto,w_800`) |
+| `GET` | `/api/integrations/whatsapp/products/:id/measurements` | API Key Bot | Consulta de medidas anatómicas por talla y colores disponibles para asesoría de clientes |
 | `POST` | `/api/integrations/whatsapp/orders` | API Key Bot | Creación de pedido con idempotencia, reserva hasta fin de día (La Paz UTC-4) e instrucciones de BancoSol |
 | `POST` | `/api/integrations/whatsapp/payments/:id/proof`| API Key Bot | Subida de captura de comprobante enviada por el cliente, prórroga de reserva 48h y notificación a Telegram |
 | `GET` | `/api/integrations/whatsapp/orders/:nro` | API Key Bot | Consulta de estado de orden filtrada por número de teléfono del cliente (`?phone=`) |
@@ -472,7 +475,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 ### 6.13 Catálogo Interno de Productos
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/productos` | `ADMIN`, `VENDEDOR` | Listado completo de prendas. Cada variante incluye costos internos y el desglose de existencias por sucursal en `sucursalesStock` |
+| `GET` | `/api/productos` | `ADMIN`, `VENDEDOR` | Listado completo de prendas. Soporta `?withStock=true` y `?sucursalId=` para consultar existencias locales. Cada variante incluye costos internos y desglose multisucursal en `sucursalesStock` |
 | `POST` | `/api/productos` | `ADMIN` | Alta de nueva prenda con sus variantes, medidas y precios base |
 | `GET` | `/api/productos/:id` | `ADMIN`, `VENDEDOR` | Ficha técnica interna de producto con histórico y variantes enriquecidas con `sucursalesStock` |
 | `PUT` | `/api/productos/:id` | `ADMIN` | Edición integral de producto, variantes, precios y categorías |
@@ -498,7 +501,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `POST` | `/api/admin/sucursales` | `ADMIN` | Alta de nueva sucursal (`nombre`, `codigo`, `tipo`, `permiteVentaPOS`, `permiteDespachoWeb`, `permiteRetiroCliente`, `requiereAperturaCaja`) |
 | `GET` | `/api/admin/sucursales/:id` | `ADMIN` | Detalle de sucursal y configuración operativa |
 | `PUT` | `/api/admin/sucursales/:id` | `ADMIN` | Modificación de datos y políticas de la sucursal (ej. activar o desactivar `requiereAperturaCaja`) |
-| `DELETE` | `/api/admin/sucursales/:id` | `ADMIN` | Desactivación lógica de la sucursal |
+| `PATCH` | `/api/admin/sucursales/:id` | `ADMIN` | Activa o desactiva lógicamente la sucursal (`{ activa: boolean }`, impidiendo desactivar el almacén principal) |
 | `GET` | `/api/admin/productos/:id/stock-sucursales` | `ADMIN`, `VENDEDOR` | Desglose pormenorizado de niveles de stock (`stockFisico`, `stockReservado`, `stockDisponible`) por cada sucursal para el producto |
 
 ---
@@ -522,7 +525,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `POST` | `/api/compras` | `ADMIN` | Registra compra: incrementa existencias en la sucursal destino, recalcula el Costo Promedio Ponderado (CPP) por variante, asienta `ENTRADA` en Kárdex y descuenta fondos de la cuenta de tesorería |
 | `GET` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Detalle completo de una compra con snapshots inmutables de costos anteriores vs nuevos y stock resultante |
 | `PUT` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Reemplazo atómico / Corrección de compra. Revierte atómicamente la compra anterior en memoria y aplica la nueva versión corregida en una sola transacción ACID, vinculando `reemplazaACompraId` y `reemplazadaPorCompraId` |
-| `PATCH` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Actualización de metadatos informativos (`notas`, `comprobanteReferencia`, `proveedor`) sin alterar inventario ni contabilidad |
+| `PATCH` | `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Actualización de metadatos informativos (`notas`, `comprobanteReferencia`, `proveedor`, `fecha`) sin alterar inventario ni contabilidad |
 | `DELETE`| `/api/compras/:id` | `ADMIN`, `VENDEDOR` | Anulación de compra. Body opcional: `{ motivo?: string }`. Revierte el stock en la sucursal destino y en catálogo global, restituye el dinero a la cuenta de tesorería y marca la compra como `ANULADA` |
 
 ---
@@ -534,7 +537,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `POST` | `/api/admin/finanzas/cuentas` | `ADMIN` | Alta de cuenta bancaria o caja física |
 | `GET` | `/api/admin/finanzas/cuentas/:id` | `ADMIN` | Detalle de cuenta |
 | `PUT` | `/api/admin/finanzas/cuentas/:id` | `ADMIN` | Actualiza datos de cuenta |
-| `DELETE`| `/api/admin/finanzas/cuentas/:id` | `ADMIN` | Desactiva cuenta |
+| `PATCH` | `/api/admin/finanzas/cuentas/:id` | `ADMIN` | Modifica el estado activo/inactivo de la cuenta (`{ activa: boolean }`) |
 | `GET` | `/api/admin/finanzas/cuentas/:id/movimientos` | `ADMIN` | Historial contable de movimientos con saldos anteriores y posteriores |
 | `POST` | `/api/admin/finanzas/cuentas/transferencia` | `ADMIN` | Traspaso de fondos entre cuentas (ej. depósito de caja física a banco) |
 

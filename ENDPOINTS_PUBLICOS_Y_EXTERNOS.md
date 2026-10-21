@@ -21,11 +21,11 @@
    - [4.2 Login JWT (`POST /api/auth/login`)](#42-login-jwt-post-apiauthlogin)
    - [4.3 Login Google (`POST /api/auth/google`)](#43-login-google-post-apiauthgoogle)
    - [4.4 Perfil Propio (`GET/PUT /api/clientes/me`)](#44-perfil-propio-getput-apiclientesme)
-   - [4.5 Direcciones Guardadas (`GET/POST/DELETE /api/clientes/me/direcciones`)](#45-direcciones-guardadas-getpostdelete-apiclientesmedirecciones)
+   - [4.5 Direcciones Guardadas (`GET/POST/PUT/DELETE /api/clientes/me/direcciones`)](#45-direcciones-guardadas-getpostputdelete-apiclientesmedirecciones)
 5. [Carrito de Compras Persistente](#5-carrito-de-compras-persistente)
    - [5.1 Obtener Carrito (`GET /api/carrito`)](#51-obtener-carrito-get-apicarrito)
    - [5.2 Agregar Ítem (`POST /api/carrito/items`)](#52-agregar-ítem-post-apicarritoitems)
-   - [5.3 Modificar Cantidad (`PATCH /api/carrito/items/:itemId`)](#53-modificar-cantidad-patch-apicarritoitemsitemid)
+   - [5.3 Modificar Cantidad (`PUT/PATCH /api/carrito/items/:itemId`)](#53-modificar-cantidad-putpatch-apicarritoitemsitemid)
    - [5.4 Eliminar Ítem (`DELETE /api/carrito/items/:itemId`)](#54-eliminar-ítem-delete-apicarritoitemsitemid)
    - [5.5 Vaciar Carrito (`DELETE /api/carrito`)](#55-vaciar-carrito-delete-apicarrito)
 6. [Checkout y Pedidos Web/Móvil](#6-checkout-y-pedidos-web-móvil)
@@ -53,12 +53,14 @@
 10. [Sucursales y Stock por Tienda](#10-sucursales-y-stock-por-tienda)
     - [10.1 Listado de Sucursales (`GET /api/admin/sucursales`)](#101-listado-de-sucursales-get-apiadminsucursales)
     - [10.2 Desglose de Stock por Sucursal (`GET /api/admin/productos/:id/stock-sucursales`)](#102-desglose-de-stock-por-sucursal-get-apiadminproductosidstock-sucursales)
+    - [10.3 Detalle y Actualización de Sucursal (`GET/PUT/PATCH /api/admin/sucursales/:id`)](#103-detalle-y-actualización-de-sucursal-getputpatch-apiadminsucursalesid)
 11. [Compras de Proveedores y Reemplazo Atómico](#11-compras-de-proveedores-y-reemplazo-atómico)
     - [11.1 Listar Compras (`GET /api/compras`)](#111-listar-compras-get-apicompras)
     - [11.2 Registrar Compra con CPP (`POST /api/compras`)](#112-registrar-compra-con-cpp-post-apicompras)
     - [11.3 Detalle de Compra y Snapshots (`GET /api/compras/:id`)](#113-detalle-de-compra-y-snapshots-get-apicomprasid)
     - [11.4 Anular Compra con Reversión (`DELETE /api/compras/:id`)](#114-anular-compra-con-reversión-delete-apicomprasid)
     - [11.5 Reemplazo Atómico / Clonación Corregida (`PUT /api/compras/:id`)](#115-reemplazo-atómico--clonación-corregida-put-apicomprasid)
+    - [11.6 Actualización de Metadatos de Compra (`PATCH /api/compras/:id`)](#116-actualización-de-metadatos-de-compra-patch-apicomprasid)
 12. [Traspasos de Mercadería entre Sucursales](#12-traspasos-de-mercadería-entre-sucursales)
     - [12.1 Listar Traspasos (`GET /api/admin/traspasos`)](#121-listar-traspasos-get-apiadmintraspasos)
     - [12.2 Solicitar Traspaso (`POST /api/admin/traspasos`)](#122-solicitar-traspaso-post-apiadmintraspasos)
@@ -524,19 +526,30 @@ Retorna el perfil del cliente autenticado y su dirección de entrega predetermin
 
 ---
 
-### 4.5 Direcciones Guardadas (`GET /api/clientes/me/direcciones`)
-- **`GET /api/clientes/me/direcciones`**: Lista todas las direcciones del cliente.
+### 4.5 Direcciones Guardadas (`GET/POST/PUT/DELETE /api/clientes/me/direcciones`)
+Permite al cliente gestionar su libreta de direcciones para despachos y envíos.
+
+- **`GET /api/clientes/me/direcciones`**: Lista todas las direcciones guardadas del cliente.
 - **`POST /api/clientes/me/direcciones`**: Crea una nueva dirección.
   ```json
   {
-    "alias": "Oficina",
+    "etiqueta": "Oficina",
     "nombreDestinatario": "Carlos Mendoza",
     "telefono": "78965412",
     "direccion": "Edificio Alianza Piso 2, Calacoto Calle 15",
     "ciudad": "La Paz",
     "departamento": "La Paz",
+    "zona": "Calacoto",
     "referencia": "Al lado de la farmacia",
     "esPredeterminada": false
+  }
+  ```
+- **`PUT /api/clientes/me/direcciones/:direccionId`** (o `PATCH`): Actualiza los datos de una dirección guardada existente (admite modificar `etiqueta`, `nombreDestinatario`, `telefono`, `departamento`, `ciudad`, `zona`, `direccion`, `referencia`, `codigoPostal`, `esPredeterminada`).
+  ```json
+  {
+    "telefono": "78965499",
+    "referencia": "Al lado de la farmacia, timbre piso 2",
+    "esPredeterminada": true
   }
   ```
 - **`DELETE /api/clientes/me/direcciones/:direccionId`**: Elimina una dirección guardada.
@@ -614,7 +627,17 @@ Retorna el documento del carrito recalculado.
 
 ---
 
-### 5.3 Modificar Cantidad (`PATCH /api/carrito/items/:itemId`)
+### 5.3 Modificar Cantidad (`PUT /api/carrito/items/:itemId`)
+Actualiza la cantidad solicitada de un ítem ya añadido al carrito. Admite tanto `PUT` como `PATCH`.
+
+```bash
+curl -X PUT https://control-ventas-azure.vercel.app/api/carrito/items/item-670e24aaf1b4 \
+  -H "Authorization: Bearer <accessToken>" \
+  -H "Content-Type: application/json" \
+  -d '{"cantidad": 3}'
+```
+
+#### Payload:
 ```json
 {
   "cantidad": 3
@@ -1012,7 +1035,7 @@ Diseñado para que el **Agente IA de WhatsApp** busque productos y variantes dis
 #### Reglas de Negocio:
 1. Filtra automáticamente en MongoDB prendas con `estado: "ACTIVO"`.
 2. Filtra y devuelve **únicamente variantes con stock web real disponible (`stockDisponible > 0`)**.
-3. Si la variante tiene fotos en Cloudinary, retorna directamente la URL de la primera foto para que el bot la envíe al chat de WhatsApp.
+3. Si la variante tiene fotos en Cloudinary, transforma automáticamente la URL inyectando `f_auto,q_auto,w_800/` para que la imagen sea ultraliviana, optimizada para WhatsApp y cargue al instante en conexiones móviles.
 4. Incluye un resumen anatómico de medidas (`anchoPecho` y `largoTotal`) si están registradas.
 
 #### Ejemplo de Petición:
@@ -1041,7 +1064,7 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/integrations/whatsapp/p
           "talla": "M",
           "stockDisponible": 4,
           "precioVenta": 140,
-          "imagen": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864000/chompa-azul-m.jpg",
+          "imagen": "https://res.cloudinary.com/dq1jeikev/image/upload/f_auto,q_auto,w_800/v1728864000/chompa-azul-m.jpg",
           "medidasResumen": {
             "anchoPecho": 54,
             "largoTotal": 68
@@ -1456,6 +1479,30 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/admin/productos/670e10a
 
 ---
 
+### 10.3 Detalle y Actualización de Sucursal (`GET/PUT/PATCH /api/admin/sucursales/:id`)
+Permite consultar, modificar la configuración operativa o activar/desactivar una sucursal específica.
+
+- **`GET /api/admin/sucursales/:id`**: Retorna la ficha técnica de la sucursal y sus banderas operativas (`permiteVentaPOS`, `permiteDespachoWeb`, `permiteRetiroCliente`, `requiereAperturaCaja`).
+- **`PUT /api/admin/sucursales/:id`**: Actualiza datos de la tienda física o almacén (`nombre`, `tipo`, `direccion`, `ciudad`, `telefono`, flags operativos y `esAlmacenPrincipal`).
+  ```json
+  {
+    "nombre": "Tienda 1 - San Miguel",
+    "tipo": "TIENDA_FISICA",
+    "direccion": "Av. Montenegro #1234",
+    "ciudad": "La Paz",
+    "telefono": "59170123456",
+    "permiteVentaPOS": true,
+    "permiteDespachoWeb": false,
+    "permiteRetiroCliente": true,
+    "requiereAperturaCaja": true,
+    "esAlmacenPrincipal": false
+  }
+  ```
+- **`PATCH /api/admin/sucursales/:id`**: Modifica el estado activo/inactivo (`{ "activa": boolean }`).
+  > ⚠️ **Regla de Consistencia:** No se permite desactivar una sucursal si está marcada como almacén principal único (`esAlmacenPrincipal: true`), respondiendo `HTTP 400 Bad Request` para garantizar que siempre exista un almacén central de despacho.
+
+---
+
 ## 11. Compras de Proveedores y Reemplazo Atómico
 
 Permite a los administradores registrar abastecimiento de mercadería con recálculo automático de Costo Promedio Ponderado (CPP), anular compras con reversión completa o corregir compras erróneas mediante reemplazo atómico en transacción.
@@ -1650,6 +1697,39 @@ Envía el mismo esquema de registro de compra (`createCompraSchema`) con los dat
     "estado": "COMPLETADA",
     "reemplazaACompraId": "670e5000f1b4c90011990011",
     "totalBOB": 1755.00
+  }
+}
+```
+
+---
+
+### 11.6 Actualización de Metadatos de Compra (`PATCH /api/compras/:id`)
+Permite corregir notas, fecha, proveedor o el número de factura/comprobante de referencia de una compra completada sin alterar cantidades de inventario ni movimientos contables.
+
+- **Método:** `PATCH`
+- **Ruta:** `/api/compras/:id`
+- **Auth:** `Authorization: Bearer <accessToken>` (`ADMIN` o `VENDEDOR`)
+
+#### Payload:
+```json
+{
+  "proveedor": "Textiles del Valle S.R.L. - Sucursal Puno",
+  "comprobanteReferencia": "FAC-9842-RECTIFICADA",
+  "notas": "Se adjuntó factura electrónica escaneada por el proveedor",
+  "fecha": "2026-10-20T10:00:00.000Z"
+}
+```
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "message": "Compra actualizada exitosamente",
+  "compra": {
+    "_id": "670e5000f1b4c90011990011",
+    "numeroCompra": "COM-261020-001",
+    "proveedor": "Textiles del Valle S.R.L. - Sucursal Puno",
+    "comprobanteReferencia": "FAC-9842-RECTIFICADA",
+    "notas": "Se adjuntó factura electrónica escaneada por el proveedor"
   }
 }
 ```

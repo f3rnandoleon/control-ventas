@@ -24,11 +24,11 @@
    - [6.3 Inicio de Sesión Google OAuth (`POST /api/auth/google`)](#63-inicio-de-sesión-google-oauth-post-apiauthgoogle)
    - [6.4 Perfil del Cliente Autenticado (`GET /api/clientes/me`)](#64-perfil-del-cliente-autenticado-get-apiclientesme)
    - [6.5 Actualización de Perfil y Preferencias (`PUT /api/clientes/me`)](#65-actualización-de-perfil-y-preferencias-put-apiclientesme)
-   - [6.6 Libreta de Direcciones de Envío (`GET/POST/DELETE /api/clientes/me/direcciones`)](#66-libreta-de-direcciones-de-envío-getpostdelete-apiclientesmedirecciones)
+   - [6.6 Libreta de Direcciones de Envío (`GET/POST/PUT/DELETE /api/clientes/me/direcciones`)](#66-libreta-de-direcciones-de-envío-getpostputdelete-apiclientesmedirecciones)
 7. [Módulo 3: Carrito de Compras Persistente en Servidor](#7-módulo-3-carrito-de-compras-persistente-en-servidor)
    - [7.1 Obtener Carrito Activo y Subtotales (`GET /api/carrito`)](#71-obtener-carrito-activo-y-subtotales-get-apicarrito)
    - [7.2 Agregar Ítem al Carrito (`POST /api/carrito/items`)](#72-agregar-ítem-al-carrito-post-apicarritoitems)
-   - [7.3 Actualizar Cantidad de un Ítem (`PATCH /api/carrito/items/:itemId`)](#73-actualizar-cantidad-de-un-ítem-patch-apicarritoitemsitemid)
+   - [7.3 Actualizar Cantidad de un Ítem (`PUT/PATCH /api/carrito/items/:itemId`)](#73-actualizar-cantidad-de-un-ítem-putpatch-apicarritoitemsitemid)
    - [7.4 Eliminar Ítem del Carrito (`DELETE /api/carrito/items/:itemId`)](#74-eliminar-ítem-del-carrito-delete-apicarritoitemsitemid)
    - [7.5 Vaciar Todo el Carrito (`DELETE /api/carrito`)](#75-vaciar-todo-el-carrito-delete-apicarrito)
 8. [Módulo 4: Checkout y Bloqueo Atómico de Inventario](#8-módulo-4-checkout-y-bloqueo-atómico-de-inventario)
@@ -550,7 +550,7 @@ Permite al cliente actualizar su nombre, teléfono, documento de identidad o mé
 
 ---
 
-### 6.6 Libreta de Direcciones de Envío (`GET/POST/DELETE /api/clientes/me/direcciones`)
+### 6.6 Libreta de Direcciones de Envío (`GET/POST/PUT/DELETE /api/clientes/me/direcciones`)
 
 * **`GET /api/clientes/me/direcciones`**: Lista todas las direcciones guardadas por el cliente.
 * **`POST /api/clientes/me/direcciones`**: Guarda una nueva dirección en la libreta.
@@ -567,7 +567,15 @@ Permite al cliente actualizar su nombre, teléfono, documento de identidad o mé
     "esPredeterminada": true
   }
   ```
-* **`DELETE /api/clientes/me/direcciones/:id`**: Elimina una dirección por su ObjectId.
+* **`PUT /api/clientes/me/direcciones/:direccionId`** (o `PATCH`): Actualiza una dirección guardada existente (admite modificar `etiqueta`, `nombreDestinatario`, `telefono`, `departamento`, `ciudad`, `zona`, `direccion`, `referencia`, `codigoPostal`, `esPredeterminada`).
+  ```json
+  {
+    "telefono": "78965499",
+    "referencia": "Frente a la plaza Isabel La Católica, Torre B Oficina 1002",
+    "esPredeterminada": true
+  }
+  ```
+* **`DELETE /api/clientes/me/direcciones/:direccionId`**: Elimina una dirección guardada por su ObjectId.
 
 ---
 
@@ -639,10 +647,10 @@ Agrega una prenda validando en tiempo real que exista stock vendible (`stockDisp
 
 ---
 
-### 7.3 Actualizar Cantidad de un Ítem (`PATCH /api/carrito/items/:itemId`)
-Modifica la cantidad de unidades de un ítem ya presente en el carrito.
+### 7.3 Actualizar Cantidad de un Ítem (`PUT /api/carrito/items/:itemId`)
+Modifica la cantidad de unidades de un ítem ya presente en el carrito. Admite tanto `PUT` como `PATCH`.
 
-* **Método:** `PATCH`
+* **Método:** `PUT` (o `PATCH`)
 * **Ruta:** `/api/carrito/items/:itemId` (donde `:itemId` es el `_id` del ítem dentro del array del carrito).
 
 #### Payload:

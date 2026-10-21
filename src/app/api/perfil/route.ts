@@ -114,3 +114,5 @@ export async function PUT(request: Request) {
     });
   }
 }
+
+export const PATCH = PUT;
