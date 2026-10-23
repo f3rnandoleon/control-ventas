@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getKardexProducto, KardexProductoDetalleResponse } from "@/services/kardex.service";
 import { getSucursales } from "@/services/sucursales.service";
 import type { Sucursal } from "@/types/sucursal";
@@ -8,22 +8,26 @@ import { formatMoney } from "@/utils/pricing";
 
 export default function KardexIndividualModal({
   productoId,
+  initialVarianteId,
   onClose,
 }: {
   productoId: string;
+  initialVarianteId?: string;
   onClose: () => void;
 }) {
   const [data, setData] = useState<KardexProductoDetalleResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedVarianteId, setSelectedVarianteId] = useState<string>("");
+  const [selectedVarianteId, setSelectedVarianteId] = useState<string>(initialVarianteId || "");
   const [selectedSucursalId, setSelectedSucursalId] = useState<string>("");
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const hasAutoSelectedRef = useRef(Boolean(initialVarianteId));
 
   useEffect(() => {
     getSucursales().then(setSucursales).catch(() => {});
   }, []);
 
   useEffect(() => {
+    let isCancelled = false;
     const load = async () => {
       setLoading(true);
       try {
@@ -32,15 +36,30 @@ export default function KardexIndividualModal({
           selectedVarianteId || undefined,
           selectedSucursalId || undefined
         );
+        if (isCancelled) return;
         setData(res);
+
+        // Si no se especificó variante inicial y aún no se seleccionó una,
+        // auto-seleccionar por defecto la primera variante para abrir la tarjeta individual real
+        if (!hasAutoSelectedRef.current && res.producto?.variantes?.length > 0 && !selectedVarianteId) {
+          hasAutoSelectedRef.current = true;
+          setSelectedVarianteId(res.producto.variantes[0].varianteId || "");
+        }
       } catch (err) {
-        console.error("Error al cargar kardex:", err);
+        if (!isCancelled) console.error("Error al cargar kardex:", err);
       } finally {
-        setLoading(false);
+        if (!isCancelled) setLoading(false);
       }
     };
     load();
+    return () => {
+      isCancelled = true;
+    };
   }, [productoId, selectedVarianteId, selectedSucursalId]);
+
+  const activeVariante = data?.producto.variantes.find(
+    (v) => v.varianteId === selectedVarianteId
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -48,11 +67,20 @@ export default function KardexIndividualModal({
         {/* HEADER */}
         <div className="p-6 border-b border-white/10 flex justify-between items-start bg-gray-900/90">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                 TARJETA KARDEX VALORADA
               </span>
               <span className="text-xs text-gray-400">Método: Costo Promedio Ponderado (CPP)</span>
+              {activeVariante ? (
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Variante: {activeVariante.color} / Talla {activeVariante.talla}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30" title="Mezcla movimientos de todas las tallas y colores">
+                  Vista Consolidada (Todas las variantes)
+                </span>
+              )}
             </div>
             <h3 className="text-xl font-bold text-white mt-1">
               {data?.producto.nombre || "Cargando producto..."}{" "}
@@ -85,13 +113,16 @@ export default function KardexIndividualModal({
                 </label>
                 <select
                   value={selectedVarianteId}
-                  onChange={(e) => setSelectedVarianteId(e.target.value)}
+                  onChange={(e) => {
+                    hasAutoSelectedRef.current = true;
+                    setSelectedVarianteId(e.target.value);
+                  }}
                   className="rounded-xl bg-gray-800 border border-white/10 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="">Todas las variantes</option>
+                  <option value="">📊 Consolidado del modelo (Todas las variantes)</option>
                   {data?.producto.variantes.map((v) => (
                     <option key={v.varianteId} value={v.varianteId}>
-                      {v.color} - Talla {v.talla} (Stock: {v.stock} u.)
+                      Talla {v.talla} - Color {v.color} (Stock: {v.stock} u.)
                     </option>
                   ))}
                 </select>
@@ -199,9 +230,11 @@ export default function KardexIndividualModal({
                       const isEntrada =
                         m.tipo === "ENTRADA" ||
                         m.tipo === "DEVOLUCION" ||
-                        m.tipo === "TRASPASO_ENTRADA";
+                        m.tipo === "TRASPASO_ENTRADA" ||
+                        (m.tipo === "AJUSTE" && m.entradaCantidad > 0);
                       const isTraspaso =
                         m.tipo === "TRASPASO_ENTRADA" || m.tipo === "TRASPASO_SALIDA";
+                      const isAjuste = m.tipo === "AJUSTE";
 
                       return (
                         <tr key={m._id} className="hover:bg-white/[0.02]">
@@ -230,9 +263,13 @@ export default function KardexIndividualModal({
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 isTraspaso
                                   ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                                  : isEntrada
-                                    ? "bg-cyan-500/20 text-cyan-300"
-                                    : "bg-amber-500/20 text-amber-300"
+                                  : isAjuste
+                                    ? isEntrada
+                                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                    : isEntrada
+                                      ? "bg-cyan-500/20 text-cyan-300"
+                                      : "bg-amber-500/20 text-amber-300"
                               }`}
                             >
                               {m.tipo}

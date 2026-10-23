@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import KardexConsolidadoView from "@/components/inventario/KardexConsolidadoView";
 import { getKardexConsolidado } from "@/services/kardex.service";
 import type { KardexConsolidadoResumen } from "@/types/inventario";
 
-export default function AdminKardexPage() {
+function AdminKardexContent() {
+  const searchParams = useSearchParams();
+  const initialProductoId = searchParams.get("productoId") || undefined;
+  const initialVarianteId = searchParams.get("varianteId") || undefined;
+
   const [data, setData] = useState<KardexConsolidadoResumen | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +54,26 @@ export default function AdminKardexPage() {
         </div>
       </div>
 
-      <KardexConsolidadoView data={data} loading={loading} />
+      <KardexConsolidadoView
+        data={data}
+        loading={loading}
+        initialProductoId={initialProductoId}
+        initialVarianteId={initialVarianteId}
+      />
     </div>
+  );
+}
+
+export default function AdminKardexPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-gray-400">
+          Cargando módulo de kardex...
+        </div>
+      }
+    >
+      <AdminKardexContent />
+    </Suspense>
   );
 }

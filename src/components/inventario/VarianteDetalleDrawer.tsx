@@ -326,7 +326,7 @@ export default function VarianteDetalleDrawer({
           <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3 shrink-0">
             {isAdmin && (
               <Link
-                href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}`}
+                href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}&varianteId=${variante.varianteId}`}
                 className="px-3.5 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <span>📊</span> Ver Kardex

@@ -314,12 +314,21 @@ export async function updateCatalogProduct(
     );
   }
 
+  const defaultWarehouseId = await getDefaultWarehouseId();
+
   for (const vNueva of productoDespues.variantes) {
     const vAnterior = (productoAntes.variantes as Variante[]).find((v) =>
       matchesVariant(v, vNueva)
     );
 
+    const costoUnitario = Number(
+      vNueva.precioCosto !== undefined && vNueva.precioCosto !== null && Number(vNueva.precioCosto) > 0
+        ? vNueva.precioCosto
+        : productoDespues.precioCosto || 0
+    );
+
     if (!vAnterior && vNueva.stock > 0) {
+      const valorTotalOperacion = Number((vNueva.stock * costoUnitario).toFixed(2));
       await recordInventoryMovement({
         producto: productoDespues,
         variante: vNueva,
@@ -327,26 +336,125 @@ export async function updateCatalogProduct(
         cantidad: vNueva.stock,
         stockAnterior: 0,
         stockActual: vNueva.stock,
-        motivo: "Nueva variante",
+        costoUnitario,
+        valorTotalOperacion,
+        costoPromedioResultante: costoUnitario,
+        saldoValorado: valorTotalOperacion,
+        motivo: "Nueva variante en edición de producto",
         referencia: "VARIANTE_NUEVA",
         userId,
+        sucursalId: defaultWarehouseId,
       });
+
+      await NivelStock.findOneAndUpdate(
+        { sucursalId: defaultWarehouseId, varianteId: vNueva.varianteId },
+        {
+          $set: { stockFisico: vNueva.stock },
+          $setOnInsert: { productoId: productoDespues._id, stockReservado: 0, stockMinimo: 2 },
+        },
+        { upsert: true }
+      );
     }
 
     if (vAnterior && vNueva.stock > vAnterior.stock) {
       const diff = vNueva.stock - vAnterior.stock;
+      const valorTotalOperacion = Number((diff * costoUnitario).toFixed(2));
+      const saldoValorado = Number((vNueva.stock * costoUnitario).toFixed(2));
 
       await recordInventoryMovement({
         producto: productoDespues,
         variante: vNueva,
-        tipo: "ENTRADA",
+        tipo: "AJUSTE",
         cantidad: diff,
         stockAnterior: vAnterior.stock,
         stockActual: vNueva.stock,
-        motivo: "Aumento de stock",
-        referencia: "ACTUALIZACION_VARIANTE",
+        costoUnitario,
+        valorTotalOperacion,
+        costoPromedioResultante: costoUnitario,
+        saldoValorado,
+        motivo: "Ajuste de inventario en catálogo (aumento)",
+        referencia: "AJUSTE_CATALOGO",
         userId,
+        sucursalId: defaultWarehouseId,
       });
+
+      await NivelStock.findOneAndUpdate(
+        { sucursalId: defaultWarehouseId, varianteId: vNueva.varianteId },
+        {
+          $inc: { stockFisico: diff },
+          $setOnInsert: { productoId: productoDespues._id, stockReservado: 0, stockMinimo: 2 },
+        },
+        { upsert: true }
+      );
+    }
+
+    if (vAnterior && vNueva.stock < vAnterior.stock) {
+      const diff = vAnterior.stock - vNueva.stock;
+      const valorTotalOperacion = Number((diff * costoUnitario).toFixed(2));
+      const saldoValorado = Number((vNueva.stock * costoUnitario).toFixed(2));
+
+      await recordInventoryMovement({
+        producto: productoDespues,
+        variante: vNueva,
+        tipo: "AJUSTE",
+        cantidad: diff,
+        stockAnterior: vAnterior.stock,
+        stockActual: vNueva.stock,
+        costoUnitario,
+        valorTotalOperacion,
+        costoPromedioResultante: costoUnitario,
+        saldoValorado,
+        motivo: "Ajuste de inventario en catálogo (disminución / corrección)",
+        referencia: "AJUSTE_CATALOGO",
+        userId,
+        sucursalId: defaultWarehouseId,
+      });
+
+      await NivelStock.findOneAndUpdate(
+        { sucursalId: defaultWarehouseId, varianteId: vNueva.varianteId },
+        {
+          $inc: { stockFisico: -diff },
+          $setOnInsert: { productoId: productoDespues._id, stockReservado: 0, stockMinimo: 2 },
+        },
+        { upsert: true }
+      );
+    }
+  }
+
+  // Comprobar variantes eliminadas que tenían stock para descargar de inventario
+  for (const vAnterior of (productoAntes.variantes as Variante[])) {
+    const sigueExistiendo = (productoDespues.variantes as Variante[]).some((v) =>
+      matchesVariant(v, vAnterior)
+    );
+    if (!sigueExistiendo && vAnterior.stock > 0) {
+      const costoUnitario = Number(
+        vAnterior.precioCosto !== undefined && vAnterior.precioCosto !== null && Number(vAnterior.precioCosto) > 0
+          ? vAnterior.precioCosto
+          : productoDespues.precioCosto || 0
+      );
+      const valorTotalOperacion = Number((vAnterior.stock * costoUnitario).toFixed(2));
+
+      await recordInventoryMovement({
+        producto: productoDespues,
+        variante: vAnterior,
+        tipo: "AJUSTE",
+        cantidad: vAnterior.stock,
+        stockAnterior: vAnterior.stock,
+        stockActual: 0,
+        costoUnitario,
+        valorTotalOperacion,
+        costoPromedioResultante: costoUnitario,
+        saldoValorado: 0,
+        motivo: "Variante eliminada en edición de catálogo",
+        referencia: "ELIMINACION_VARIANTE",
+        userId,
+        sucursalId: defaultWarehouseId,
+      });
+
+      await NivelStock.findOneAndUpdate(
+        { sucursalId: defaultWarehouseId, varianteId: vAnterior.varianteId },
+        { $set: { stockFisico: 0 } }
+      );
     }
   }
 
