@@ -437,12 +437,6 @@ export async function adjustInventoryStock({
     );
   }
 
-  const costoUnitarioAjuste = Number(
-    variante.precioCosto !== undefined && variante.precioCosto !== null
-      ? variante.precioCosto
-      : producto.precioCosto || 0
-  );
-
   const cantidadMovimiento =
     tipo === "AJUSTE" ? Math.abs(stockActual - stockAnterior) : qty;
 
@@ -464,7 +458,6 @@ export async function adjustInventoryStock({
     stockActual,
     motivo,
     referencia,
-    costoUnitario: costoUnitarioAjuste,
     userId: new mongoose.Types.ObjectId(userIdRaw),
     costoUnitario,
     valorTotalOperacion,
