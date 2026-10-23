@@ -40,12 +40,12 @@ type RecordInventoryMovementInput = {
   producto: ProductoWithVariants;
   variante: VariantWithStock;
   tipo:
-    | "ENTRADA"
-    | "SALIDA"
-    | "AJUSTE"
-    | "DEVOLUCION"
-    | "TRASPASO_SALIDA"
-    | "TRASPASO_ENTRADA";
+  | "ENTRADA"
+  | "SALIDA"
+  | "AJUSTE"
+  | "DEVOLUCION"
+  | "TRASPASO_SALIDA"
+  | "TRASPASO_ENTRADA";
   cantidad: number;
   stockAnterior: number;
   stockActual: number;
@@ -443,18 +443,33 @@ export async function adjustInventoryStock({
       : producto.precioCosto || 0
   );
 
+  const cantidadMovimiento =
+    tipo === "AJUSTE" ? Math.abs(stockActual - stockAnterior) : qty;
+
+  const costoUnitario = Number(
+    variante.precioCosto !== undefined && variante.precioCosto !== null && Number(variante.precioCosto) > 0
+      ? variante.precioCosto
+      : (producto as unknown as { precioCosto?: number }).precioCosto || 0
+  );
+  const valorTotalOperacion = Number((cantidadMovimiento * costoUnitario).toFixed(2));
+  const saldoValorado = Number((stockActual * costoUnitario).toFixed(2));
+
   const movimiento = await recordInventoryMovement({
     producto,
     variante,
     sucursalId: targetSucursalId,
     tipo,
-    cantidad: qty,
+    cantidad: cantidadMovimiento,
     stockAnterior,
     stockActual,
     motivo,
     referencia,
     costoUnitario: costoUnitarioAjuste,
     userId: new mongoose.Types.ObjectId(userIdRaw),
+    costoUnitario,
+    valorTotalOperacion,
+    costoPromedioResultante: costoUnitario,
+    saldoValorado,
   }, session);
 
   await recordAuditEventSafe(
@@ -577,6 +592,14 @@ export async function consumeStockForSale({
   producto.totalVendidos += cantidad;
   await producto.save(session ? { session } : undefined);
 
+  const costoUnitario = Number(
+    variante.precioCosto !== undefined && variante.precioCosto !== null && Number(variante.precioCosto) > 0
+      ? variante.precioCosto
+      : (producto as unknown as { precioCosto?: number }).precioCosto || 0
+  );
+  const valorTotalOperacion = Number((cantidad * costoUnitario).toFixed(2));
+  const saldoValorado = Number((stockActual * costoUnitario).toFixed(2));
+
   const movimiento = await recordInventoryMovement({
     producto,
     variante,
@@ -588,6 +611,10 @@ export async function consumeStockForSale({
     motivo,
     referencia,
     userId,
+    costoUnitario,
+    valorTotalOperacion,
+    costoPromedioResultante: costoUnitario,
+    saldoValorado,
   }, session);
 
   return { stockAnterior, stockActual, movimiento };

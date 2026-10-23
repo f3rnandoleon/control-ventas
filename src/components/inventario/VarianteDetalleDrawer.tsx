@@ -184,19 +184,18 @@ export default function VarianteDetalleDrawer({
                   Resumen de Stock Consolidado
                 </h4>
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    stockDisponible === 0
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${stockDisponible === 0
                       ? "bg-rose-100 text-rose-700 border border-rose-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/30"
                       : stockDisponible <= (producto.stockMinimo || 2)
-                      ? "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30"
-                      : "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
-                  }`}
+                        ? "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30"
+                        : "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
+                    }`}
                 >
                   {stockDisponible === 0
                     ? "AGOTADO"
                     : stockDisponible <= (producto.stockMinimo || 2)
-                    ? "STOCK BAJO"
-                    : "DISPONIBLE"}
+                      ? "STOCK BAJO"
+                      : "DISPONIBLE"}
                 </span>
               </div>
 
@@ -331,7 +330,7 @@ export default function VarianteDetalleDrawer({
             {isAdmin && (
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}`}
+                  href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}&varianteId=${variante.varianteId}`}
                   className="px-3 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>📊</span> Kardex
@@ -374,7 +373,7 @@ export default function VarianteDetalleDrawer({
                 const filtrados = data.filter((n) => n.varianteId === varId);
                 setNivelesSucursal(filtrados);
               })
-              .catch(() => {});
+              .catch(() => { });
           }}
         />
       )}

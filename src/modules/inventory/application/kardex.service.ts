@@ -185,7 +185,8 @@ export async function getKardexPorProducto(
     const esEntrada =
       mov.tipo === "ENTRADA" ||
       mov.tipo === "DEVOLUCION" ||
-      mov.tipo === "TRASPASO_ENTRADA";
+      mov.tipo === "TRASPASO_ENTRADA" ||
+      (mov.tipo === "AJUSTE" && Number(mov.stockActual || 0) > Number(mov.stockAnterior || 0));
 
     if (esEntrada) {
       entradaCantidad = cantidad;
