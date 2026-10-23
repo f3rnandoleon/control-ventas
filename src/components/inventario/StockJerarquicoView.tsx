@@ -10,15 +10,18 @@ import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import { useAuth } from "@/context/AuthContext";
 import VarianteDetalleDrawer from "./VarianteDetalleDrawer";
+import AjusteStockModal from "./AjusteStockModal";
 
 interface StockJerarquicoViewProps {
   productos: ProductoInventario[];
   searchTerm?: string;
+  onStockUpdated?: () => void;
 }
 
 export default function StockJerarquicoView({
   productos,
   searchTerm: initialSearch = "",
+  onStockUpdated,
 }: StockJerarquicoViewProps) {
   const { user } = useAuth();
   const isAdmin = user?.rol === "ADMIN";
@@ -40,6 +43,12 @@ export default function StockJerarquicoView({
 
   // Drawer de análisis de variante
   const [drawerVariante, setDrawerVariante] = useState<{
+    producto: ProductoInventario;
+    variante: Variante;
+  } | null>(null);
+
+  // Modal de ajuste directo de stock
+  const [ajusteTarget, setAjusteTarget] = useState<{
     producto: ProductoInventario;
     variante: Variante;
   } | null>(null);
@@ -822,16 +831,31 @@ export default function StockJerarquicoView({
                                 </td>
 
                                 <td className="px-3 py-2.5 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDrawerVariante({ producto, variante });
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-500/30 text-[11px] font-semibold transition inline-flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <span>🔍</span> Ver Análisis
-                                  </button>
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {isAdmin && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setAjusteTarget({ producto, variante });
+                                        }}
+                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30 text-[11px] font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                                        title="Ajustar stock físico (sobrante o faltante)"
+                                      >
+                                        <span>⚖️</span> Ajustar
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDrawerVariante({ producto, variante });
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-500/30 text-[11px] font-semibold transition inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>🔍</span> Ver Análisis
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -854,6 +878,21 @@ export default function StockJerarquicoView({
           variante={drawerVariante.variante}
           tipoCambioOficial={tipoCambioOficial}
           onClose={() => setDrawerVariante(null)}
+          onStockUpdated={onStockUpdated}
+        />
+      )}
+
+      {/* 5. MODAL DE AJUSTE RÁPIDO DE STOCK */}
+      {ajusteTarget && (
+        <AjusteStockModal
+          isOpen={Boolean(ajusteTarget)}
+          producto={ajusteTarget.producto}
+          variante={ajusteTarget.variante}
+          onClose={() => setAjusteTarget(null)}
+          onSuccess={() => {
+            setAjusteTarget(null);
+            if (onStockUpdated) onStockUpdated();
+          }}
         />
       )}
     </div>

@@ -403,8 +403,9 @@ export async function adjustInventoryStock({
   variante.stock = stockActual;
   await producto.save(session ? { session } : undefined);
 
-  const targetSucursalId =
-    sucursalId || (await getDefaultWarehouseId(session));
+  const targetSucursalId = sucursalId
+    ? new mongoose.Types.ObjectId(sucursalId.toString())
+    : await getDefaultWarehouseId(session);
 
   // Actualizar NivelStock por sucursal
   if (tipo === "ENTRADA") {
@@ -419,8 +420,11 @@ export async function adjustInventoryStock({
   } else if (tipo === "SALIDA") {
     await NivelStock.findOneAndUpdate(
       { sucursalId: targetSucursalId, varianteId: variante.varianteId },
-      { $inc: { stockFisico: -qty } },
-      { session: session ?? undefined }
+      {
+        $inc: { stockFisico: -qty },
+        $setOnInsert: { productoId: producto._id, stockReservado: 0, stockMinimo: 2 },
+      },
+      { upsert: true, session: session ?? undefined }
     );
   } else if (tipo === "AJUSTE") {
     await NivelStock.findOneAndUpdate(
@@ -433,6 +437,12 @@ export async function adjustInventoryStock({
     );
   }
 
+  const costoUnitarioAjuste = Number(
+    variante.precioCosto !== undefined && variante.precioCosto !== null
+      ? variante.precioCosto
+      : producto.precioCosto || 0
+  );
+
   const movimiento = await recordInventoryMovement({
     producto,
     variante,
@@ -443,6 +453,7 @@ export async function adjustInventoryStock({
     stockActual,
     motivo,
     referencia,
+    costoUnitario: costoUnitarioAjuste,
     userId: new mongoose.Types.ObjectId(userIdRaw),
   }, session);
 

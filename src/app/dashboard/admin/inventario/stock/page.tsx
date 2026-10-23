@@ -9,15 +9,15 @@ export default function AdminInventarioStockPage() {
   const [productos, setProductos] = useState<ProductoInventario[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setProductos(await getProductosInventario());
-      } finally {
-        setLoading(false);
-      }
-    };
+  const load = async () => {
+    try {
+      setProductos(await getProductosInventario());
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     load();
   }, []);
 
@@ -32,7 +32,7 @@ export default function AdminInventarioStockPage() {
       {loading ? (
         <div className="h-72 animate-pulse rounded-2xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/5" />
       ) : (
-        <StockDisponibleTable productos={productos} />
+        <StockDisponibleTable productos={productos} onStockUpdated={load} />
       )}
     </div>
   );

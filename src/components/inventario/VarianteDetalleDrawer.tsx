@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { ProductoInventario } from "@/types/inventario";
 import type { Variante } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
+import AjusteStockModal from "./AjusteStockModal";
 
 interface NivelStockSucursal {
   _id: string;
@@ -30,6 +31,7 @@ interface VarianteDetalleDrawerProps {
   variante: Variante | null;
   tipoCambioOficial?: number;
   onClose: () => void;
+  onStockUpdated?: () => void;
 }
 
 export default function VarianteDetalleDrawer({
@@ -37,10 +39,12 @@ export default function VarianteDetalleDrawer({
   variante,
   tipoCambioOficial = 1.85,
   onClose,
+  onStockUpdated,
 }: VarianteDetalleDrawerProps) {
   const { user } = useAuth();
   const isAdmin = user?.rol === "ADMIN";
 
+  const [modalAjusteAbierto, setModalAjusteAbierto] = useState(false);
   const [nivelesSucursal, setNivelesSucursal] = useState<NivelStockSucursal[]>([]);
   const [loadingSucursales, setLoadingSucursales] = useState(false);
 
@@ -323,14 +327,23 @@ export default function VarianteDetalleDrawer({
           </div>
 
           {/* FOOTER DE ACCIONES */}
-          <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-3 shrink-0">
+          <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-2.5 shrink-0">
             {isAdmin && (
-              <Link
-                href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}`}
-                className="px-3.5 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>📊</span> Ver Kardex
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}`}
+                  className="px-3 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>📊</span> Kardex
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setModalAjusteAbierto(true)}
+                  className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>⚖️</span> Ajustar Stock
+                </button>
+              </div>
             )}
             <button
               type="button"
@@ -342,6 +355,29 @@ export default function VarianteDetalleDrawer({
           </div>
         </div>
       </div>
+
+      {/* MODAL DE AJUSTE DE STOCK */}
+      {modalAjusteAbierto && (
+        <AjusteStockModal
+          isOpen={modalAjusteAbierto}
+          producto={producto}
+          variante={variante}
+          onClose={() => setModalAjusteAbierto(false)}
+          onSuccess={() => {
+            setModalAjusteAbierto(false);
+            if (onStockUpdated) onStockUpdated();
+            // Recargar niveles de sucursal
+            fetch(`/api/admin/productos/${producto._id}/stock-sucursales`)
+              .then((res) => (res.ok ? res.json() : []))
+              .then((data: NivelStockSucursal[]) => {
+                const varId = variante.varianteId || `${variante.color}-${variante.talla}`;
+                const filtrados = data.filter((n) => n.varianteId === varId);
+                setNivelesSucursal(filtrados);
+              })
+              .catch(() => {});
+          }}
+        />
+      )}
     </div>
   );
 }

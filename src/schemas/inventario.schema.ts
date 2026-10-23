@@ -29,6 +29,8 @@ export const ajusteStockSchema = z.object({
 
     varianteId: optionalObjectIdSchema,
 
+    sucursalId: optionalObjectIdSchema,
+
     color: nonEmptyStringSchema
         .max(50, "El color no puede exceder 50 caracteres"),
 

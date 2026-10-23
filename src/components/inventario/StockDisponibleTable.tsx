@@ -6,9 +6,17 @@ import StockJerarquicoView from "./StockJerarquicoView";
 export default function StockDisponibleTable({
   productos,
   searchTerm = "",
+  onStockUpdated,
 }: {
   productos: ProductoInventario[];
   searchTerm?: string;
+  onStockUpdated?: () => void;
 }) {
-  return <StockJerarquicoView productos={productos} searchTerm={searchTerm} />;
+  return (
+    <StockJerarquicoView
+      productos={productos}
+      searchTerm={searchTerm}
+      onStockUpdated={onStockUpdated}
+    />
+  );
 }
