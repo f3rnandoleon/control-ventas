@@ -133,10 +133,17 @@ export async function getKardexPorProducto(
     throw new AppError("Producto no encontrado", 404);
   }
 
+  const validVariantIds = (producto.variantes || [])
+    .map((v) => v.varianteId)
+    .filter(Boolean) as string[];
+
   const query: Record<string, unknown> = { productoId };
   if (varianteId) {
     query["variante.varianteId"] = varianteId;
+  } else if (validVariantIds.length > 0) {
+    query["variante.varianteId"] = { $in: validVariantIds };
   }
+
   if (sucursalId) {
     query["sucursalId"] = sucursalId;
   }
@@ -147,9 +154,18 @@ export async function getKardexPorProducto(
     .sort({ createdAt: 1 })
     .lean();
 
+  const currentVariant = varianteId
+    ? (producto.variantes || []).find((v) => v.varianteId === varianteId)
+    : null;
+
+  const costoBaseInicial =
+    currentVariant && currentVariant.precioCosto !== undefined && Number(currentVariant.precioCosto) > 0
+      ? Number(currentVariant.precioCosto)
+      : Number(producto.precioCosto || 0);
+
   let runningSaldoFisico = 0;
   let runningSaldoValorado = 0;
-  let runningCostoPromedio = Number(producto.precioCosto || 0);
+  let runningCostoPromedio = costoBaseInicial;
 
   const kardexMovimientos: KardexMovimiento[] = [];
 
@@ -226,6 +242,32 @@ export async function getKardexPorProducto(
     });
   }
 
+  let saldoFisicoResult = runningSaldoFisico;
+  let saldoValoradoResult = Number(runningSaldoValorado.toFixed(2));
+  let costoPromedioResult = runningCostoPromedio;
+
+  if (!varianteId) {
+    const totalStockProd = (producto.variantes || []).reduce(
+      (acc, v) => acc + Math.max(0, Number(v.stock || 0)),
+      0
+    );
+    const totalValorProd = (producto.variantes || []).reduce((acc, v) => {
+      const cost = Number(
+        v.precioCosto !== undefined && v.precioCosto !== null && Number(v.precioCosto) > 0
+          ? v.precioCosto
+          : producto.precioCosto || 0
+      );
+      return acc + Math.max(0, Number(v.stock || 0)) * cost;
+    }, 0);
+
+    saldoFisicoResult = totalStockProd;
+    saldoValoradoResult = Number(totalValorProd.toFixed(2));
+    costoPromedioResult =
+      totalStockProd > 0
+        ? Number((totalValorProd / totalStockProd).toFixed(2))
+        : Number(producto.precioCosto || 0);
+  }
+
   return {
     producto: {
       _id: String(producto._id),
@@ -237,9 +279,9 @@ export async function getKardexPorProducto(
       precioVentaBase: producto.precioVenta,
       variantes: producto.variantes,
     },
-    saldoFisicoActual: runningSaldoFisico,
-    saldoValoradoActual: Number(runningSaldoValorado.toFixed(2)),
-    costoPromedioActual: runningCostoPromedio,
+    saldoFisicoActual: saldoFisicoResult,
+    saldoValoradoActual: saldoValoradoResult,
+    costoPromedioActual: costoPromedioResult,
     movimientos: kardexMovimientos.reverse(), // devolver más recientes primero para visualización tabular
   };
 }

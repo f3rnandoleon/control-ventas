@@ -103,13 +103,14 @@ El helper [`resolveApiAuth`](file:///e:/proyectos/control-ropa/control-ventas/sr
 | Dominio | CLIENTE | VENDEDOR | ADMIN |
 |---|---|---|---|
 | Catálogo público / Políticas / Delivery Options | Sí | Sí | Sí |
-| Catálogo interno / Búsqueda por código | No | Sí | Sí |
+| Búsqueda por código/SKU (`/api/productos/by-code/:code`) | Sí (sanitizado) | Sí | Sí |
+| Catálogo interno (`/api/productos`) | No | Sí | Sí |
 | Carrito y Checkout de cliente | Sí | No | No |
 | Mis Pedidos (propios) | Sí | No | No |
 | Pedidos operativos maestros | No | Sí | Sí |
 | Pagos (confirmación, fallo, comprobante) | Sí (sus pagos) | Sí (staff) | Sí |
 | Reembolsos (Refund) | No | Sí | Sí |
-| Entregas / Fulfillment | Lectura propia | Sí | Sí |
+| Entregas / Fulfillment (`/api/entregas/:id`) | Sí (propio, 403 si ajeno) | Sí | Sí |
 | POS (Venta mostrador, escáner, cajas) | No | Sí | Sí |
 | Sucursales y Traspasos | No | Sí (operativo) | Sí (total) |
 | Inventario / Kárdex | No | Sí (lectura) | Sí (ajustes) |
@@ -121,16 +122,26 @@ El helper [`resolveApiAuth`](file:///e:/proyectos/control-ropa/control-ventas/sr
 
 ---
 
-## 4. Rate Limiting y Convenciones de Error
+## 4. CORS, Rate Limiting y Convenciones de Error
 
-### 4.1 Rate Limiting (en Memoria)
+### 4.1 Soporte de CORS (Cross-Origin Resource Sharing)
+Para facilitar la integración desde aplicaciones web externas (como el Storefront FitAndes) y clientes móviles, el servidor incluye cabeceras CORS automáticas y soporte nativo para preflight (`OPTIONS`):
+- **Encabezados Emitidos:**
+  - `Access-Control-Allow-Origin: *`
+  - `Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS`
+  - `Access-Control-Allow-Headers: Content-Type, Authorization, x-user-id, x-user-role, x-request-id`
+  - `Access-Control-Max-Age: 86400`
+- **Preflight `OPTIONS`:** Interceptado a nivel de middleware retornando `HTTP 204 No Content` con cabeceras CORS inmediatas sin requerir autenticación.
+- **Rutas Públicas Habilitadas:** `/api/public/*`, `/api/productos/publicos*`, `/api/productos/by-code/*`, `/api/delivery-options*`, `/api/estado*`, `/api/auth/signup`.
+
+### 4.2 Rate Limiting (en Memoria)
 - **Login / Signup / Auth:** 5 peticiones/min por IP.
-- **Catálogo Público (`/api/productos/publicos`):** 100 peticiones/min por IP.
+- **Catálogo Público (`/api/productos/publicos`, `/api/productos/by-code`, `/api/delivery-options`):** 100 peticiones/min por IP.
 - **Lectura protegida (`GET`):** 60 peticiones/min por usuario.
 - **Escritura protegida (`POST`, `PUT`, `PATCH`, `DELETE`):** 30 peticiones/min por usuario.
 - **Respuesta 429:** `{ "message": "Demasiadas solicitudes. Inténtalo más tarde." }` con cabecera `Retry-After: 60`.
 
-### 4.2 Respuestas de Error
+### 4.3 Respuestas de Error
 - **Error de validación Zod (HTTP 400):**
   ```json
   {
@@ -351,8 +362,9 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 ### 6.2 Catálogo Público y Opciones de Entrega
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/productos/publicos` | Pública | Listado de catálogo con búsqueda (`q`), filtros (`categoria`, `color`, `talla`, `soloDisponible`) y paginación (`page`, `limit`) |
+| `GET` | `/api/productos/publicos` | Pública | Listado de catálogo con búsqueda (`q`), filtros (`categoria`, `color`, `talla`, `soloDisponible`) y paginación (`page`, `limit`). Respuesta siempre estandarizada en formato envoltorio `{ data: [...], total, page, limit, totalPages }` |
 | `GET` | `/api/productos/publicos/:id` | Pública | Detalle de producto con variantes, stock vendible y medidas |
+| `GET` | `/api/productos/by-code/:code` | Pública | Búsqueda directa por código de prenda (código de barra, QR o SKU). Sanitizada para clientes públicos (oculta costos y existencias internas) |
 | `GET` | `/api/delivery-options` | Pública | Lista de puntos de recojo, horarios y empresas de envío por departamento |
 
 ---
@@ -480,7 +492,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `GET` | `/api/productos/:id` | `ADMIN`, `VENDEDOR` | Ficha técnica interna de producto con histórico y variantes enriquecidas con `sucursalesStock` |
 | `PUT` | `/api/productos/:id` | `ADMIN` | Edición integral de producto, variantes, precios y categorías |
 | `DELETE` | `/api/productos/:id` | `ADMIN` | Baja lógica de producto |
-| `GET` | `/api/productos/by-code/:code` | `ADMIN`, `VENDEDOR` | Búsqueda directa por código de barras o QR interno |
+| `GET` | `/api/productos/by-code/:code` | Pública, Staff | Búsqueda por código de barras, QR o SKU. Público/CLIENTE: respuesta sanitizada. Staff: incluye costos y existencias operativas |
 
 ---
 

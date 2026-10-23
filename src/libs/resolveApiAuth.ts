@@ -36,15 +36,18 @@ export async function resolveApiAuth(
         }
         // En Node.js (el runtime de App Router API Routes) `jsonwebtoken` funciona perfectamente.
         const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
-        await connectDB();
-        const dbUser = await User.findById(decoded.id).select("estaActivo");
-        if (!dbUser || !dbUser.estaActivo) return null;
-        if (decoded && decoded.id && decoded.rol) {
+        const resolvedId = (decoded.id || decoded.sub || decoded._id) as string | undefined;
+        const resolvedRole = (decoded.rol || decoded.role) as AuthUser["rol"] | undefined;
+
+        if (resolvedId && resolvedRole) {
+          await connectDB();
+          const dbUser = await User.findById(resolvedId).select("estaActivo");
+          if (!dbUser || !dbUser.estaActivo) return null;
           return {
-            id: decoded.id,
+            id: resolvedId,
             email: decoded.email,
             nombreCompleto: decoded.nombreCompleto,
-            rol: decoded.rol as AuthUser["rol"],
+            rol: resolvedRole,
           };
         }
       } catch (err) {
