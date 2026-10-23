@@ -191,106 +191,149 @@ export default function ProductoForm({
       </div>
 
       {/* SECCIÓN FINANCIERA: COSTO & PRECIO DE VENTA */}
-      <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-sky-900 uppercase tracking-wider">
-            Definición de Costo de Compra
-          </label>
-          {/* Toggle de Moneda de Compra */}
-          <div className="inline-flex rounded-lg bg-white p-0.5 border border-sky-200 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setMonedaCosto("PEN")}
-              className={`px-3 py-1 rounded-md transition ${
-                monedaCosto === "PEN"
-                  ? "bg-sky-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-sky-700"
-              }`}
-            >
-              🇵🇪 Soles (PEN)
-            </button>
-            <button
-              type="button"
-              onClick={() => setMonedaCosto("BOB")}
-              className={`px-3 py-1 rounded-md transition ${
-                monedaCosto === "BOB"
-                  ? "bg-sky-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-sky-700"
-              }`}
-            >
-              🇧🇴 Bolivianos (Bs)
-            </button>
+      {initialData?._id ? (
+        // MODO EDICIÓN: COSTO BLOQUEADO (AUDITADO POR KARDEX / CPP)
+        <div className="rounded-2xl border border-sky-200/80 bg-sky-50/50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🔒</span>
+              <label className="text-xs font-bold text-sky-950 uppercase tracking-wider">
+                Costo Promedio Ponderado Oficial (CPP)
+              </label>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">
+              Auditado por Kardex
+            </span>
           </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-sky-100 shadow-xs">
+            <div>
+              <span className="text-[11px] text-slate-500 block">Costo unitario actual en sistema</span>
+              <span className="text-xl font-black text-sky-900">
+                Bs {precioCostoWatched.toFixed(2)}
+              </span>
+            </div>
+            <a
+              href="/dashboard/admin/inventario/compras/nueva"
+              className="text-xs font-semibold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-lg border border-sky-200 transition text-center"
+            >
+              📦 Registrar nueva compra
+            </a>
+          </div>
+
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Este costo se calcula y actualiza de manera automática mediante las órdenes de compra. No es editable manualmente para evitar descuadres contables en la tarjeta valorada.
+          </p>
         </div>
-
-        {monedaCosto === "PEN" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      ) : (
+        // MODO CREACIÓN: COSTO DE REFERENCIA ESTIMADO PARA CALCULAR MARGEN COMERCIAL
+        <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <label className="text-xs font-medium text-slate-700">
-                Costo en Soles (S/.)
+              <label className="text-xs font-bold text-sky-900 uppercase tracking-wider block">
+                Costo de Referencia Inicial
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={costoPEN || ""}
-                onChange={(e) => setCostoPEN(parseFloat(e.target.value) || 0)}
-                className="input w-full mt-1 bg-white"
-                placeholder="Ej: 35.00"
-              />
+              <span className="text-[11px] text-slate-500">
+                Estimado para calcular el margen comercial proyectado (el oficial entrará por Compras)
+              </span>
             </div>
+            {/* Toggle de Moneda de Compra */}
+            <div className="inline-flex rounded-lg bg-white p-0.5 border border-sky-200 text-xs font-semibold self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setMonedaCosto("PEN")}
+                className={`px-3 py-1 rounded-md transition ${
+                  monedaCosto === "PEN"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-sky-700"
+                }`}
+              >
+                🇵🇪 Soles (PEN)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonedaCosto("BOB")}
+                className={`px-3 py-1 rounded-md transition ${
+                  monedaCosto === "BOB"
+                    ? "bg-sky-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-sky-700"
+                }`}
+              >
+                🇧🇴 Bolivianos (Bs)
+              </button>
+            </div>
+          </div>
 
-            <div>
-              <div className="flex items-center justify-between">
+          {monedaCosto === "PEN" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
                 <label className="text-xs font-medium text-slate-700">
-                  Tipo de cambio (Bs/S/.)
+                  Costo en Soles (S/.)
                 </label>
-                {tipoCambio !== oficialTC && (
-                  <button
-                    type="button"
-                    onClick={() => setTipoCambio(oficialTC)}
-                    className="text-[10px] text-sky-600 underline font-semibold"
-                  >
-                    Usar oficial ({oficialTC})
-                  </button>
-                )}
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={costoPEN || ""}
+                  onChange={(e) => setCostoPEN(parseFloat(e.target.value) || 0)}
+                  className="input w-full mt-1 bg-white"
+                  placeholder="Ej: 35.00"
+                />
               </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-700">
+                    Tipo de cambio (Bs/S/.)
+                  </label>
+                  {tipoCambio !== oficialTC && (
+                    <button
+                      type="button"
+                      onClick={() => setTipoCambio(oficialTC)}
+                      className="text-[10px] text-sky-600 underline font-semibold"
+                    >
+                      Usar oficial ({oficialTC})
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={tipoCambio || ""}
+                  onChange={(e) => setTipoCambio(parseFloat(e.target.value) || 0)}
+                  className="input w-full mt-1 bg-white font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700">
+                  Costo Resultante (Bs)
+                </label>
+                <div className="mt-1 flex h-10 items-center justify-between rounded-xl bg-white px-3 font-bold text-sky-800 border border-slate-200">
+                  <span>Bs {precioCostoWatched.toFixed(2)}</span>
+                  <span className="text-[11px] font-normal text-slate-400">Referencial</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="label">Precio costo referencial (Bs)</label>
               <input
+                {...register("precioCosto", { valueAsNumber: true })}
                 type="number"
+                className="input w-full bg-white"
                 step="0.01"
-                min="0.01"
-                value={tipoCambio || ""}
-                onChange={(e) => setTipoCambio(parseFloat(e.target.value) || 0)}
-                className="input w-full mt-1 bg-white font-medium text-slate-800"
+                placeholder="Ej: 50.00"
               />
             </div>
+          )}
 
-            <div>
-              <label className="text-xs font-medium text-slate-700">
-                Costo Resultante (Bs)
-              </label>
-              <div className="mt-1 flex h-10 items-center justify-between rounded-xl bg-white px-3 font-bold text-sky-800 border border-slate-200">
-                <span>Bs {precioCostoWatched.toFixed(2)}</span>
-                <span className="text-[11px] font-normal text-slate-400">Congelado</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <label className="label">Precio costo directo (Bs)</label>
-            <input
-              {...register("precioCosto", { valueAsNumber: true })}
-              type="number"
-              className="input w-full bg-white"
-              step="0.01"
-            />
-          </div>
-        )}
-
-        {errors.precioCosto && (
-          <p className="text-xs text-red-500">{errors.precioCosto.message}</p>
-        )}
-      </div>
+          {errors.precioCosto && (
+            <p className="text-xs text-red-500">{errors.precioCosto.message}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>

@@ -268,7 +268,7 @@ export default function VarianteForm({
       return {
         ...row,
         talla: row.talla.trim(),
-        stock: Number(row.stock),
+        stock: row.varianteId ? Math.max(0, Number(row.stock || 0)) : 0,
         precioVenta:
           pVentaNum !== undefined && !Number.isNaN(pVentaNum) && pVentaNum > 0
             ? pVentaNum
@@ -400,9 +400,9 @@ export default function VarianteForm({
       <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-medium text-white">Tallas, Stock, Precios y Medidas</p>
+            <p className="text-sm font-medium text-white">Tallas, Precios y Medidas</p>
             <p className="text-xs text-gray-400">
-              Reutiliza el mismo color e imágenes. El precio y costo son opcionales por talla (si se dejan vacíos, heredan los del producto).
+              El stock físico y el costo contable oficial se gestionan mediante el módulo de Compras.
             </p>
           </div>
 
@@ -418,6 +418,7 @@ export default function VarianteForm({
         <div className="space-y-3">
           {sizeRows.map((row, index) => {
             const rowHasMedidas = hasAnyMedida(row.medidas);
+            const isExistingVariant = Boolean(row.varianteId);
 
             return (
               <div
@@ -427,12 +428,13 @@ export default function VarianteForm({
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-12 md:items-center">
                   {/* Selector Talla */}
                   <div className="md:col-span-3">
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Talla</label>
                     <select
                       className="input w-full"
                       value={row.talla}
                       onChange={(e) => updateSizeRow(index, "talla", e.target.value)}
                     >
-                      <option value="">Talla</option>
+                      <option value="">Selecciona Talla</option>
                       {getVariantSelectOptions(row.talla, TALLA_OPTIONS).map(
                         (talla) => (
                           <option key={talla} value={talla}>
@@ -443,24 +445,29 @@ export default function VarianteForm({
                     </select>
                   </div>
 
-                  {/* Stock */}
+                  {/* Stock (Solo Lectura) */}
                   <div className="md:col-span-2">
+                    <label className="text-[10px] text-gray-400 block mb-0.5">
+                      {isExistingVariant ? "Stock actual" : "Stock inicial"}
+                    </label>
                     <input
                       type="number"
-                      className="input w-full"
-                      placeholder="Stock"
-                      title="Stock disponible"
-                      min={0}
-                      step={1}
-                      value={row.stock}
-                      onChange={(e) =>
-                        updateSizeRow(index, "stock", Number(e.target.value))
+                      className="input w-full cursor-not-allowed bg-white/5 text-gray-300 font-medium"
+                      placeholder="0"
+                      title={
+                        isExistingVariant
+                          ? "El stock disponible se gestiona desde Compras, Ventas o Ajustes"
+                          : "Las nuevas variantes inician en 0. La mercadería ingresa por el módulo de Compras."
                       }
+                      value={isExistingVariant ? (row.stock ?? 0) : 0}
+                      disabled
+                      readOnly
                     />
                   </div>
 
                   {/* Precio Venta Opcional */}
                   <div className="md:col-span-2">
+                    <label className="text-[10px] text-gray-400 block mb-0.5">P. Venta (opc)</label>
                     <input
                       type="number"
                       className="input w-full text-xs"
@@ -483,19 +490,30 @@ export default function VarianteForm({
                     />
                   </div>
 
-                  {/* Precio Costo Opcional */}
+                  {/* Precio Costo (Bloqueado si existe, o referencial si es nueva) */}
                   <div className="md:col-span-2">
+                    <label className="text-[10px] text-gray-400 block mb-0.5">
+                      {isExistingVariant ? "🔒 Costo (CPP)" : "Costo Ref. (opc)"}
+                    </label>
                     <input
                       type="number"
-                      className="input w-full text-xs"
+                      className={`input w-full text-xs ${
+                        isExistingVariant ? "cursor-not-allowed bg-white/5 text-cyan-300 font-semibold" : ""
+                      }`}
                       placeholder={
                         precioBaseCosto
                           ? `Cost: Bs ${precioBaseCosto}`
-                          : "P. Costo (opc)"
+                          : "P. Costo"
                       }
-                      title="Precio de costo específico para esta talla (deja vacío para usar costo base)"
+                      title={
+                        isExistingVariant
+                          ? "Costo unitario oficial fijado por Compras (Solo lectura)"
+                          : "Costo estimado referencial (deja vacío para usar costo base)"
+                      }
                       min={0}
                       step="any"
+                      disabled={isExistingVariant}
+                      readOnly={isExistingVariant}
                       value={row.precioCosto ?? ""}
                       onChange={(e) =>
                         updateSizeRow(

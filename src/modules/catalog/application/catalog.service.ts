@@ -167,24 +167,22 @@ export async function createCatalogProduct(
   );
 
   const variantesProcesadas = variantesConIdentidad.map((variante, index) => {
-    if (variante.codigoBarra && variante.qrCode) {
-      return {
-        ...variante,
-        stockReservado: 0,
-      };
-    }
-
-    const { codigoBarra, qrCode } = generarCodigoVariante({
-      sku,
-      color: variante.color,
-      colorSecundario: variante.colorSecundario,
-      talla: variante.talla,
-      correlativo: index + 1,
-    });
+    const { codigoBarra, qrCode } =
+      variante.codigoBarra && variante.qrCode
+        ? { codigoBarra: variante.codigoBarra, qrCode: variante.qrCode }
+        : generarCodigoVariante({
+            sku,
+            color: variante.color,
+            colorSecundario: variante.colorSecundario,
+            talla: variante.talla,
+            correlativo: index + 1,
+          });
 
     return {
       ...variante,
+      stock: 0, // Productos nuevos en catálogo nacen siempre con 0 unidades (mercancía ingresa por Compras)
       stockReservado: 0,
+      precioCosto: Number(variante.precioCosto || data.precioCosto || 0),
       codigoBarra: variante.codigoBarra || codigoBarra,
       qrCode: variante.qrCode || qrCode,
     };
@@ -203,7 +201,7 @@ export async function createCatalogProduct(
       sucursalId: defaultWarehouseId,
       productoId: created._id,
       varianteId: v.varianteId,
-      stockFisico: Math.max(0, Number(v.stock || 0)),
+      stockFisico: 0,
       stockReservado: 0,
       stockMinimo: 2,
     }));
@@ -268,13 +266,24 @@ export async function updateCatalogProduct(
       const existentes = (productoAntes.variantes as Variante[]).filter((actual) =>
         matchesVariant(actual, variante)
       );
+      const stockExistente = existentes[0]?.stock !== undefined ? existentes[0].stock : 0;
       const stockReservado = existentes[0]?.stockReservado || 0;
+      const precioCostoExistente =
+        existentes[0]?.precioCosto !== undefined && Number(existentes[0].precioCosto) > 0
+          ? Number(existentes[0].precioCosto)
+          : variante.precioCosto !== undefined && Number(variante.precioCosto) > 0
+            ? Number(variante.precioCosto)
+            : Number(productoAntes.precioCosto || 0);
+
+      const baseVariant = {
+        ...variante,
+        stock: stockExistente,
+        stockReservado,
+        precioCosto: precioCostoExistente,
+      };
 
       if (variante.codigoBarra && variante.qrCode) {
-        return {
-          ...variante,
-          stockReservado,
-        };
+        return baseVariant;
       }
 
       const correlativo = existentes.length + 1;
@@ -287,16 +296,22 @@ export async function updateCatalogProduct(
       });
 
       return {
-        ...variante,
-        stockReservado: existentes[0]?.stockReservado || 0,
+        ...baseVariant,
         codigoBarra: variante.codigoBarra || codigoBarra,
         qrCode: variante.qrCode || qrCode,
       };
     });
   }
 
+  // Al actualizar desde catálogo, preservar el precioCosto auditado por Kardex/Compras
+  const precioCostoSeguro =
+    productoAntes.precioCosto && productoAntes.precioCosto > 0
+      ? productoAntes.precioCosto
+      : data.precioCosto || 0;
+
   const updatePayload = {
     ...data,
+    precioCosto: precioCostoSeguro,
     sku: nuevoSKU,
     ...(Array.isArray(variantesProcesadas) ? { variantes: variantesProcesadas } : {}),
   };
