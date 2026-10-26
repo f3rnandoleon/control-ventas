@@ -116,7 +116,16 @@ export async function crearSolicitudTraspaso(
         colorSecundario: variante.colorSecundario,
         talla: variante.talla,
         codigoBarra: variante.codigoBarra,
-        imagen: variante.imagenes?.[0] || undefined,
+        imagen:
+          variante.imagenes?.[0] ||
+          variante.imagen ||
+          producto.variantes?.find(
+            (v: Variante) => (v.imagenes && v.imagenes.length > 0) || Boolean(v.imagen)
+          )?.imagenes?.[0] ||
+          producto.variantes?.find(
+            (v: Variante) => Boolean(v.imagen)
+          )?.imagen ||
+          undefined,
       },
       cantidadEnviada: qty,
       cantidadRecibida: 0,

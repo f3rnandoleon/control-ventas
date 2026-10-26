@@ -31,8 +31,8 @@ export interface TraspasoItem {
 export interface Traspaso {
   _id: string;
   numeroTraspaso: string;
-  sucursalOrigenId: string | { _id: string; nombre: string; codigo: string };
-  sucursalDestinoId: string | { _id: string; nombre: string; codigo: string };
+  sucursalOrigenId: string | { _id: string; nombre: string; codigo: string; tipo?: string; direccion?: string; esAlmacenPrincipal?: boolean };
+  sucursalDestinoId: string | { _id: string; nombre: string; codigo: string; tipo?: string; direccion?: string; esAlmacenPrincipal?: boolean };
   estado: EstadoTraspaso;
   items: TraspasoItem[];
   totalPrendasEnviadas: number;

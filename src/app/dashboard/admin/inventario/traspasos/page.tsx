@@ -12,45 +12,37 @@ import { getSucursales } from "@/services/sucursales.service";
 import type { Traspaso } from "@/types/traspaso";
 import type { Sucursal } from "@/types/sucursal";
 import type { Producto } from "@/types/producto";
-import { formatMoney } from "@/utils/pricing";
+import { toast } from "sonner";
+
+// Componentes modulares
+import TraspasoKPIs from "@/components/traspasos/TraspasoKPIs";
+import TraspasoTable from "@/components/traspasos/TraspasoTable";
+import TraspasoCard from "@/components/traspasos/TraspasoCard";
+import NuevoTraspasoModal from "@/components/traspasos/NuevoTraspasoModal";
+import DetalleTraspasoModal from "@/components/traspasos/DetalleTraspasoModal";
+import RecibirTraspasoModal from "@/components/traspasos/RecibirTraspasoModal";
+import GuiaTraspasoPrintModal from "@/components/traspasos/GuiaTraspasoPrintModal";
 
 export default function TraspasosPage() {
   const [traspasos, setTraspasos] = useState<Traspaso[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filtros y Vista
   const [filtroEstado, setFiltroEstado] = useState<string>("TODOS");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filtroSucursal, setFiltroSucursal] = useState<string>("TODAS");
+  const [viewMode, setViewMode] = useState<"auto" | "table" | "grid">("auto");
 
   // Modales
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTraspaso, setSelectedTraspaso] = useState<Traspaso | null>(null);
   const [receiveModalTraspaso, setReceiveModalTraspaso] = useState<Traspaso | null>(null);
-
-  // Estados de formulario de nuevo traspaso
-  const [origenId, setOrigenId] = useState("");
-  const [destinoId, setDestinoId] = useState("");
-  const [motivo, setMotivo] = useState("Reabastecimiento de tienda");
-  const [notasEnvio, setNotasEnvio] = useState("");
-  const [itemsDraft, setItemsDraft] = useState<
-    Array<{
-      productoId: string;
-      productoNombre: string;
-      varianteId: string;
-      color: string;
-      talla: string;
-      sku: string;
-      cantidadEnviada: number;
-    }>
-  >([]);
-
-  // Selector de ítem en borrador
-  const [selectedProdId, setSelectedProdId] = useState("");
-  const [selectedVarId, setSelectedVarId] = useState("");
-  const [cantidadAdd, setCantidadAdd] = useState(1);
+  const [printModalTraspaso, setPrintModalTraspaso] = useState<Traspaso | null>(null);
 
   // Acciones en curso
   const [actionLoading, setActionLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
 
   const loadData = async () => {
     try {
@@ -63,15 +55,9 @@ export default function TraspasosPage() {
       setTraspasos(listTraspasos);
       setSucursales(listSucursales);
       setProductos(resProds);
-
-      if (listSucursales.length >= 2) {
-        const principal = listSucursales.find((s) => s.esAlmacenPrincipal) || listSucursales[0];
-        const secondary = listSucursales.find((s) => s._id !== principal._id) || listSucursales[1];
-        setOrigenId(principal._id);
-        setDestinoId(secondary._id);
-      }
     } catch (err) {
-      console.error(err);
+      console.error("Error al cargar datos de traspasos:", err);
+      toast.error("Error al cargar los datos de traspasos");
     } finally {
       setLoading(false);
     }
@@ -81,763 +67,436 @@ export default function TraspasosPage() {
     loadData();
   }, []);
 
-  const productoActual = useMemo(
-    () => productos.find((p) => p._id === selectedProdId),
-    [productos, selectedProdId]
-  );
-
-  const varianteActual = useMemo(
-    () => productoActual?.variantes?.find((v) => v.varianteId === selectedVarId),
-    [productoActual, selectedVarId]
-  );
-
-  const handleAddItem = () => {
-    if (!productoActual || !varianteActual || !varianteActual.varianteId || cantidadAdd <= 0) return;
-    const vId = varianteActual.varianteId;
-    const exists = itemsDraft.find((i) => i.varianteId === vId);
-    if (exists) {
-      setItemsDraft(
-        itemsDraft.map((i) =>
-          i.varianteId === vId
-            ? { ...i, cantidadEnviada: i.cantidadEnviada + cantidadAdd }
-            : i
-        )
-      );
-    } else {
-      setItemsDraft([
-        ...itemsDraft,
-        {
-          productoId: productoActual._id,
-          productoNombre: productoActual.nombre,
-          varianteId: vId,
-          color: varianteActual.color,
-          talla: varianteActual.talla,
-          sku: productoActual.sku,
-          cantidadEnviada: cantidadAdd,
-        },
-      ]);
+  // Mapa de productos indexado por ID para lookup ultrarrápido de imágenes y modelos
+  const productosMap = useMemo(() => {
+    const map: Record<string, Producto> = {};
+    for (const p of productos) {
+      map[p._id] = p;
     }
-    setCantidadAdd(1);
-  };
+    return map;
+  }, [productos]);
 
-  const handleRemoveItem = (varianteId: string) => {
-    setItemsDraft(itemsDraft.filter((i) => i.varianteId !== varianteId));
-  };
-
-  const handleCreateTraspaso = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (origenId === destinoId) {
-      setErrorMsg("La sucursal de origen y destino deben ser diferentes");
-      return;
-    }
-    if (itemsDraft.length === 0) {
-      setErrorMsg("Debes agregar al menos un ítem al traspaso");
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      setErrorMsg("");
-      await crearTraspaso({
-        sucursalOrigenId: origenId,
-        sucursalDestinoId: destinoId,
-        motivo,
-        notasEnvio,
-        items: itemsDraft.map((i) => ({
-          productoId: i.productoId,
-          varianteId: i.varianteId,
-          cantidad: i.cantidadEnviada,
-          cantidadEnviada: i.cantidadEnviada,
-        })),
-      });
-
-      setShowCreateModal(false);
-      setItemsDraft([]);
-      await loadData();
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Error al crear el traspaso");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
+  // Acciones
   const handleDespachar = async (id: string) => {
-    if (!confirm("¿Confirmas el despacho de esta mercadería? Saldrá del stock de la sucursal origen y pasará a EN TRÁNSITO.")) {
+    if (
+      !confirm(
+        "¿Confirmas el despacho de esta mercadería?\n\nEl stock saldrá físicamente del almacén de origen y pasará al estado EN TRÁNSITO."
+      )
+    ) {
       return;
     }
     try {
       setActionLoading(true);
       await despacharTraspaso(id);
+      toast.success("Mercadería despachada. Ahora se encuentra EN TRÁNSITO.");
       await loadData();
       if (selectedTraspaso?._id === id) setSelectedTraspaso(null);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error al despachar");
+      toast.error(err instanceof Error ? err.message : "Error al despachar");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleRecibir = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!receiveModalTraspaso) return;
+  const handleConfirmRecibir = async (
+    traspasoId: string,
+    data?: {
+      itemsRecibidos?: Array<{
+        varianteId: string;
+        cantidadRecibida: number;
+      }>;
+      notasRecepcion?: string;
+    }
+  ) => {
     try {
       setActionLoading(true);
-      await recibirTraspaso(receiveModalTraspaso._id);
+      await recibirTraspaso(traspasoId, data);
       setReceiveModalTraspaso(null);
+      if (selectedTraspaso?._id === traspasoId) setSelectedTraspaso(null);
       await loadData();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error al recibir traspaso");
+      throw err;
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleCancelar = async (id: string) => {
-    if (!confirm("¿Seguro que deseas cancelar esta solicitud de transferencia?")) return;
+    if (
+      !confirm(
+        "¿Seguro que deseas cancelar este traspaso?\n\nSi estaba en tránsito, el stock será restituido automáticamente a la sucursal de origen."
+      )
+    ) {
+      return;
+    }
     try {
       setActionLoading(true);
       await cancelarTraspaso(id);
+      toast.success("Traspaso cancelado correctamente");
       await loadData();
       if (selectedTraspaso?._id === id) setSelectedTraspaso(null);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Error al cancelar");
+      toast.error(err instanceof Error ? err.message : "Error al cancelar");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Filtrado
+  // Filtrado reactivo con búsqueda inteligente
   const traspasosFiltrados = useMemo(() => {
-    if (filtroEstado === "TODOS") return traspasos;
-    return traspasos.filter((t) => t.estado === filtroEstado);
-  }, [traspasos, filtroEstado]);
+    return traspasos.filter((t) => {
+      // Filtro por Estado
+      if (filtroEstado !== "TODOS" && t.estado !== filtroEstado) {
+        return false;
+      }
 
-  const countSolicitadas = traspasos.filter((t) => t.estado === "SOLICITADA").length;
-  const countTransito = traspasos.filter((t) => t.estado === "EN_TRANSITO").length;
-  const countRecibidas = traspasos.filter((t) => t.estado === "RECIBIDA").length;
+      // Filtro por Sucursal
+      if (filtroSucursal !== "TODAS") {
+        const origId = typeof t.sucursalOrigenId === "object" ? t.sucursalOrigenId._id : t.sucursalOrigenId;
+        const destId = typeof t.sucursalDestinoId === "object" ? t.sucursalDestinoId._id : t.sucursalDestinoId;
+        if (origId !== filtroSucursal && destId !== filtroSucursal) {
+          return false;
+        }
+      }
+
+      // Filtro por Query (Texto)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const num = (t.numeroTraspaso || "").toLowerCase();
+        const mot = (t.motivo || "").toLowerCase();
+        const origNom =
+          typeof t.sucursalOrigenId === "object"
+            ? (t.sucursalOrigenId.nombre || "").toLowerCase()
+            : "";
+        const destNom =
+          typeof t.sucursalDestinoId === "object"
+            ? (t.sucursalDestinoId.nombre || "").toLowerCase()
+            : "";
+
+        const matchesProduct = (t.items || []).some((it) => {
+          const prodNom = (it.productoSnapshot?.nombre || "").toLowerCase();
+          const prodMod = (it.productoSnapshot?.modelo || "").toLowerCase();
+          const prodSku = (it.productoSnapshot?.sku || "").toLowerCase();
+          const varCol = (it.varianteSnapshot?.color || "").toLowerCase();
+          return prodNom.includes(q) || prodMod.includes(q) || prodSku.includes(q) || varCol.includes(q);
+        });
+
+        if (
+          !num.includes(q) &&
+          !mot.includes(q) &&
+          !origNom.includes(q) &&
+          !destNom.includes(q) &&
+          !matchesProduct
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [traspasos, filtroEstado, filtroSucursal, searchQuery]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Header Superior */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Transferencias entre Sucursales
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Control de movimiento y traspasos de mercadería entre tiendas y almacenes con control en tránsito.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setErrorMsg("");
-            setShowCreateModal(true);
-          }}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-sm shadow-lg shadow-cyan-900/30 transition cursor-pointer"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>Nuevo Traspaso</span>
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Total Transferencias
-          </p>
-          <p className="text-3xl font-extrabold text-white mt-2">{traspasos.length}</p>
-          <p className="text-xs text-gray-400 mt-1">Histórico de movimientos</p>
-        </div>
-        <div className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
-          <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
-            Solicitadas (Pendientes)
-          </p>
-          <p className="text-3xl font-extrabold text-amber-300 mt-2">{countSolicitadas}</p>
-          <p className="text-xs text-amber-500/80 mt-1">Por empaquetar y despachar</p>
-        </div>
-        <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 backdrop-blur-sm relative overflow-hidden">
-          <div className="absolute top-3 right-3 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Transferencias entre Sucursales
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+              Kárdex & Tránsito
+            </span>
           </div>
-          <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
-            En Tránsito (Viajando)
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            Gestión logística integral: mueve stock entre tiendas y almacenes con control en tránsito,
+            fotografías de prendas, modelos y conservación del costo valorado (CPP).
           </p>
-          <p className="text-3xl font-extrabold text-cyan-300 mt-2">{countTransito}</p>
-          <p className="text-xs text-cyan-500/80 mt-1">Stock en carretera</p>
         </div>
-        <div className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 backdrop-blur-sm">
-          <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-            Recibidas (Completadas)
-          </p>
-          <p className="text-3xl font-extrabold text-emerald-300 mt-2">{countRecibidas}</p>
-          <p className="text-xs text-emerald-500/80 mt-1">Ingresadas a destino</p>
-        </div>
-      </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 border-b border-white/10 pb-2 overflow-x-auto">
-        {(["TODOS", "SOLICITADA", "EN_TRANSITO", "RECIBIDA", "CANCELADA"] as const).map((est) => (
+        <div className="flex items-center gap-2.5">
           <button
-            key={est}
-            onClick={() => setFiltroEstado(est)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition cursor-pointer whitespace-nowrap ${
-              filtroEstado === est
-                ? "bg-white/15 text-white shadow"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
+            onClick={loadData}
+            title="Recargar datos"
+            disabled={loading}
+            className="p-2.5 rounded-xl border border-white/10 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer disabled:opacity-50"
           >
-            {est === "TODOS"
-              ? "Todos"
-              : est === "SOLICITADA"
-                ? "Solicitadas"
-                : est === "EN_TRANSITO"
-                  ? "En Tránsito"
-                  : est === "RECIBIDA"
-                    ? "Recibidas"
-                    : "Canceladas"}
+            <svg
+              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
-        ))}
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs sm:text-sm shadow-xl shadow-cyan-950/50 hover:shadow-cyan-900/60 transition active:scale-98 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Nuevo Traspaso</span>
+          </button>
+        </div>
       </div>
 
-      {/* Table */}
+      {/* KPI Cards Interactivas */}
+      <TraspasoKPIs
+        traspasos={traspasos}
+        filtroEstado={filtroEstado}
+        onSelectFiltro={(est) => setFiltroEstado(est)}
+      />
+
+      {/* Barra de Filtros, Búsqueda y Modos de Vista */}
+      <div className="rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md p-4 space-y-3 shadow-lg">
+        {/* Pills de Estado */}
+        <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+          <div className="flex gap-1.5 shrink-0">
+            {(
+              [
+                { id: "TODOS", label: "Todos" },
+                { id: "SOLICITADA", label: "Solicitadas" },
+                { id: "EN_TRANSITO", label: "En Tránsito" },
+                { id: "RECIBIDA", label: "Recibidas" },
+                { id: "CANCELADA", label: "Canceladas" },
+              ] as const
+            ).map((item) => {
+              const active = filtroEstado === item.id;
+              const count =
+                item.id === "TODOS"
+                  ? traspasos.length
+                  : traspasos.filter((t) => t.estado === item.id).length;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setFiltroEstado(item.id)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition cursor-pointer select-none whitespace-nowrap ${
+                    active
+                      ? "bg-white/15 text-white shadow-sm ring-1 ring-white/20"
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-md text-[10px] ${
+                      active ? "bg-cyan-500/30 text-cyan-200" : "bg-white/10 text-slate-400"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Toggle de Modo de Vista (Desktop) */}
+          <div className="hidden md:flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-white/10 shrink-0">
+            <button
+              onClick={() => setViewMode("table")}
+              title="Vista de Tabla"
+              className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
+                viewMode === "table" || viewMode === "auto"
+                  ? "bg-white/15 text-white"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              title="Vista de Tarjetas"
+              className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-white/15 text-white"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Buscador & Selector de Sucursal */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="relative sm:col-span-2">
+            <input
+              type="text"
+              placeholder="Buscar por código (TRF-...), prenda, modelo, SKU o sucursal..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-white/10 bg-slate-950/80 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-cyan-500"
+            />
+            <svg
+              className="w-4 h-4 text-slate-400 absolute left-3 top-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div>
+            <select
+              value={filtroSucursal}
+              onChange={(e) => setFiltroSucursal(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-slate-950/80 text-white text-xs sm:text-sm focus:outline-none focus:border-cyan-500 font-medium"
+            >
+              <option value="TODAS">Todas las Sucursales</option>
+              {sucursales.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.nombre} ({s.codigo})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Contenedor Principal de Lista / Tabla */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-20 animate-pulse rounded-2xl border border-white/10 bg-white/5"
+              className="h-24 animate-pulse rounded-2xl border border-white/10 bg-white/5"
             />
           ))}
         </div>
       ) : traspasosFiltrados.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-gray-400">
-          <p className="text-4xl mb-3">🔄</p>
-          <p className="text-lg font-medium text-gray-200">No hay transferencias en este estado</p>
-          <p className="text-sm mt-1">
-            Usa el botón &quot;Nuevo Traspaso&quot; para enviar mercadería desde tu almacén central a tus tiendas.
+        <div className="rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-md p-12 text-center text-slate-400 space-y-3 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-3xl mx-auto text-slate-300">
+            🔄
+          </div>
+          <h3 className="text-lg font-bold text-white">No hay transferencias encontradas</h3>
+          <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+            {searchQuery || filtroEstado !== "TODOS" || filtroSucursal !== "TODAS"
+              ? "Prueba cambiando los filtros o el término de búsqueda."
+              : "Comienza registrando tu primera transferencia entre sucursales para abastecer tus tiendas."}
           </p>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition cursor-pointer mt-2"
+          >
+            + Crear Primer Traspaso
+          </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/10 bg-white/5 shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-gray-300">
-              <thead className="bg-white/5 border-b border-white/10 text-xs text-gray-400 uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-4 text-left">Código</th>
-                  <th className="px-5 py-4 text-left">Ruta (Origen → Destino)</th>
-                  <th className="px-5 py-4 text-center">Prendas</th>
-                  <th className="px-5 py-4 text-right">Valor CPP</th>
-                  <th className="px-5 py-4 text-center">Estado</th>
-                  <th className="px-5 py-4 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {traspasosFiltrados.map((t) => {
-                  const origen =
-                    typeof t.sucursalOrigenId === "object"
-                      ? (t.sucursalOrigenId as unknown as Sucursal).nombre
-                      : "Origen";
-                  const destino =
-                    typeof t.sucursalDestinoId === "object"
-                      ? (t.sucursalDestinoId as unknown as Sucursal).nombre
-                      : "Destino";
-
-                  return (
-                    <tr key={t._id} className="hover:bg-white/[0.03] transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="font-mono font-semibold text-white">{t.numeroTraspaso}</div>
-                        <div className="text-xs text-gray-500">
-                          {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "-"}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-purple-300">{origen}</span>
-                          <span className="text-gray-500">→</span>
-                          <span className="font-medium text-emerald-300">{destino}</span>
-                        </div>
-                        {t.motivo && <div className="text-xs text-gray-500 mt-0.5">{t.motivo}</div>}
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <span className="inline-flex px-2.5 py-1 rounded-lg bg-white/5 font-semibold text-white text-xs">
-                          {t.totalPrendasEnviadas} un.
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-right font-medium text-cyan-300">
-                        {formatMoney(t.valorTotalCostoTraspaso)}
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        {t.estado === "SOLICITADA" && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            ⏳ Solicitada
-                          </span>
-                        )}
-                        {t.estado === "EN_TRANSITO" && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-pulse">
-                            🚚 En Tránsito
-                          </span>
-                        )}
-                        {t.estado === "RECIBIDA" && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            ✅ Recibida
-                          </span>
-                        )}
-                        {t.estado === "CANCELADA" && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-300 border border-red-500/30">
-                            ✕ Cancelada
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => setSelectedTraspaso(t)}
-                            className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 hover:text-white transition cursor-pointer"
-                          >
-                            Ver
-                          </button>
-                          {t.estado === "SOLICITADA" && (
-                            <>
-                              <button
-                                disabled={actionLoading}
-                                onClick={() => handleDespachar(t._id)}
-                                className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold text-white shadow transition cursor-pointer"
-                              >
-                                Despachar
-                              </button>
-                              <button
-                                disabled={actionLoading}
-                                onClick={() => handleCancelar(t._id)}
-                                className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-xs font-medium text-red-300 transition cursor-pointer"
-                              >
-                                Cancelar
-                              </button>
-                            </>
-                          )}
-                          {t.estado === "EN_TRANSITO" && (
-                            <button
-                              disabled={actionLoading}
-                              onClick={() => setReceiveModalTraspaso(t)}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow transition cursor-pointer"
-                            >
-                              Recibir en Tienda
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Vista Móvil: Tarjetas táctiles siempre activas en pantallas pequeñas */}
+          <div className="block md:hidden space-y-3">
+            {traspasosFiltrados.map((t) => (
+              <TraspasoCard
+                key={t._id}
+                traspaso={t}
+                productosMap={productosMap}
+                actionLoading={actionLoading}
+                onView={(item) => setSelectedTraspaso(item)}
+                onDespachar={handleDespachar}
+                onRecibir={(item) => setReceiveModalTraspaso(item)}
+                onCancelar={handleCancelar}
+                onPrint={(item) => setPrintModalTraspaso(item)}
+              />
+            ))}
           </div>
-        </div>
+
+          {/* Vista Desktop: Tabla o Grid según selección */}
+          <div className="hidden md:block">
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {traspasosFiltrados.map((t) => (
+                  <TraspasoCard
+                    key={t._id}
+                    traspaso={t}
+                    productosMap={productosMap}
+                    actionLoading={actionLoading}
+                    onView={(item) => setSelectedTraspaso(item)}
+                    onDespachar={handleDespachar}
+                    onRecibir={(item) => setReceiveModalTraspaso(item)}
+                    onCancelar={handleCancelar}
+                    onPrint={(item) => setPrintModalTraspaso(item)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <TraspasoTable
+                traspasos={traspasosFiltrados}
+                productosMap={productosMap}
+                actionLoading={actionLoading}
+                onView={(item) => setSelectedTraspaso(item)}
+                onDespachar={handleDespachar}
+                onRecibir={(item) => setReceiveModalTraspaso(item)}
+                onCancelar={handleCancelar}
+                onPrint={(item) => setPrintModalTraspaso(item)}
+              />
+            )}
+          </div>
+        </>
       )}
 
-      {/* Modal Nuevo Traspaso */}
+      {/* Modales */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-gray-900 p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">Nueva Solicitud de Traspaso</h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Mueve stock entre sucursales conservando el costo valorado (CPP).
-                </p>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-white text-xl cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {errorMsg && (
-              <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateTraspaso} className="space-y-4">
-              {/* Rutas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                    Sucursal Origen (Sale stock) *
-                  </label>
-                  <select
-                    value={origenId}
-                    onChange={(e) => setOrigenId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-gray-800 text-white focus:outline-none focus:border-cyan-500 text-sm"
-                  >
-                    {sucursales.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.nombre} ({s.codigo})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                    Sucursal Destino (Entra stock) *
-                  </label>
-                  <select
-                    value={destinoId}
-                    onChange={(e) => setDestinoId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-gray-800 text-white focus:outline-none focus:border-cyan-500 text-sm"
-                  >
-                    {sucursales.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.nombre} ({s.codigo})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Agregar Ítems */}
-              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3">
-                <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
-                  Seleccionar Variantes a Enviar
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Producto</label>
-                    <select
-                      value={selectedProdId}
-                      onChange={(e) => {
-                        setSelectedProdId(e.target.value);
-                        setSelectedVarId("");
-                      }}
-                      className="w-full px-3 py-2 rounded-lg border border-white/10 bg-gray-800 text-white text-xs focus:outline-none focus:border-cyan-500"
-                    >
-                      <option value="">-- Elegir producto --</option>
-                      {productos.map((p) => (
-                        <option key={p._id} value={p._id}>
-                          {p.nombre} ({p.sku})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Variante (Color/Talla)</label>
-                    <select
-                      value={selectedVarId}
-                      disabled={!productoActual}
-                      onChange={(e) => setSelectedVarId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-white/10 bg-gray-800 text-white text-xs focus:outline-none focus:border-cyan-500 disabled:opacity-50"
-                    >
-                      <option value="">-- Elegir variante --</option>
-                      {productoActual?.variantes?.map((v) => (
-                        <option key={v.varianteId} value={v.varianteId}>
-                          {v.color} / {v.talla} (Disp. Global: {v.stockDisponible ?? v.stock ?? 0})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Cantidad a Enviar</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={cantidadAdd}
-                        onChange={(e) => setCantidadAdd(Math.max(1, Number(e.target.value)))}
-                        className="w-full px-3 py-2 rounded-lg border border-white/10 bg-gray-800 text-white text-xs focus:outline-none focus:border-cyan-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddItem}
-                        disabled={!varianteActual}
-                        className="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow transition disabled:opacity-50 cursor-pointer"
-                      >
-                        Añadir
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lista de ítems en borrador */}
-                {itemsDraft.length > 0 && (
-                  <div className="mt-3 border border-white/10 rounded-lg overflow-hidden">
-                    <table className="w-full text-xs text-gray-300">
-                      <thead className="bg-white/5 border-b border-white/10 text-gray-400">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Producto</th>
-                          <th className="px-3 py-2 text-left">Variante</th>
-                          <th className="px-3 py-2 text-center">Cantidad</th>
-                          <th className="px-3 py-2 text-center">Quitar</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {itemsDraft.map((item) => (
-                          <tr key={item.varianteId}>
-                            <td className="px-3 py-2 font-medium text-white">{item.productoNombre}</td>
-                            <td className="px-3 py-2">
-                              {item.color} / {item.talla}
-                            </td>
-                            <td className="px-3 py-2 text-center font-bold text-cyan-300">
-                              {item.cantidadEnviada}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(item.varianteId)}
-                                className="text-red-400 hover:text-red-300 font-bold cursor-pointer"
-                              >
-                                ✕
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                  Motivo
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Reabastecimiento fin de semana"
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                  Notas de Envío
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Instrucciones al transportista o encargado..."
-                  value={notasEnvio}
-                  onChange={(e) => setNotasEnvio(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 text-sm"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading || itemsDraft.length === 0}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-sm shadow-lg shadow-cyan-900/30 transition disabled:opacity-50 cursor-pointer"
-                >
-                  {actionLoading ? "Guardando..." : "Crear Traspaso"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <NuevoTraspasoModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          sucursales={sucursales}
+          productos={productos}
+          onCreated={loadData}
+          onSubmit={async (data) => {
+            await crearTraspaso(data);
+          }}
+        />
       )}
 
-      {/* Modal Detalle de Traspaso */}
       {selectedTraspaso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-gray-900 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <h2 className="text-xl font-bold text-white">Detalle de Traspaso {selectedTraspaso.numeroTraspaso}</h2>
-                <p className="text-xs text-gray-400">
-                  Creado el {selectedTraspaso.createdAt ? new Date(selectedTraspaso.createdAt).toLocaleString() : "-"}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedTraspaso(null)}
-                className="text-gray-400 hover:text-white text-xl cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-gray-400">Estado</span>
-                <p className="font-bold text-white mt-1">{selectedTraspaso.estado}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-gray-400">Total Prendas</span>
-                <p className="font-bold text-cyan-300 mt-1">{selectedTraspaso.totalPrendasEnviadas} un.</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-gray-400">Costo Total</span>
-                <p className="font-bold text-emerald-300 mt-1">{formatMoney(selectedTraspaso.valorTotalCostoTraspaso)}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-gray-400">Motivo</span>
-                <p className="font-medium text-gray-200 mt-1 truncate">{selectedTraspaso.motivo || "N/A"}</p>
-              </div>
-            </div>
-
-            {selectedTraspaso.notas && (
-              <div className="p-3 rounded-xl bg-white/5 text-xs text-gray-300">
-                <span className="font-semibold text-gray-400 block mb-0.5">Notas de Envío:</span>
-                {selectedTraspaso.notas}
-              </div>
-            )}
-
-            <div className="border border-white/10 rounded-xl overflow-hidden">
-              <table className="w-full text-xs text-gray-300">
-                <thead className="bg-white/5 border-b border-white/10 text-gray-400 uppercase">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Producto</th>
-                    <th className="px-4 py-3 text-left">Variante</th>
-                    <th className="px-4 py-3 text-right">Costo Unit.</th>
-                    <th className="px-4 py-3 text-center">Enviado</th>
-                    <th className="px-4 py-3 text-center">Recibido</th>
-                    <th className="px-4 py-3 text-right">Subtotal CPP</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {selectedTraspaso.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-3 font-semibold text-white">
-                        {it.productoSnapshot?.nombre || "Producto"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {it.varianteSnapshot?.color} / {it.varianteSnapshot?.talla}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-400">
-                        {formatMoney(it.costoUnitarioCPP)}
-                      </td>
-                      <td className="px-4 py-3 text-center font-bold text-white">
-                        {it.cantidadEnviada}
-                      </td>
-                      <td className="px-4 py-3 text-center font-bold text-emerald-400">
-                        {it.cantidadRecibida ?? 0}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-cyan-300">
-                        {formatMoney(it.cantidadEnviada * it.costoUnitarioCPP)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
-              {selectedTraspaso.estado === "SOLICITADA" && (
-                <button
-                  disabled={actionLoading}
-                  onClick={() => handleDespachar(selectedTraspaso._id)}
-                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow transition cursor-pointer"
-                >
-                  Despachar Mercadería
-                </button>
-              )}
-              {selectedTraspaso.estado === "EN_TRANSITO" && (
-                <button
-                  disabled={actionLoading}
-                  onClick={() => {
-                    setReceiveModalTraspaso(selectedTraspaso);
-                    setSelectedTraspaso(null);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow transition cursor-pointer"
-                >
-                  Recibir Mercadería
-                </button>
-              )}
-              <button
-                onClick={() => setSelectedTraspaso(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium text-xs transition cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <DetalleTraspasoModal
+          traspaso={selectedTraspaso}
+          productosMap={productosMap}
+          actionLoading={actionLoading}
+          onClose={() => setSelectedTraspaso(null)}
+          onDespachar={handleDespachar}
+          onRecibir={(item) => {
+            setSelectedTraspaso(null);
+            setReceiveModalTraspaso(item);
+          }}
+          onCancelar={handleCancelar}
+          onPrint={(item) => setPrintModalTraspaso(item)}
+        />
       )}
 
-      {/* Modal Recibir Traspaso */}
       {receiveModalTraspaso && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-gray-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <h2 className="text-xl font-bold text-white">
-                  Confirmar Recepción de Mercadería
-                </h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Traspaso {receiveModalTraspaso.numeroTraspaso} • {receiveModalTraspaso.totalPrendasEnviadas} prendas
-                </p>
-              </div>
-              <button
-                onClick={() => setReceiveModalTraspaso(null)}
-                className="text-gray-400 hover:text-white text-xl cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+        <RecibirTraspasoModal
+          traspaso={receiveModalTraspaso}
+          productosMap={productosMap}
+          actionLoading={actionLoading}
+          onClose={() => setReceiveModalTraspaso(null)}
+          onConfirm={handleConfirmRecibir}
+        />
+      )}
 
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs">
-              Al confirmar la recepción, las {receiveModalTraspaso.totalPrendasEnviadas} prendas ingresarán
-              automáticamente al stock físico de la sucursal de destino y se registrará en el Kárdex.
-            </div>
-
-            <div className="border border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-              <table className="w-full text-xs text-gray-300">
-                <thead className="bg-white/5 border-b border-white/10 text-gray-400">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Producto</th>
-                    <th className="px-3 py-2 text-left">Variante</th>
-                    <th className="px-3 py-2 text-center">Cant. Enviada</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {receiveModalTraspaso.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="px-3 py-2 font-medium text-white">
-                        {it.productoSnapshot?.nombre}
-                      </td>
-                      <td className="px-3 py-2">
-                        {it.varianteSnapshot?.color} / {it.varianteSnapshot?.talla}
-                      </td>
-                      <td className="px-3 py-2 text-center font-bold text-emerald-400">
-                        {it.cantidadEnviada}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <form onSubmit={handleRecibir} className="space-y-4 pt-2">
-              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setReceiveModalTraspaso(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-lg shadow-emerald-900/30 transition disabled:opacity-50 cursor-pointer"
-                >
-                  {actionLoading ? "Procesando..." : "Confirmar Ingreso a Sucursal"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {printModalTraspaso && (
+        <GuiaTraspasoPrintModal
+          traspaso={printModalTraspaso}
+          productosMap={productosMap}
+          onClose={() => setPrintModalTraspaso(null)}
+        />
       )}
     </div>
   );
