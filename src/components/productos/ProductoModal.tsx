@@ -6,22 +6,24 @@ export default function ProductoModal({
   open,
   onClose,
   title,
+  maxWidth = "max-w-2xl",
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
+  maxWidth?: string;
   children: React.ReactNode;
 }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 dark:bg-slate-950/80 p-3 sm:p-5 md:p-6 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 dark:bg-slate-950/80 p-2 sm:p-5 md:p-6 backdrop-blur-md animate-in fade-in duration-150">
       <div
-        className="relative flex flex-col w-full max-w-2xl max-h-[92dvh] rounded-2xl sm:rounded-3xl
+        className={`relative flex flex-col w-full ${maxWidth} max-h-[94dvh] sm:max-h-[92dvh] rounded-2xl sm:rounded-3xl
         bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15
         shadow-2xl dark:shadow-[0_0_50px_rgba(0,180,255,0.25)]
-        animate-in zoom-in-95 duration-150 overflow-hidden transition-colors"
+        animate-in zoom-in-95 duration-150 overflow-hidden transition-colors`}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 dark:border-white/10 p-4 sm:p-5 bg-white/95 dark:bg-slate-900/90">

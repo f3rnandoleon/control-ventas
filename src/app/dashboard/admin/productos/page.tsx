@@ -329,6 +329,9 @@ export default function AdminProductosPage() {
                     <span className="rounded-lg bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
                       {formatProductPriceDisplay(producto)}
                     </span>
+                    <span className="rounded-lg bg-sky-50 dark:bg-cyan-950/50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-cyan-300 border border-sky-200 dark:border-cyan-500/30">
+                      🏷️ {producto.variantes?.length || 0} var.
+                    </span>
                     <span className="rounded-lg bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-white/5">
                       Costo: Bs {producto.precioCosto}
                     </span>
@@ -362,7 +365,7 @@ export default function AdminProductosPage() {
                   className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:hover:bg-cyan-500/25 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30 active:scale-95 shadow-sm"
                   onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}
                 >
-                  🏷️ Variantes
+                  🏷️ Variantes ({producto.variantes?.length || 0})
                 </button>
                 <button
                   type="button"
@@ -440,7 +443,12 @@ export default function AdminProductosPage() {
           </tbody>
         </table>
       </div>
-      <ProductoModal open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} title={view === "PRODUCTO" ? (editing ? "Editar producto" : "Nuevo producto") : "Gestionar variantes"}>
+      <ProductoModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditing(null); }}
+        title={view === "PRODUCTO" ? (editing ? "Editar producto" : "Nuevo producto") : (editing ? `Variantes: ${editing.nombre}` : "Gestionar variantes")}
+        maxWidth={view === "VARIANTES" ? "max-w-4xl" : "max-w-2xl"}
+      >
         {view === "PRODUCTO" && <ProductoForm initialData={editing || undefined} onSubmit={handleSave} />}
         {view === "VARIANTES" && editing && <VariantesManager producto={editing} onUpdated={loadProductos} />}
       </ProductoModal>
