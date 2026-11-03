@@ -74,6 +74,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/productos/publicos") ||
     pathname.startsWith("/api/productos/by-code") ||
     pathname.startsWith("/api/delivery-options") ||
+    pathname.startsWith("/api/ubicaciones") ||
     pathname.startsWith("/api/estado") ||
     pathname.startsWith("/api/public")
   ) {
@@ -105,6 +106,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/estado") ||
     pathname.startsWith("/api/public") ||
     pathname.startsWith("/api/delivery-options") ||
+    pathname.startsWith("/api/ubicaciones") ||
     pathname.startsWith("/api/verificar/pago") ||
     isPublicProductosRoute;
 

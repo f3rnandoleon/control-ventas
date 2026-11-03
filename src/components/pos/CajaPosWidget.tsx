@@ -180,7 +180,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
     if (loading) {
         return (
-            <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900/60 p-3 text-xs text-slate-600 dark:text-gray-400">
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900/60 px-3 py-2 text-xs text-slate-600 dark:text-gray-400">
                 <span>Verificando estado de caja física...</span>
             </div>
         );
@@ -193,52 +193,52 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
         return (
             <>
                 {esOpcional ? (
-                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-cyan-300 dark:border-cyan-500/30 bg-gradient-to-r from-cyan-50 via-sky-50/80 to-white dark:from-cyan-950/40 dark:via-slate-900/40 dark:to-slate-900/60 p-3.5 shadow-md dark:shadow-lg backdrop-blur-md">
-                        <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 dark:bg-cyan-500/20 text-xl text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/30">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 rounded-xl border border-cyan-300 dark:border-cyan-500/30 bg-gradient-to-r from-cyan-50 via-sky-50/80 to-white dark:from-cyan-950/40 dark:via-slate-900/40 dark:to-slate-900/60 p-3 shadow-sm backdrop-blur-md">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-100 dark:bg-cyan-500/20 text-base text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/30">
                                 🏬
                             </span>
                             <div>
-                                <div className="flex items-center gap-2">
-                                    <p className="font-bold text-cyan-900 dark:text-cyan-200 text-sm">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-bold text-cyan-900 dark:text-cyan-200 text-xs sm:text-sm">
                                         Caja Libre Activa — {sucursalInfo?.nombre || "Tienda"}
                                     </p>
                                     <span className="rounded-md bg-cyan-100 dark:bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30">
                                         Turno Opcional
                                     </span>
                                 </div>
-                                <p className="text-xs text-slate-600 dark:text-gray-400">
-                                    Esta sucursal no exige apertura obligatoria. Puedes registrar ventas directamente o abrir un turno formal si lo deseas.
+                                <p className="text-[11px] text-slate-600 dark:text-gray-400">
+                                    Puedes registrar ventas directamente o abrir un turno formal.
                                 </p>
                             </div>
                         </div>
                         <button
                             type="button"
                             onClick={() => setModalAperturaOpen(true)}
-                            className="w-full sm:w-auto shrink-0 rounded-xl border border-cyan-300 dark:border-cyan-500/40 bg-cyan-100/70 hover:bg-cyan-200/80 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 px-4 py-2 text-xs font-semibold text-cyan-900 dark:text-cyan-300 transition active:scale-95 shadow-sm"
+                            className="w-full sm:w-auto shrink-0 rounded-xl border border-cyan-300 dark:border-cyan-500/40 bg-cyan-100/70 hover:bg-cyan-200/80 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 px-3.5 py-1.5 text-xs font-semibold text-cyan-900 dark:text-cyan-300 transition active:scale-95 shadow-sm"
                         >
                             Abrir Turno Formal
                         </button>
                     </div>
                 ) : (
-                    <div className="mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-300 dark:border-amber-500/40 bg-gradient-to-r from-amber-50 via-amber-100/50 to-white dark:from-amber-950/40 dark:via-amber-900/20 dark:to-slate-900/60 p-4 shadow-md dark:shadow-xl backdrop-blur-md">
-                        <div className="flex items-center gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-500/20 text-xl text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-gradient-to-r from-amber-50 via-amber-100/50 to-white dark:from-amber-950/40 dark:via-amber-900/20 dark:to-slate-900/60 p-3 shadow-sm backdrop-blur-md">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-500/20 text-base text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
                                 ⚠️
                             </span>
                             <div>
-                                <p className="font-bold text-amber-950 dark:text-amber-200 text-sm sm:text-base">
-                                    Apertura de Caja Requerida para Ventas
+                                <p className="font-bold text-amber-950 dark:text-amber-200 text-xs sm:text-sm">
+                                    Apertura de Caja Requerida ({sucursalInfo?.nombre || "Tienda"})
                                 </p>
-                                <p className="text-xs text-amber-900/80 dark:text-amber-300/80">
-                                    Debes abrir la caja física de esta sucursal ({sucursalInfo?.nombre || "Tienda"}) con tu saldo inicial para empezar a cobrar.
+                                <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80">
+                                    Abre la caja física con tu saldo inicial para empezar a cobrar.
                                 </p>
                             </div>
                         </div>
                         <button
                             type="button"
                             onClick={() => setModalAperturaOpen(true)}
-                            className="w-full sm:w-auto shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95"
+                            className="w-full sm:w-auto shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/25 transition hover:brightness-110 active:scale-95"
                         >
                             Abrir Caja Diaria
                         </button>
@@ -333,9 +333,9 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
 
     return (
         <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-300 dark:border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-emerald-100/30 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 p-3 sm:p-4 shadow-md dark:shadow-lg">
-                <div className="flex items-center gap-3">
-                    <span className="flex h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-emerald-100/30 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 p-3 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                    <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     <div>
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
@@ -346,9 +346,9 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                             </span>
                         </div>
                         <p className="text-[11px] text-slate-600 dark:text-gray-400">
-                            Fondo inicial: <strong className="text-slate-800 dark:text-gray-200">Bs {sesionActiva.montoApertura.toFixed(2)}</strong> |
+                            Fondo: <strong className="text-slate-800 dark:text-gray-200">Bs {sesionActiva.montoApertura.toFixed(2)}</strong> |
                             Ventas: <strong className="text-emerald-700 dark:text-emerald-300">Bs {(sesionActiva.totalVentasEfectivo + sesionActiva.totalVentasQR).toFixed(2)}</strong> |
-                            Efectivo en gaveta estimado: <strong className="text-slate-900 dark:text-white">Bs {totalEsperadoEfectivo.toFixed(2)}</strong>
+                            Efectivo gaveta: <strong className="text-slate-900 dark:text-white">Bs {totalEsperadoEfectivo.toFixed(2)}</strong>
                         </p>
                     </div>
                 </div>

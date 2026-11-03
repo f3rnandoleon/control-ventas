@@ -18,6 +18,7 @@
    - [5.3 Ficha Técnica de Prenda y Medidas Corporales (`GET /api/productos/publicos/:id`)](#53-ficha-técnica-de-prenda-y-medidas-corporales-get-apiproductospublicosid)
    - [5.4 Opciones de Entrega, Horarios y Courier (`GET /api/delivery-options`)](#54-opciones-de-entrega-horarios-y-courier-get-apidelivery-options)
    - [5.5 Políticas Legales y Devoluciones (`GET /api/public/politicas`)](#55-políticas-legales-y-devoluciones-get-apipublicpoliticas)
+   - [5.6 Ubicaciones de Tiendas y Google Maps (`GET /api/ubicaciones`)](#56-ubicaciones-de-tiendas-y-google-maps-get-apiubicaciones)
 6. [Módulo 2: Autenticación, Registro y Perfil de Cliente](#6-módulo-2-autenticación-registro-y-perfil-de-cliente)
    - [6.1 Registro de Nueva Cuenta (`POST /api/auth/signup`)](#61-registro-de-nueva-cuenta-post-apiauthsignup)
    - [6.2 Inicio de Sesión Credenciales (`POST /api/auth/login`)](#62-inicio-de-sesión-credenciales-post-apiauthlogin)
@@ -68,7 +69,7 @@ La tienda web interactúa con el backend central construido sobre **Next.js API 
 ## 2. Autenticación, Cabeceras y Seguridad
 
 ### 2.1 Peticiones Públicas (Sin Autenticación)
-Para consultar catálogo, ficha de producto, políticas y opciones de transporte:
+Para consultar catálogo, ficha de producto, políticas, opciones de transporte y ubicaciones de tiendas con Google Maps:
 ```http
 Accept: application/json
 ```
@@ -409,6 +410,54 @@ Provee las políticas dinámicas de la empresa configuradas desde administració
     "version": "1.0",
     "activo": true
   }
+}
+```
+
+---
+
+### 5.6 Ubicaciones de Tiendas y Google Maps (`GET /api/ubicaciones`)
+Retorna las sucursales y puntos de retiro activos que están marcados con `visibleEnWebYAgente: true`. Permite mostrar en la página web la sección **"Nuestras Tiendas / Ubicaciones"**, botones directos de *"Abrir en Google Maps"*, mapas interactivos con coordenadas (`lat`, `lng`), referencias de cómo llegar y horarios de atención.
+
+* **Método:** `GET`
+* **Ruta:** `/api/ubicaciones`
+* **Rate Limit:** 100 req/min por IP.
+
+#### Parámetros de Consulta Opcionales (Query Params):
+| Parámetro | Tipo | Requerido | Descripción | Ejemplo |
+|---|---|---|---|---|
+| `ciudad` | `string` | No | Filtra sucursales por ciudad (insensible a mayúsculas/minúsculas) | `?ciudad=La Paz` |
+
+#### Ejemplo de Petición:
+```bash
+curl -X GET "https://control-ventas-azure.vercel.app/api/ubicaciones?ciudad=La%20Paz" \
+  -H "Accept: application/json"
+```
+
+#### Respuesta Exitosa (`HTTP 200`):
+```json
+{
+  "total": 1,
+  "ubicaciones": [
+    {
+      "id": "670e1000f1b4c90011000002",
+      "nombre": "Tienda Central - San Pedro",
+      "codigo": "TDA-01",
+      "tipo": "TIENDA_FISICA",
+      "ciudad": "La Paz",
+      "direccion": "Av. 20 de Octubre esq. Conchitas #1450",
+      "telefono": "+591 67113105",
+      "permiteVentaPOS": true,
+      "permiteRetiroCliente": true,
+      "ubicacionMapa": {
+        "googleMapsUrl": "https://www.google.com/maps?q=-16.5042,-68.1345",
+        "embedUrl": "",
+        "lat": -16.5042,
+        "lng": -68.1345,
+        "referencia": "A media cuadra de la Plaza San Pedro, Galería Central, Local 12",
+        "horariosTexto": "Lunes a Sábado de 09:30 a 20:00"
+      }
+    }
+  ]
 }
 ```
 

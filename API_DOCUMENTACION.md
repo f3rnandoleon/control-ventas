@@ -1,6 +1,6 @@
 # Documentación API - Control Ventas (Fit Andes)
 
-**Estado del documento:** Actualizado a Octubre de 2026.  
+**Estado del documento:** Actualizado a Noviembre de 2026.  
 **Referencia de implementación:** `src/app/api/**/route.ts`  
 **Validaciones de entrada:** Esquemas Zod en `src/schemas/*.ts`  
 **Capa de datos y persistencia:** Modelos Mongoose en `src/models/*.ts` y módulos de dominio en `src/modules/*`
@@ -17,11 +17,11 @@
    - [5.1 Producto Público Sanitizado](#51-producto-público-sanitizado)
    - [5.2 Producto Interno Enriquecido con Stock Multisucursal](#52-producto-interno-enriquecido-con-stock-multisucursal)
    - [5.3 Pedido Unificado](#53-pedido-unificado)
-   - [5.4 Sucursal y Configuración de Caja](#54-sucursal-y-configuración-de-caja)
+   - [5.4 Sucursal, Geolocalización Google Maps y Configuración de Caja](#54-sucursal-geolocalización-google-maps-y-configuración-de-caja)
    - [5.5 Compra a Proveedor y Costo Promedio Ponderado (CPP)](#55-compra-a-proveedor-y-costo-promedio-ponderado-cpp)
 6. [Catálogo de Endpoints por Dominio](#6-catálogo-de-endpoints-por-dominio)
    - [6.1 Salud y Estado Técnico](#61-salud-y-estado-técnico)
-   - [6.2 Catálogo Público y Opciones de Entrega](#62-catálogo-público-y-opciones-de-entrega)
+   - [6.2 Catálogo Público, Ubicaciones y Opciones de Entrega](#62-catálogo-público-ubicaciones-y-opciones-de-entrega)
    - [6.3 Políticas Públicas y Legales](#63-políticas-públicas-y-legales)
    - [6.4 Autenticación](#64-autenticación)
    - [6.5 Perfil y Clientes](#65-perfil-y-clientes)
@@ -78,7 +78,7 @@ Está orientado a:
 ## 3. Autenticación, Roles y Seguridad
 
 ### 3.1 Mecanismos de Autenticación
-El helper [`resolveApiAuth`](file:///e:/proyectos/control-ropa/control-ventas/src/libs/resolveApiAuth.ts) aplica una estrategia desacoplada:
+El helper [`resolveApiAuth`](file:///c:/proyectos/control-ventas/src/libs/resolveApiAuth.ts) aplica una estrategia desacoplada:
 
 1. **JWT Bearer Token:**
    Utilizado por la App Móvil, scripts y clientes desacoplados:
@@ -102,7 +102,7 @@ El helper [`resolveApiAuth`](file:///e:/proyectos/control-ropa/control-ventas/sr
 ### 3.2 Matriz de Acceso por Rol
 | Dominio | CLIENTE | VENDEDOR | ADMIN |
 |---|---|---|---|
-| Catálogo público / Políticas / Delivery Options | Sí | Sí | Sí |
+| Catálogo público / Políticas / Delivery Options / Ubicaciones | Sí | Sí | Sí |
 | Búsqueda por código/SKU (`/api/productos/by-code/:code`) | Sí (sanitizado) | Sí | Sí |
 | Catálogo interno (`/api/productos`) | No | Sí | Sí |
 | Carrito y Checkout de cliente | Sí | No | No |
@@ -132,11 +132,11 @@ Para facilitar la integración desde aplicaciones web externas (como el Storefro
   - `Access-Control-Allow-Headers: Content-Type, Authorization, x-user-id, x-user-role, x-request-id`
   - `Access-Control-Max-Age: 86400`
 - **Preflight `OPTIONS`:** Interceptado a nivel de middleware retornando `HTTP 204 No Content` con cabeceras CORS inmediatas sin requerir autenticación.
-- **Rutas Públicas Habilitadas:** `/api/public/*`, `/api/productos/publicos*`, `/api/productos/by-code/*`, `/api/delivery-options*`, `/api/estado*`, `/api/auth/signup`.
+- **Rutas Públicas Habilitadas:** `/api/public/*`, `/api/productos/publicos*`, `/api/productos/by-code/*`, `/api/delivery-options*`, `/api/ubicaciones*`, `/api/estado*`, `/api/auth/signup`.
 
 ### 4.2 Rate Limiting (en Memoria)
 - **Login / Signup / Auth:** 5 peticiones/min por IP.
-- **Catálogo Público (`/api/productos/publicos`, `/api/productos/by-code`, `/api/delivery-options`):** 100 peticiones/min por IP.
+- **Catálogo Público (`/api/productos/publicos`, `/api/productos/by-code`, `/api/delivery-options`, `/api/ubicaciones`):** 100 peticiones/min por IP.
 - **Lectura protegida (`GET`):** 60 peticiones/min por usuario.
 - **Escritura protegida (`POST`, `PUT`, `PATCH`, `DELETE`):** 30 peticiones/min por usuario.
 - **Respuesta 429:** `{ "message": "Demasiadas solicitudes. Inténtalo más tarde." }` con cabecera `Retry-After: 60`.
@@ -283,8 +283,8 @@ En endpoints administrativos (`/api/productos` y `/api/productos/:id`), cada var
 }
 ```
 
-### 5.4 Sucursal y Configuración de Caja
-Define las propiedades operativas de cada local o almacén, controlando si el personal de caja debe abrir turno formalmente o puede operar con caja libre:
+### 5.4 Sucursal, Geolocalización Google Maps y Configuración de Caja
+Define las propiedades operativas de cada local o almacén, su ubicación en Google Maps (para compartir en la Tienda Web y con el Agente de WhatsApp) y si el personal de caja debe abrir turno formalmente o puede operar con caja libre:
 ```json
 {
   "_id": "670e1000f1b4c90011000001",
@@ -294,6 +294,15 @@ Define las propiedades operativas de cada local o almacén, controlando si el pe
   "direccion": "Av. Montenegro #1234",
   "ciudad": "La Paz",
   "telefono": "59170123456",
+  "ubicacionMapa": {
+    "googleMapsUrl": "https://www.google.com/maps?q=-16.5401,-68.0789",
+    "embedUrl": "",
+    "lat": -16.5401,
+    "lng": -68.0789,
+    "referencia": "Frente a la parada del PumaKatari, Galería San Miguel Local 4",
+    "horariosTexto": "Lunes a Sábado de 09:30 a 20:00"
+  },
+  "visibleEnWebYAgente": true,
   "permiteVentaPOS": true,
   "permiteDespachoWeb": false,
   "permiteRetiroCliente": true,
@@ -359,13 +368,14 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 
 ---
 
-### 6.2 Catálogo Público y Opciones de Entrega
+### 6.2 Catálogo Público, Ubicaciones y Opciones de Entrega
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
 | `GET` | `/api/productos/publicos` | Pública | Listado de catálogo con búsqueda (`q`), filtros (`categoria`, `color`, `talla`, `soloDisponible`) y paginación (`page`, `limit`). Respuesta siempre estandarizada en formato envoltorio `{ data: [...], total, page, limit, totalPages }` |
 | `GET` | `/api/productos/publicos/:id` | Pública | Detalle de producto con variantes, stock vendible y medidas |
 | `GET` | `/api/productos/by-code/:code` | Pública | Búsqueda directa por código de prenda (código de barra, QR o SKU). Sanitizada para clientes públicos (oculta costos y existencias internas) |
 | `GET` | `/api/delivery-options` | Pública | Lista de puntos de recojo, horarios y empresas de envío por departamento |
+| `GET` | `/api/ubicaciones` | Pública | Lista de sucursales y puntos de retiro públicos (`activa: true`, `visibleEnWebYAgente: true`) con enlace de Google Maps (`googleMapsUrl`), coordenadas (`lat`, `lng`), referencia y horarios de atención. Soporta filtro `?ciudad=` |
 
 ---
 
@@ -478,6 +488,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 |---|---|---|---|
 | `GET` | `/api/integrations/whatsapp/products/search` | API Key Bot | Búsqueda ultra-rápida y compacta para IA (`?q=`, `?color=`, `?talla=`, `?minPrecio=`, `?maxPrecio=`, `?limit=`). Filtra prendas activas con variantes con stock vendible en sucursales de despacho web y aplica optimización Cloudinary (`f_auto,q_auto,w_800`) |
 | `GET` | `/api/integrations/whatsapp/products/:id/measurements` | API Key Bot | Consulta de medidas anatómicas por talla y colores disponibles para asesoría de clientes |
+| `GET` | `/api/integrations/whatsapp/locations` | API Key Bot | Consulta de tiendas físicas y puntos de retiro públicos (`activa: true`, `visibleEnWebYAgente: true`) con enlace de Google Maps (`googleMapsUrl`), coordenadas (`lat`, `lng`), dirección, referencia, horarios y teléfono. Soporta filtro opcional `?ciudad=` |
 | `POST` | `/api/integrations/whatsapp/orders` | API Key Bot | Creación de pedido con idempotencia, reserva hasta fin de día (La Paz UTC-4) e instrucciones de BancoSol |
 | `POST` | `/api/integrations/whatsapp/payments/:id/proof`| API Key Bot | Subida de captura de comprobante enviada por el cliente, prórroga de reserva 48h y notificación a Telegram |
 | `GET` | `/api/integrations/whatsapp/orders/:nro` | API Key Bot | Consulta de estado de orden filtrada por número de teléfono del cliente (`?phone=`) |
@@ -509,10 +520,10 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 ### 6.15 Sucursales y Stock Multitienda
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| `GET` | `/api/admin/sucursales` | `ADMIN`, `VENDEDOR` | Listado de sucursales (tiendas físicas, almacenes y puntos de retiro) con flags de venta POS, despacho web y requerimiento de caja |
-| `POST` | `/api/admin/sucursales` | `ADMIN` | Alta de nueva sucursal (`nombre`, `codigo`, `tipo`, `permiteVentaPOS`, `permiteDespachoWeb`, `permiteRetiroCliente`, `requiereAperturaCaja`) |
-| `GET` | `/api/admin/sucursales/:id` | `ADMIN` | Detalle de sucursal y configuración operativa |
-| `PUT` | `/api/admin/sucursales/:id` | `ADMIN` | Modificación de datos y políticas de la sucursal (ej. activar o desactivar `requiereAperturaCaja`) |
+| `GET` | `/api/admin/sucursales` | `ADMIN`, `VENDEDOR` | Listado de sucursales (tiendas físicas, almacenes y puntos de retiro) con ubicación Google Maps (`ubicacionMapa`), visibilidad web/agente (`visibleEnWebYAgente`), flags de venta POS, despacho web y requerimiento de caja |
+| `POST` | `/api/admin/sucursales` | `ADMIN` | Alta de nueva sucursal (`nombre`, `codigo`, `tipo`, `ubicacionMapa`, `visibleEnWebYAgente`, `permiteVentaPOS`, `permiteDespachoWeb`, `permiteRetiroCliente`, `requiereAperturaCaja`) |
+| `GET` | `/api/admin/sucursales/:id` | `ADMIN`, `VENDEDOR` | Detalle de sucursal, geolocalización y configuración operativa |
+| `PUT` | `/api/admin/sucursales/:id` | `ADMIN` | Modificación de datos, coordenadas/enlace de Google Maps (`ubicacionMapa`), visibilidad en Web/Agente y políticas operativas de la sucursal |
 | `PATCH` | `/api/admin/sucursales/:id` | `ADMIN` | Activa o desactiva lógicamente la sucursal (`{ activa: boolean }`, impidiendo desactivar el almacén principal) |
 | `GET` | `/api/admin/productos/:id/stock-sucursales` | `ADMIN`, `VENDEDOR` | Desglose pormenorizado de niveles de stock (`stockFisico`, `stockReservado`, `stockDisponible`) por cada sucursal para el producto |
 

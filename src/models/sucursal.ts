@@ -34,6 +34,36 @@ const sucursalSchema = new Schema(
       type: String,
       trim: true,
     },
+    ubicacionMapa: {
+      googleMapsUrl: {
+        type: String,
+        trim: true,
+      },
+      embedUrl: {
+        type: String,
+        trim: true,
+      },
+      lat: {
+        type: Number,
+        default: null,
+      },
+      lng: {
+        type: Number,
+        default: null,
+      },
+      referencia: {
+        type: String,
+        trim: true,
+      },
+      horariosTexto: {
+        type: String,
+        trim: true,
+      },
+    },
+    visibleEnWebYAgente: {
+      type: Boolean,
+      default: true,
+    },
     permiteVentaPOS: {
       type: Boolean,
       default: true,

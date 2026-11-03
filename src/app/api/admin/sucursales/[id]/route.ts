@@ -59,6 +59,27 @@ export async function PUT(
         direccion: body.direccion,
         ciudad: body.ciudad,
         telefono: body.telefono,
+        ubicacionMapa: body.ubicacionMapa
+          ? {
+              googleMapsUrl: body.ubicacionMapa.googleMapsUrl || "",
+              embedUrl: body.ubicacionMapa.embedUrl || "",
+              lat:
+                body.ubicacionMapa.lat !== undefined &&
+                body.ubicacionMapa.lat !== null &&
+                body.ubicacionMapa.lat !== ""
+                  ? Number(body.ubicacionMapa.lat)
+                  : null,
+              lng:
+                body.ubicacionMapa.lng !== undefined &&
+                body.ubicacionMapa.lng !== null &&
+                body.ubicacionMapa.lng !== ""
+                  ? Number(body.ubicacionMapa.lng)
+                  : null,
+              referencia: body.ubicacionMapa.referencia || "",
+              horariosTexto: body.ubicacionMapa.horariosTexto || "",
+            }
+          : undefined,
+        visibleEnWebYAgente: body.visibleEnWebYAgente,
         permiteVentaPOS: body.permiteVentaPOS,
         permiteDespachoWeb: body.permiteDespachoWeb,
         permiteRetiroCliente: body.permiteRetiroCliente,

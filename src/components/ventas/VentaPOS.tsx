@@ -250,15 +250,15 @@ export default function VentaPOS({
   };
 
   return (
-    <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
-      <div className="shrink-0 space-y-3 border-b border-slate-200 dark:border-white/10 p-4 sm:p-5">
-        {/* CABECERA POS CON SELECTOR DE SUCURSAL Y ESTADO DE CAJA */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-3.5 backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-lg border border-blue-200 dark:border-blue-500/30">
+    <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-y-auto rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
+      {/* BLOQUE DESPLAZABLE: SELECTOR DE SUCURSAL Y ESTADO DE CAJA (Se desplazan al bajar a los productos) */}
+      <div className="space-y-3 p-3.5 sm:p-5 pb-2">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-3 backdrop-blur-sm">
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-lg border border-blue-200 dark:border-blue-500/30">
               🏢
             </span>
-            <div>
+            <div className="min-w-0 flex-1">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
                 Sucursal de Venta POS:
               </label>
@@ -266,7 +266,7 @@ export default function VentaPOS({
                 <select
                   value={sucursalSeleccionadaId}
                   onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
-                  className="rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                  className="w-full sm:w-auto rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm"
                 >
                   {sucursales.map((s) => (
                     <option key={s._id} value={s._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
@@ -278,12 +278,17 @@ export default function VentaPOS({
             </div>
           </div>
 
-          <CajaPosWidget sucursalId={sucursalSeleccionadaId} />
+          <div className="min-w-0 flex-1">
+            <CajaPosWidget sucursalId={sucursalSeleccionadaId} />
+          </div>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-slate-700 dark:text-slate-300">
-          <span>Seleccione los productos.</span>
-          <div className="w-fit rounded-full bg-cyan-100 dark:bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
+      {/* BARRA STICKY COMPACTA: BUSCADOR Y CATEGORÍAS */}
+      <div className="sticky top-0 z-20 space-y-2.5 border-b border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-950/90 px-3.5 py-2.5 sm:px-5 backdrop-blur-md">
+        <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+          <span className="font-medium">Seleccione los productos:</span>
+          <div className="w-fit rounded-full bg-cyan-100 dark:bg-cyan-500/10 px-3 py-0.5 text-xs font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
             {fields.length} {fields.length === 1 ? "item" : "items"}
           </div>
         </div>
@@ -293,7 +298,7 @@ export default function VentaPOS({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Buscar por nombre, modelo o SKU..."
-          className="input py-3 text-sm"
+          className="input py-2.5 text-sm"
         />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -302,10 +307,11 @@ export default function VentaPOS({
               key={categoria}
               type="button"
               onClick={() => setCategoriaActiva(categoria)}
-              className={`shrink-0 rounded-xl border px-4 py-2 text-xs font-bold transition sm:text-sm ${categoriaActiva === categoria
+              className={`shrink-0 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition sm:text-sm ${
+                categoriaActiva === categoria
                   ? "border-blue-500 bg-blue-600 text-white shadow-sm"
                   : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10"
-                }`}
+              }`}
             >
               {categoria}
             </button>
@@ -313,7 +319,8 @@ export default function VentaPOS({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+      {/* GRILLA DE PRODUCTOS */}
+      <div className="flex-1 p-3.5 sm:p-5 pb-24">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
           {productosFiltrados.map((producto) => {
             const image = getProductoImage(producto);
