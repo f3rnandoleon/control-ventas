@@ -22,6 +22,9 @@ import {
 } from "@/modules/inventory/application/branch-stock.service";
 import NivelStock from "@/models/nivelStock";
 import Sucursal from "@/models/sucursal";
+import ProductoModel from "@/models/producto";
+import Pedido from "@/models/pedido";
+import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sales";
 import type { Variante, Producto } from "@/types/producto";
 
 import { getVariantPricing } from "@/utils/pricing";
@@ -752,4 +755,125 @@ export async function findCatalogProductByCode(
       qrCode: variante.qrCode,
     },
   };
+}
+
+export async function getPublicRelatedProducts(productId: string) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    throw new AppError("ID de producto inválido", 400);
+  }
+
+  await connectDB();
+  const currentProduct = (await ProductoModel.findById(productId).select("_id categoria estado").lean()) as {
+    _id: mongoose.Types.ObjectId;
+    categoria?: string;
+    estado?: string;
+  } | null;
+  if (!currentProduct || currentProduct.estado === "INACTIVO") {
+    throw new AppError("Producto no encontrado", 404);
+  }
+
+  const currentId = currentProduct._id.toString();
+
+  // 1. Buscar hasta 4 productos activos de la misma categoría que tengan stock vendible web (> 0)
+  const categoryProducts = await catalogRepository.listPublic(
+    PUBLIC_PRODUCT_PROJECTION,
+    {
+      _id: { $ne: currentProduct._id },
+      categoria: currentProduct.categoria,
+    }
+  );
+
+  const categoryProductIds = categoryProducts.map((p) => p._id);
+  const categoryStockMap = await getWebStockMapForProducts(categoryProductIds);
+
+  const processedCategoryProducts = categoryProducts
+    .map((p) =>
+      withWebVariantAvailability(
+        p.toObject ? p.toObject() : p,
+        categoryStockMap.get(p._id.toString())
+      )
+    )
+    .filter((p) => typeof p.stockDisponible === "number" && p.stockDisponible > 0);
+
+  const related = processedCategoryProducts.slice(0, 4);
+  const selectedIds = new Set<string>([
+    currentId,
+    ...related.map((p) => p._id.toString()),
+  ]);
+
+  // 2. Si la categoría no tiene suficientes productos, rellenar con las prendas más vendidas del catálogo
+  if (related.length < 4) {
+    const salesMatch = buildRecognizedSalesMatch();
+    const topSales = await Pedido.aggregate([
+      { $match: salesMatch },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.productoId",
+          cantidadVendida: { $sum: "$items.cantidad" },
+        },
+      },
+      { $sort: { cantidadVendida: -1 } },
+      { $limit: 30 },
+    ]);
+
+    const topCandidateIds = topSales
+      .map((t) => t._id)
+      .filter((id) => id && !selectedIds.has(id.toString()));
+
+    type PublicDoc = Awaited<ReturnType<typeof catalogRepository.listPublic>>[number];
+    const candidateDocs: PublicDoc[] = [];
+    if (topCandidateIds.length > 0) {
+      const topDocs = await catalogRepository.listPublic(
+        PUBLIC_PRODUCT_PROJECTION,
+        {
+          _id: { $in: topCandidateIds },
+        }
+      );
+      const topDocsMap = new Map(topDocs.map((doc) => [doc._id.toString(), doc]));
+      for (const cid of topCandidateIds) {
+        const doc = topDocsMap.get(cid.toString());
+        if (doc) candidateDocs.push(doc);
+      }
+    }
+
+    // Si aún se necesitan candidatos para evaluar el stock web, agregar otros productos del catálogo activo
+    if (related.length + candidateDocs.length < 4) {
+      const allExclude = Array.from(
+        new Set([...selectedIds, ...candidateDocs.map((c) => c._id.toString())])
+      ).map((id) => new mongoose.Types.ObjectId(id));
+
+      const extraDocs = await catalogRepository.listPublic(
+        PUBLIC_PRODUCT_PROJECTION,
+        {
+          _id: { $nin: allExclude },
+        }
+      );
+      candidateDocs.push(...extraDocs);
+    }
+
+    if (candidateDocs.length > 0) {
+      const candidateIds = candidateDocs.map((p) => p._id);
+      const candidateStockMap = await getWebStockMapForProducts(candidateIds);
+
+      const processedCandidates = candidateDocs
+        .map((p) =>
+          withWebVariantAvailability(
+            p.toObject ? p.toObject() : p,
+            candidateStockMap.get(p._id.toString())
+          )
+        )
+        .filter((p) => typeof p.stockDisponible === "number" && p.stockDisponible > 0);
+
+      for (const p of processedCandidates) {
+        if (related.length >= 4) break;
+        if (!selectedIds.has(p._id.toString())) {
+          related.push(p);
+          selectedIds.add(p._id.toString());
+        }
+      }
+    }
+  }
+
+  return related;
 }

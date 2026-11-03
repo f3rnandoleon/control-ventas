@@ -4,9 +4,11 @@ import CronLock from "@/models/cronLock";
 import Producto from "@/models/producto";
 import User from "@/models/user";
 import Sucursal from "@/models/sucursal";
+import TransaccionPago from "@/models/transaccionPago";
 import {
     getDefaultWarehouseId,
     getWebDispatchBranchId,
+    getAvailableWebStockForVariant,
 } from "@/modules/inventory/application/branch-stock.service";
 import {
     resolveDefaultAccountForPayment,
@@ -45,8 +47,8 @@ import type { Variante } from "@/types/producto";
 import { getVariantPricing } from "@/utils/pricing";
 import type { SalesQueryInput } from "@/schemas/sales-query.schema";
 
-function createPedidoNumber() {
-    return generateOrderedId("P");
+function createPedidoNumber(prefix = "P") {
+    return generateOrderedId(prefix);
 }
 
 function createReservationExpirationDate(minutes = 15) {
@@ -213,17 +215,21 @@ export async function releaseExpiredReservations(limit = 100) {
     }
 }
 
-export async function crearPedidoDesdeCarrito(
-    customerId: string,
+export async function crearPedidoCheckout(
+    customerId: string | null,
     payload: CheckoutCartInput
 ) {
-    assertObjectId(customerId, "Usuario no valido");
     await connectDB();
 
-    const customer = await obtenerContextoClientePorUsuario(customerId, {
-        ensureProfile: true,
-    });
+    let customer: Awaited<ReturnType<typeof obtenerContextoClientePorUsuario>> | null = null;
+    if (customerId) {
+        assertObjectId(customerId, "Usuario no valido");
+        customer = await obtenerContextoClientePorUsuario(customerId, {
+            ensureProfile: true,
+        });
+    }
 
+    const isGuest = !customerId || Boolean(payload.esInvitado || payload.clienteInvitado);
     const metodoEntrega = payload.entrega?.metodo ?? null;
     let snapshotEntrega: Record<string, unknown> | null = null;
 
@@ -233,8 +239,8 @@ export async function crearPedidoDesdeCarrito(
         snapshotEntrega = {
             metodo: "PICKUP_POINT",
             puntoRecojo: payload.entrega?.direccion ?? null,
-            telefono: payload.entrega?.telefono ?? null,
-            nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
+            telefono: payload.entrega?.telefono || payload.clienteInvitado?.telefono || customer?.profile?.telefono || customer?.defaultAddress?.telefono || null,
+            nombreDestinatario: payload.entrega?.nombreDestinatario || payload.clienteInvitado?.nombreCompleto || customer?.user.nombreCompleto || "Cliente",
             programadoPara: payload.entrega?.programadoPara ?? null,
         };
     } else if (metodoEntrega === "SHIPPING_NATIONAL") {
@@ -244,12 +250,12 @@ export async function crearPedidoDesdeCarrito(
             ciudad: payload.entrega?.ciudad ?? null,
             empresaEnvio: payload.entrega?.empresaEnvio ?? null,
             sucursal: payload.entrega?.sucursal ?? null,
-            nombreRemitente: payload.entrega?.nombreRemitente ?? null,
-            ciRemitente: payload.entrega?.ciRemitente ?? null,
-            telefonoRemitente: payload.entrega?.telefonoRemitente ?? null,
-            nombreDestinatario: payload.entrega?.nombreDestinatario || customer.user.nombreCompleto,
+            nombreRemitente: payload.entrega?.nombreRemitente || payload.clienteInvitado?.nombreCompleto || customer?.user.nombreCompleto || null,
+            ciRemitente: payload.entrega?.ciRemitente || payload.clienteInvitado?.ci || customer?.profile?.numeroDocumento || null,
+            telefonoRemitente: payload.entrega?.telefonoRemitente || payload.clienteInvitado?.telefono || customer?.profile?.telefono || null,
+            nombreDestinatario: payload.entrega?.nombreDestinatario || payload.clienteInvitado?.nombreCompleto || customer?.user.nombreCompleto || null,
         };
-    } else if (payload.direccionId) {
+    } else if (payload.direccionId && customerId) {
         const address = await obtenerDireccionClientePorUsuario(customerId, payload.direccionId);
         snapshotEntrega = {
             metodo: "PICKUP_POINT",
@@ -257,7 +263,7 @@ export async function crearPedidoDesdeCarrito(
             telefono: payload.entrega?.telefono || address.telefono,
             nombreDestinatario: payload.entrega?.nombreDestinatario || address.nombreDestinatario,
         };
-    } else if (customer.defaultAddress) {
+    } else if (customer?.defaultAddress) {
         snapshotEntrega = {
             metodo: "PICKUP_POINT",
             puntoRecojo: customer.defaultAddress.direccion,
@@ -269,68 +275,202 @@ export async function crearPedidoDesdeCarrito(
     const reservationMinutes =
         (metodoEntrega === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
 
-    const pedido = await runInTransaction(async (session) => {
-        const { validatedItems } = await getValidatedCartForCheckout(
-            customerId,
-            session
-        );
-        const subtotal = validatedItems.reduce((sum, item) => sum + item.subtotal, 0);
-        const total = subtotal;
-
+    const result = await runInTransaction(async (session) => {
         const webDispatchBranchId = await getWebDispatchBranchId(session);
+        let itemsProcesados: Array<{
+            productoId: unknown;
+            variante: {
+                varianteId?: string;
+                color: string;
+                colorSecundario?: string;
+                talla: string;
+                codigoBarra?: string;
+                qrCode?: string;
+            };
+            productoSnapshot: {
+                nombre: string;
+                modelo?: string;
+                sku?: string;
+                imagen?: string;
+            };
+            cantidad: number;
+            precioUnitario: number;
+            totalLinea: number;
+            precioCosto: number;
+            ganancia: number;
+        }> = [];
 
-        for (const { producto, variante, cartItem } of validatedItems) {
-            if (getAvailableStockForVariant(variante) < cartItem.cantidad) {
-                throw new AppError(
-                    `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
-                    400
+        let subtotal = 0;
+        let gananciaTotal = 0;
+
+        if (payload.items && payload.items.length > 0) {
+            for (const itemInput of payload.items) {
+                assertObjectId(itemInput.productoId, "ID de producto inválido");
+                const producto = await Producto.findById(itemInput.productoId).session(session ?? null);
+                if (!producto || producto.estado === "INACTIVO") {
+                    throw new AppError("Producto no disponible", 400);
+                }
+
+                const variantes = (producto.variantes || []) as unknown as Variante[];
+                const variante = findVariantByIdentity(variantes, {
+                    varianteId: itemInput.variantId || undefined,
+                    color: itemInput.color,
+                    talla: itemInput.talla,
+                });
+
+                if (!variante) {
+                    throw new AppError(
+                        `Variante no encontrada para ${producto.nombre} (${itemInput.color} - ${itemInput.talla})`,
+                        400
+                    );
+                }
+
+                const varId = variante.varianteId || String((variante as unknown as { _id?: unknown })._id || "");
+                const stockDisponibleWeb = await getAvailableWebStockForVariant(producto._id, varId, session);
+                if (stockDisponibleWeb < itemInput.cantidad) {
+                    throw new AppError(
+                        `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
+                        400
+                    );
+                }
+
+                if (getAvailableStockForVariant(variante) < itemInput.cantidad) {
+                    throw new AppError(
+                        `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
+                        400
+                    );
+                }
+
+                await reserveStockForOrder(
+                    {
+                        producto,
+                        variante,
+                        cantidad: itemInput.cantidad,
+                        sucursalId: webDispatchBranchId,
+                    },
+                    session
+                );
+
+                const pricing = getVariantPricing(producto, variante);
+                const effectivePrecioVenta = pricing.precioVenta;
+                const effectivePrecioCosto = pricing.precioCosto;
+                const totalLinea = effectivePrecioVenta * itemInput.cantidad;
+                const ganancia = (effectivePrecioVenta - effectivePrecioCosto) * itemInput.cantidad;
+
+                subtotal += totalLinea;
+                gananciaTotal += ganancia;
+
+                itemsProcesados.push({
+                    productoId: producto._id,
+                    variante: {
+                        varianteId: variante.varianteId,
+                        color: variante.color,
+                        colorSecundario: variante.colorSecundario,
+                        talla: variante.talla,
+                        codigoBarra: variante.codigoBarra,
+                        qrCode: variante.qrCode,
+                    },
+                    productoSnapshot: {
+                        nombre: producto.nombre,
+                        modelo: producto.modelo,
+                        sku: producto.sku,
+                        imagen: (variante.imagenes && variante.imagenes[0]) || variante.imagen || producto.imagen,
+                    },
+                    cantidad: itemInput.cantidad,
+                    precioUnitario: effectivePrecioVenta,
+                    totalLinea,
+                    precioCosto: effectivePrecioCosto,
+                    ganancia,
+                });
+            }
+        } else if (customerId) {
+            const { validatedItems } = await getValidatedCartForCheckout(customerId, session);
+            subtotal = validatedItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+            for (const { producto, variante, cartItem } of validatedItems) {
+                if (getAvailableStockForVariant(variante) < cartItem.cantidad) {
+                    throw new AppError(
+                        `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
+                        400
+                    );
+                }
+                await reserveStockForOrder(
+                    {
+                        producto,
+                        variante,
+                        cantidad: cartItem.cantidad,
+                        sucursalId: webDispatchBranchId,
+                    },
+                    session
                 );
             }
-            await reserveStockForOrder(
-                {
-                    producto,
-                    variante,
+
+            itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
+                const pricing = getVariantPricing(producto, variante);
+                const effectivePrecioCosto = pricing.precioCosto;
+                const ganancia = (precioUnitario - effectivePrecioCosto) * cartItem.cantidad;
+                return {
+                    productoId: producto._id,
+                    variante: {
+                        varianteId: variante.varianteId,
+                        color: variante.color,
+                        colorSecundario: variante.colorSecundario,
+                        talla: variante.talla,
+                        codigoBarra: variante.codigoBarra,
+                        qrCode: variante.qrCode,
+                    },
+                    productoSnapshot: {
+                        nombre: producto.nombre,
+                        modelo: producto.modelo,
+                        sku: producto.sku,
+                        imagen: cartItem.productoSnapshot.imagen,
+                    },
                     cantidad: cartItem.cantidad,
-                    sucursalId: webDispatchBranchId,
-                },
-                session
-            );
+                    precioUnitario,
+                    totalLinea: precioUnitario * cartItem.cantidad,
+                    precioCosto: effectivePrecioCosto,
+                    ganancia,
+                };
+            });
+
+            gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
+        } else {
+            throw new AppError("No se proporcionaron items para el pedido", 400);
         }
 
+        const total = subtotal;
         const estadoEntrega = metodoEntrega === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
 
-        const itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
-            const pricing = getVariantPricing(producto, variante);
-            const effectivePrecioCosto = pricing.precioCosto;
-            const ganancia = (precioUnitario - effectivePrecioCosto) * cartItem.cantidad;
-            return {
-                productoId: producto._id,
-                variante: {
-                    varianteId: variante.varianteId,
-                    color: variante.color,
-                    colorSecundario: variante.colorSecundario,
-                    talla: variante.talla,
-                    codigoBarra: variante.codigoBarra,
-                    qrCode: variante.qrCode,
-                },
-                productoSnapshot: {
-                    nombre: producto.nombre,
-                    modelo: producto.modelo,
-                    sku: producto.sku,
-                    imagen: cartItem.productoSnapshot.imagen,
-                },
-                cantidad: cartItem.cantidad,
-                precioUnitario,
-                totalLinea: precioUnitario * cartItem.cantidad,
-                precioCosto: effectivePrecioCosto,
-                ganancia
+        const snapshotCliente = customer
+            ? {
+                usuarioId: customer.user._id,
+                nombreCompleto: customer.user.nombreCompleto,
+                email: customer.user.email,
+                telefono: (snapshotEntrega?.telefono as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
+                tipoDocumento: customer.profile?.tipoDocumento || null,
+                numeroDocumento: customer.profile?.numeroDocumento || null,
+            }
+            : {
+                usuarioId: null,
+                nombreCompleto: payload.clienteInvitado!.nombreCompleto,
+                email: payload.clienteInvitado?.email || null,
+                telefono: payload.clienteInvitado!.telefono,
+                tipoDocumento: payload.clienteInvitado?.ci ? "CI" : null,
+                numeroDocumento: payload.clienteInvitado?.ci || null,
             };
-        });
 
-        const gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
+        const datosClienteInvitado = payload.clienteInvitado
+            ? {
+                nombreCompleto: payload.clienteInvitado.nombreCompleto,
+                telefono: payload.clienteInvitado.telefono,
+                email: payload.clienteInvitado.email || null,
+                ci: payload.clienteInvitado.ci || null,
+                origen: "WEB",
+            }
+            : undefined;
 
         const pedido = await pedidosRepository.create({
-            numeroPedido: createPedidoNumber(),
+            numeroPedido: createPedidoNumber("WEB"),
             canal: "WEB",
             sucursalId: webDispatchBranchId,
             estadoPedido: "PENDING_PAYMENT",
@@ -340,16 +480,10 @@ export async function crearPedidoDesdeCarrito(
             reservadoEn: new Date(),
             reservaExpiraEn: createReservationExpirationDate(reservationMinutes),
             metodoPago: payload.metodoPago,
-            cliente: customerId,
+            cliente: customer ? customer.user._id : null,
             vendedor: null,
-            snapshotCliente: {
-                usuarioId: customer.user._id,
-                nombreCompleto: customer.user.nombreCompleto,
-                email: customer.user.email,
-                telefono: (snapshotEntrega?.telefono as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
-                tipoDocumento: customer.profile?.tipoDocumento || null,
-                numeroDocumento: customer.profile?.numeroDocumento || null,
-            },
+            snapshotCliente,
+            datosClienteInvitado,
             snapshotEntrega,
             items: itemsProcesados,
             subtotal,
@@ -359,34 +493,55 @@ export async function crearPedidoDesdeCarrito(
             notas: payload.notas || null,
         }, session);
 
-        // Sync fulfillment will be updated to use Pedido in its own phase, but we keep the call assuming it will adapt
         await syncFulfillmentForOrder(pedido, session);
 
-        await clearCartByUserId(customerId, session);
+        if (customerId && (!payload.items || payload.items.length === 0)) {
+            await clearCartByUserId(customerId, session);
+        }
+
+        // Crear orden de pago asociada (TransaccionPago)
+        const numeroPago = generateOrderedId("PAGO");
+        const nuevaTransaccion = new TransaccionPago({
+            numeroPago,
+            pedidoId: pedido._id,
+            cliente: customer ? customer.user._id : null,
+            metodoPago: payload.metodoPago,
+            monto: pedido.total,
+            estado: "PENDING",
+        });
+        await nuevaTransaccion.save({ session });
 
         await recordAuditEventSafe(
             {
                 accion: "PEDIDO_CHECKOUT",
                 tipoEntidad: "PEDIDO",
                 idEntidad: pedido._id.toString(),
-                idActor: customerId,
-                rolActor: "CLIENTE",
+                idActor: customerId || "INVITADO",
+                rolActor: customerId ? "CLIENTE" : null,
                 estado: "SUCCESS",
                 metadata: {
                     canal: pedido.canal,
+                    esInvitado: isGuest,
                     metodoEntrega,
                     total: pedido.total,
                     items: pedido.items.length,
                     sucursalId: webDispatchBranchId.toString(),
                 },
             },
-
             session
         );
 
-        return pedido;
+        return { pedido, pago: nuevaTransaccion };
     });
 
+    return result;
+}
+
+export async function crearPedidoDesdeCarrito(
+    customerId: string,
+    payload: CheckoutCartInput
+) {
+    const { pedido } = await crearPedidoCheckout(customerId, payload);
     return pedido;
 }
 

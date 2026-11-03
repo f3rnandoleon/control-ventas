@@ -83,6 +83,13 @@ export interface Pedido {
     tipoDocumento?: "CI" | "NIT" | "PASAPORTE" | "OTRO" | null;
     numeroDocumento?: string | null;
   } | null;
+  datosClienteInvitado?: {
+    nombreCompleto: string;
+    telefono: string;
+    email?: string | null;
+    ci?: string | null;
+    origen?: string;
+  } | null;
   cliente?: {
     _id: string;
     nombreCompleto: string;

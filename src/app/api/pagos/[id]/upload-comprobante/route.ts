@@ -3,6 +3,8 @@ import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { uploadFileToCloudinary } from "@/libs/cloudinary";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 import { uploadComprobanteAndGenerateToken } from "@/modules/payments/application/payments.service";
+import { paymentsRepository } from "@/modules/payments/infrastructure/payments.repository";
+import { connectDB } from "@/libs/mongodb";
 import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 
 export const runtime = "nodejs";
@@ -15,18 +17,21 @@ type Context = { params: Promise<{ id: string }> };
  */
 export async function POST(request: Request, context: Context) {
   try {
+    const { id: paymentId } = await context.params;
     const userAuth = await resolveApiAuth(request);
+
     if (!userAuth) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
-    if (userAuth.rol !== "CLIENTE") {
+      await connectDB();
+      const existingPayment = await paymentsRepository.findById(paymentId);
+      if (!existingPayment || existingPayment.cliente) {
+        return NextResponse.json({ message: "No autenticado" }, { status: 401 });
+      }
+    } else if (userAuth.rol !== "CLIENTE") {
       return NextResponse.json(
         { message: "Solo clientes pueden subir comprobantes" },
         { status: 403 }
       );
     }
-
-    const { id: paymentId } = await context.params;
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -60,7 +65,7 @@ export async function POST(request: Request, context: Context) {
     const { payment, tokenRevision } = await uploadComprobanteAndGenerateToken(
       paymentId,
       comprobanteUrl,
-      userAuth.id
+      userAuth?.id || "INVITADO"
     );
 
     const appUrl =

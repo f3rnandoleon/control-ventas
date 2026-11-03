@@ -603,7 +603,7 @@ export async function uploadComprobanteAndGenerateToken(
 
   const payment = await paymentsRepository.findById(paymentId);
   if (!payment) throw new AppError("Pago no encontrado", 404);
-  if (payment.cliente?.toString() !== idActor) throw new AppError("No autorizado", 403);
+  if (payment.cliente && payment.cliente.toString() !== idActor) throw new AppError("No autorizado", 403);
   if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
 
   const tokenRevision = randomUUID();

@@ -136,6 +136,13 @@ const pedidoSchema = new Schema(
       },
       numeroDocumento: { type: String, default: null },
     },
+    datosClienteInvitado: {
+      nombreCompleto: { type: String, trim: true },
+      telefono: { type: String, trim: true },
+      email: { type: String, trim: true, default: null },
+      ci: { type: String, trim: true, default: null },
+      origen: { type: String, default: "WEB" },
+    },
     snapshotEntrega: {
       metodo: {
         type: String,

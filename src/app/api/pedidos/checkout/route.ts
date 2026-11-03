@@ -5,7 +5,7 @@ import {
 } from "@/middleware/validate.middleware";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { checkoutCartSchema } from "@/schemas/cart.schema";
-import { crearPedidoDesdeCarrito } from "@/modules/orders/application/pedidos.service";
+import { crearPedidoCheckout } from "@/modules/orders/application/pedidos.service";
 import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
@@ -14,15 +14,6 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const userAuth = await resolveApiAuth(request);
-
-    if (!userAuth) {
-      return NextResponse.json({ message: "No autenticado" }, { status: 401 });
-    }
-
-    if (userAuth.rol !== "CLIENTE") {
-      return NextResponse.json({ message: "No autorizado" }, { status: 403 });
-    }
-
     const validation = await validateRequest(checkoutCartSchema, request);
 
     if (!validation.success) {
@@ -30,26 +21,43 @@ export async function POST(request: Request) {
     }
 
     const payload = validation.data;
-    const pedido = await crearPedidoDesdeCarrito(userAuth.id, payload);
+    const isGuest = Boolean(payload.esInvitado || payload.clienteInvitado);
 
-    // Notificación Telegram para métodos que no requieren subir comprobante QR (Efectivo o WhatsApp)
+    if (!userAuth) {
+      if (!isGuest) {
+        return NextResponse.json({ message: "No autenticado" }, { status: 401 });
+      }
+    } else {
+      if (userAuth.rol !== "CLIENTE") {
+        return NextResponse.json({ message: "No autorizado" }, { status: 403 });
+      }
+    }
+
+    const { pedido, pago } = await crearPedidoCheckout(
+      userAuth ? userAuth.id : null,
+      payload
+    );
+
+    // Notificación Telegram para métodos en efectivo, whatsapp o pedidos de invitados
     const isEfectivo = payload.metodoPago === "EFECTIVO";
     const isWhatsapp = payload.entrega?.metodo === "WHATSAPP";
 
-    if (isEfectivo || isWhatsapp) {
+    if (isEfectivo || isWhatsapp || isGuest) {
       try {
         const pedidoEscapado = escapeTelegramMd(pedido.numeroPedido);
         const montoEscapado = escapeTelegramMd(`Bs ${pedido.total.toFixed(2)}`);
-        const clienteEscapado = escapeTelegramMd(pedido.snapshotCliente.nombreCompleto);
+        const clienteEscapado = escapeTelegramMd(
+          pedido.snapshotCliente?.nombreCompleto || payload.clienteInvitado?.nombreCompleto || "Cliente Invitado"
+        );
         const metodoPagoEscapado = escapeTelegramMd(pedido.metodoPago);
         const metodoEntregaEscapado = escapeTelegramMd(payload.entrega?.metodo || "No especificado");
-
+        const canalEscapado = isGuest ? " \\(Invitado WEB\\)" : "";
 
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://control-ventas-azure.vercel.app";
         const adminLink = `${appUrl}/dashboard/admin/pedidos`;
 
         await sendTelegramMessage(
-          `🆕 *NUEVO PEDIDO RECIBIDO*\n\n` +
+          `🆕 *NUEVO PEDIDO RECIBIDO${canalEscapado}*\n\n` +
           `📦 Pedido: \`${pedidoEscapado}\`\n` +
           `👤 Cliente: *${clienteEscapado}*\n` +
           `💰 Total: *${montoEscapado}*\n\n` +
@@ -64,14 +72,19 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        message: "Pedido creado correctamente desde el carrito",
+        ok: true,
+        orderId: pedido._id.toString(),
+        paymentId: pago ? pago._id.toString() : null,
+        codigo: pedido.numeroPedido,
+        expiresAt: pedido.reservaExpiraEn ? pedido.reservaExpiraEn.toISOString() : null,
+        message: "Pedido creado correctamente",
         pedido,
       },
       { status: 201 }
     );
   } catch (error) {
     return handleRouteError(error, {
-      fallbackMessage: "Error al crear pedido desde el carrito",
+      fallbackMessage: "Error al crear pedido desde el checkout",
       logLabel: "POST pedidos/checkout error:",
     });
   }

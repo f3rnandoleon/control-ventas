@@ -15,9 +15,13 @@ function hasUniqueValues(values: string[]) {
   return new Set(normalized).size === normalized.length;
 }
 
+const modalidadCobroSchema = z.enum(["PAGO_EN_DESTINO", "TARIFA_FIJA", "POR_COORDINAR"]);
+
 const pickupPointSchema = z.object({
   id: identifierSchema,
   name: nameSchema,
+  costoBOB: z.number().default(0).optional(),
+  costoEstimadoBOB: z.number().default(0).optional(),
 });
 
 const pickupScheduleSchema = z
@@ -37,6 +41,9 @@ const departmentSchema = z
   .object({
     name: nameSchema.max(80),
     branches: z.array(nameSchema.max(200)).max(200),
+    modalidadCobro: modalidadCobroSchema.optional(),
+    costoEstimadoBOB: z.number().min(0).optional(),
+    tiempoEstimadoHoras: z.string().max(100).optional(),
   })
   .refine((department) => hasUniqueValues(department.branches), {
     message: "Las sucursales no pueden estar duplicadas",
@@ -47,6 +54,9 @@ const shippingCompanySchema = z
   .object({
     id: identifierSchema,
     name: nameSchema,
+    modalidadCobro: modalidadCobroSchema.default("PAGO_EN_DESTINO").optional(),
+    costoEstimadoBOB: z.number().min(0).default(0).optional(),
+    tiempoEstimadoHoras: z.string().max(100).default("24 a 48 horas hábiles").optional(),
     departments: z.array(departmentSchema).max(50),
   })
   .refine((company) => hasUniqueValues(company.departments.map((item) => item.name)), {

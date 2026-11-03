@@ -25,10 +25,52 @@ const NATIONAL_SHIPPING_POLICY: ShippingPolicy = {
 };
 
 function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse {
+  const pickupPoints = (document.pickupPoints || []).map((point) => ({
+    id: point.id,
+    name: point.name,
+    costoBOB: 0,
+    costoEstimadoBOB: 0,
+  }));
+
+  const shippingCompanies = (document.shippingCompanies || []).map((company) => {
+    const modalidadCobro = company.modalidadCobro || "PAGO_EN_DESTINO";
+    const costoEstimadoBOB =
+      typeof company.costoEstimadoBOB === "number"
+        ? company.costoEstimadoBOB
+        : (modalidadCobro === "TARIFA_FIJA" ? 25 : 0);
+    const tiempoEstimadoHoras = company.tiempoEstimadoHoras || "24 a 48 horas hábiles";
+
+    const departments = (company.departments || []).map((dept) => {
+      const deptModalidad = dept.modalidadCobro || modalidadCobro;
+      const deptCosto =
+        typeof dept.costoEstimadoBOB === "number"
+          ? dept.costoEstimadoBOB
+          : costoEstimadoBOB;
+      const deptTiempo = dept.tiempoEstimadoHoras || tiempoEstimadoHoras;
+
+      return {
+        name: dept.name,
+        branches: dept.branches,
+        modalidadCobro: deptModalidad,
+        costoEstimadoBOB: deptCosto,
+        tiempoEstimadoHoras: deptTiempo,
+      };
+    });
+
+    return {
+      id: company.id,
+      name: company.name,
+      modalidadCobro,
+      costoEstimadoBOB,
+      tiempoEstimadoHoras,
+      departments,
+    };
+  });
+
   return {
-    pickupPoints: document.pickupPoints,
+    pickupPoints,
     pickupSchedules: document.pickupSchedules,
-    shippingCompanies: document.shippingCompanies,
+    shippingCompanies,
     shippingPolicy: NATIONAL_SHIPPING_POLICY,
   };
 }
@@ -68,7 +110,7 @@ export async function getDeliveryOptions(): Promise<DeliveryOptionsResponse> {
 export async function replaceDeliveryOptions(
   options: DeliveryOptionsInput,
   actor: { id: string; rol: "ADMIN" }
-): Promise<DeliveryOptionsInput> {
+): Promise<DeliveryOptionsResponse> {
   await connectDB();
 
   const previous = await deliveryOptionsRepository.findDefault();
