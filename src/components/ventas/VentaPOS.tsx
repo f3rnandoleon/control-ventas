@@ -250,151 +250,157 @@ export default function VentaPOS({
   };
 
   return (
-    <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-y-auto rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
-      {/* BLOQUE DESPLAZABLE: SELECTOR DE SUCURSAL Y ESTADO DE CAJA (Se desplazan al bajar a los productos) */}
-      <div className="space-y-3 p-3.5 sm:p-5 pb-2">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-3 backdrop-blur-sm">
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-lg border border-blue-200 dark:border-blue-500/30">
-              🏢
-            </span>
-            <div className="min-w-0 flex-1">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
-                Sucursal de Venta POS:
-              </label>
-              <div className="flex items-center gap-2 mt-0.5">
-                <select
-                  value={sucursalSeleccionadaId}
-                  onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
-                  className="w-full sm:w-auto rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm"
-                >
-                  {sucursales.map((s) => (
-                    <option key={s._id} value={s._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
-                      📍 {s.nombre} ({s.codigo}) {s.esAlmacenPrincipal ? "★ Almacén Principal" : ""}
-                    </option>
-                  ))}
-                </select>
+    <>
+      <div className="surface-card-strong flex h-[100dvh] min-h-0 flex-col overflow-hidden rounded-none md:h-[calc(100dvh-3rem)] md:rounded-2xl">
+        {/* ÚNICO CONTENEDOR CON SCROLL INTERNO (Sin backdrop-filter para no atrapar elementos fixed) */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* BLOQUE DESPLAZABLE: SELECTOR DE SUCURSAL Y ESTADO DE CAJA */}
+          <div className="space-y-3 p-3.5 sm:p-5 pb-2">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 p-3">
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-lg border border-blue-200 dark:border-blue-500/30">
+                  🏢
+                </span>
+                <div className="min-w-0 flex-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
+                    Sucursal de Venta POS:
+                  </label>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <select
+                      value={sucursalSeleccionadaId}
+                      onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
+                      className="w-full sm:w-auto rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                    >
+                      {sucursales.map((s) => (
+                        <option key={s._id} value={s._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
+                          📍 {s.nombre} ({s.codigo}) {s.esAlmacenPrincipal ? "★ Almacén Principal" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <CajaPosWidget sucursalId={sucursalSeleccionadaId} />
               </div>
             </div>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <CajaPosWidget sucursalId={sucursalSeleccionadaId} />
+          {/* BARRA STICKY COMPACTA: BUSCADOR Y CATEGORÍAS */}
+          <div className="sticky top-0 z-20 space-y-2.5 border-b border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-950/95 px-3.5 py-2.5 sm:px-5">
+            <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+              <span className="font-medium">Seleccione los productos:</span>
+              <div className="w-fit rounded-full bg-cyan-100 dark:bg-cyan-500/10 px-3 py-0.5 text-xs font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
+                {fields.length} {fields.length === 1 ? "item" : "items"}
+              </div>
+            </div>
+
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por nombre, modelo o SKU..."
+              className="input py-2.5 text-sm"
+            />
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {categorias.map((categoria) => (
+                <button
+                  key={categoria}
+                  type="button"
+                  onClick={() => setCategoriaActiva(categoria)}
+                  className={`shrink-0 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition sm:text-sm ${
+                    categoriaActiva === categoria
+                      ? "border-blue-500 bg-blue-600 text-white shadow-sm"
+                      : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10"
+                  }`}
+                >
+                  {categoria}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* BARRA STICKY COMPACTA: BUSCADOR Y CATEGORÍAS */}
-      <div className="sticky top-0 z-20 space-y-2.5 border-b border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-950/90 px-3.5 py-2.5 sm:px-5 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
-          <span className="font-medium">Seleccione los productos:</span>
-          <div className="w-fit rounded-full bg-cyan-100 dark:bg-cyan-500/10 px-3 py-0.5 text-xs font-semibold text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20">
-            {fields.length} {fields.length === 1 ? "item" : "items"}
-          </div>
-        </div>
+          {/* GRILLA DE PRODUCTOS */}
+          <div className="p-3.5 sm:p-5 pb-24">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+              {productosFiltrados.map((producto) => {
+                const image = getProductoImage(producto);
+                const stockDisponible = producto.variantes.reduce(
+                  (sum, variant) => sum + getStockEnSucursal(variant, sucursalSeleccionadaId),
+                  0
+                );
+                const otrasSucursalesTotal = producto.variantes.reduce((sum, variant) => {
+                  const otras = getOtrasSucursalesConStock(variant, sucursalSeleccionadaId);
+                  return sum + otras.reduce((s2, o) => s2 + o.stockDisponible, 0);
+                }, 0);
+                const disabled = stockDisponible <= 0 && otrasSucursalesTotal <= 0;
 
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por nombre, modelo o SKU..."
-          className="input py-2.5 text-sm"
-        />
-
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {categorias.map((categoria) => (
-            <button
-              key={categoria}
-              type="button"
-              onClick={() => setCategoriaActiva(categoria)}
-              className={`shrink-0 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition sm:text-sm ${
-                categoriaActiva === categoria
-                  ? "border-blue-500 bg-blue-600 text-white shadow-sm"
-                  : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10"
-              }`}
-            >
-              {categoria}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* GRILLA DE PRODUCTOS */}
-      <div className="flex-1 p-3.5 sm:p-5 pb-24">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-          {productosFiltrados.map((producto) => {
-            const image = getProductoImage(producto);
-            const stockDisponible = producto.variantes.reduce(
-              (sum, variant) => sum + getStockEnSucursal(variant, sucursalSeleccionadaId),
-              0
-            );
-            const otrasSucursalesTotal = producto.variantes.reduce((sum, variant) => {
-              const otras = getOtrasSucursalesConStock(variant, sucursalSeleccionadaId);
-              return sum + otras.reduce((s2, o) => s2 + o.stockDisponible, 0);
-            }, 0);
-            const disabled = stockDisponible <= 0 && otrasSucursalesTotal <= 0;
-
-            return (
-              <button
-                key={producto._id}
-                type="button"
-                onClick={() => setProductoActivo(producto)}
-                className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${
-                  disabled
-                    ? "border-white/5 opacity-55"
-                    : stockDisponible <= 0
-                    ? "border-amber-500/30 hover:border-amber-400/70"
-                    : "border-white/10 hover:border-blue-400/70"
-                }`}
-              >
-                {image ? (
-                  <CloudinaryImage
-                    src={image}
-                    alt={producto.nombre}
-                    width={320}
-                    height={400}
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-slate-800" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-                <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-2xl font-light text-white shadow-lg">
-                  +
-                </span>
-                <div className="absolute inset-x-0 bottom-0 space-y-1 p-3">
-                  <p className="line-clamp-1 text-sm font-bold !text-white drop-shadow sm:text-base">{producto.nombre}</p>
-                  <p className="line-clamp-1 text-[11px] !text-white/80 sm:text-xs">{producto.modelo}</p>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-base font-bold !text-white drop-shadow sm:text-lg">{formatProductPriceDisplay(producto)}</p>
-                    {stockDisponible > 0 ? (
-                      <p className="rounded-full bg-emerald-500/30 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-semibold !text-white">
-                        Stock {stockDisponible}
-                      </p>
-                    ) : otrasSucursalesTotal > 0 ? (
-                      <p className="rounded-full bg-amber-500/30 border border-amber-400/40 px-2 py-0.5 text-[9px] font-semibold !text-amber-200">
-                        0 ({otrasSucursalesTotal} en otra suc.)
-                      </p>
+                return (
+                  <button
+                    key={producto._id}
+                    type="button"
+                    onClick={() => setProductoActivo(producto)}
+                    className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${
+                      disabled
+                        ? "border-white/5 opacity-55"
+                        : stockDisponible <= 0
+                        ? "border-amber-500/30 hover:border-amber-400/70"
+                        : "border-white/10 hover:border-blue-400/70"
+                    }`}
+                  >
+                    {image ? (
+                      <CloudinaryImage
+                        src={image}
+                        alt={producto.nombre}
+                        width={320}
+                        height={400}
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
                     ) : (
-                      <p className="rounded-full bg-rose-500/30 border border-rose-400/40 px-2 py-0.5 text-[10px] font-semibold !text-rose-200">
-                        Agotado
-                      </p>
+                      <div className="absolute inset-0 bg-slate-800" />
                     )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                    <span className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-2xl font-light text-white shadow-lg">
+                      +
+                    </span>
+                    <div className="absolute inset-x-0 bottom-0 space-y-1 p-3">
+                      <p className="line-clamp-1 text-sm font-bold !text-white drop-shadow sm:text-base">{producto.nombre}</p>
+                      <p className="line-clamp-1 text-[11px] !text-white/80 sm:text-xs">{producto.modelo}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-base font-bold !text-white drop-shadow sm:text-lg">{formatProductPriceDisplay(producto)}</p>
+                        {stockDisponible > 0 ? (
+                          <p className="rounded-full bg-emerald-500/30 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-semibold !text-white">
+                            Stock {stockDisponible}
+                          </p>
+                        ) : otrasSucursalesTotal > 0 ? (
+                          <p className="rounded-full bg-amber-500/30 border border-amber-400/40 px-2 py-0.5 text-[9px] font-semibold !text-amber-200">
+                            0 ({otrasSucursalesTotal} en otra suc.)
+                          </p>
+                        ) : (
+                          <p className="rounded-full bg-rose-500/30 border border-rose-400/40 px-2 py-0.5 text-[10px] font-semibold !text-rose-200">
+                            Agotado
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-        {productosFiltrados.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-gray-400">
-            No hay productos que coincidan con la busqueda.
+            {productosFiltrados.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-gray-400">
+                No hay productos que coincidan con la busqueda.
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
+      {/* BOTÓN FLOTANTE Y MODALES FUERA DE SURFACE-CARD-STRONG PARA POSICIONAMIENTO FIXED REAL AL VIEWPORT */}
       <button
         type="button"
         onClick={() => setListaCompleta(true)}
@@ -668,6 +674,6 @@ export default function VentaPOS({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
