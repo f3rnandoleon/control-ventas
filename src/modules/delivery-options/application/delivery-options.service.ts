@@ -30,6 +30,7 @@ function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse 
     name: point.name,
     costoBOB: 0,
     costoEstimadoBOB: 0,
+    googleMapsUrl: point.googleMapsUrl || undefined,
   }));
 
   const shippingCompanies = (document.shippingCompanies || []).map((company) => {
@@ -39,6 +40,7 @@ function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse 
         ? company.costoEstimadoBOB
         : (modalidadCobro === "TARIFA_FIJA" ? 25 : 0);
     const tiempoEstimadoHoras = company.tiempoEstimadoHoras || "24 a 48 horas hábiles";
+    const googleMapsUrl = company.googleMapsUrl || undefined;
 
     const departments = (company.departments || []).map((dept) => {
       const deptModalidad = dept.modalidadCobro || modalidadCobro;
@@ -47,6 +49,7 @@ function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse 
           ? dept.costoEstimadoBOB
           : costoEstimadoBOB;
       const deptTiempo = dept.tiempoEstimadoHoras || tiempoEstimadoHoras;
+      const deptGoogleMapsUrl = dept.googleMapsUrl || undefined;
 
       return {
         name: dept.name,
@@ -54,6 +57,7 @@ function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse 
         modalidadCobro: deptModalidad,
         costoEstimadoBOB: deptCosto,
         tiempoEstimadoHoras: deptTiempo,
+        googleMapsUrl: deptGoogleMapsUrl,
       };
     });
 
@@ -63,6 +67,7 @@ function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse 
       modalidadCobro,
       costoEstimadoBOB,
       tiempoEstimadoHoras,
+      googleMapsUrl,
       departments,
     };
   });

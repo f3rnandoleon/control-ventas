@@ -6,6 +6,7 @@ const pickupPointSchema = new Schema(
     name: { type: String, required: true, trim: true },
     costoBOB: { type: Number, default: 0 },
     costoEstimadoBOB: { type: Number, default: 0 },
+    googleMapsUrl: { type: String, trim: true, default: undefined },
   },
   { _id: false }
 );
@@ -35,6 +36,7 @@ const departmentSchema = new Schema(
     },
     costoEstimadoBOB: { type: Number, default: undefined },
     tiempoEstimadoHoras: { type: String, default: undefined },
+    googleMapsUrl: { type: String, trim: true, default: undefined },
   },
   { _id: false }
 );
@@ -50,6 +52,7 @@ const shippingCompanySchema = new Schema(
     },
     costoEstimadoBOB: { type: Number, default: 0 },
     tiempoEstimadoHoras: { type: String, default: "24 a 48 horas hábiles" },
+    googleMapsUrl: { type: String, trim: true, default: undefined },
     departments: { type: [departmentSchema], default: [] },
   },
   { _id: false }

@@ -359,19 +359,22 @@ curl -X GET https://control-ventas-azure.vercel.app/api/delivery-options \
       "id": "teleferico-central",
       "name": "Estación Teleférico Central (Línea Roja - Av. Manco Cápac)",
       "costoBOB": 0.00,
-      "costoEstimadoBOB": 0.00
+      "costoEstimadoBOB": 0.00,
+      "googleMapsUrl": "https://maps.app.goo.gl/example1"
     },
     {
       "id": "plaza-estudiante",
       "name": "Plaza del Estudiante (El Prado)",
       "costoBOB": 0.00,
-      "costoEstimadoBOB": 0.00
+      "costoEstimadoBOB": 0.00,
+      "googleMapsUrl": "https://maps.app.goo.gl/example2"
     },
     {
       "id": "teleferico-iglesias",
       "name": "Estación Teleférico Iglesia del Carmen (Línea Morada - Obelisco)",
       "costoBOB": 0.00,
-      "costoEstimadoBOB": 0.00
+      "costoEstimadoBOB": 0.00,
+      "googleMapsUrl": "https://maps.app.goo.gl/example3"
     }
   ],
   "pickupSchedules": [
@@ -397,12 +400,14 @@ curl -X GET https://control-ventas-azure.vercel.app/api/delivery-options \
       "modalidadCobro": "PAGO_EN_DESTINO",
       "costoEstimadoBOB": 0.00,
       "tiempoEstimadoHoras": "24 a 48 horas hábiles",
+      "googleMapsUrl": "https://maps.app.goo.gl/bolivarcargo",
       "departments": [
         {
           "name": "Cochabamba",
           "modalidadCobro": "PAGO_EN_DESTINO",
           "costoEstimadoBOB": 0.00,
           "tiempoEstimadoHoras": "24 a 48 horas hábiles",
+          "googleMapsUrl": "https://maps.app.goo.gl/bolivarcbba",
           "branches": [
             "Terminal Central Cochabamba",
             "Av. Blanco Galindo Km 4"
