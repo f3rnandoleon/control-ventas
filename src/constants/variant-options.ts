@@ -24,7 +24,7 @@ export const COLOR_OPTIONS = [
   ["Cobre", "#B87333"], ["Hueso", "#E3DAC9"], ["Chocolate", "#7B3F00"],
   ["Cereza", "#D2042D"], ["Ciruela", "#8E4585"], ["Petróleo", "#006D77"],
   ["Arena", "#C2B280"], ["Ámbar", "#FFBF00"],
-] .map(([value, hex]) => ({ value, label: value, hex })) as ColorOption[];
+].map(([value, hex]) => ({ value, label: value, hex })) as ColorOption[];
 
 export const TALLA_OPTIONS = [
   "2",
