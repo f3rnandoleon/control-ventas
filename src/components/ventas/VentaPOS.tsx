@@ -73,8 +73,10 @@ export default function VentaPOS({
 
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [sucursalSeleccionadaId, setSucursalSeleccionadaId] = useState<string>("");
+  const [loadingSucursales, setLoadingSucursales] = useState<boolean>(true);
 
   useEffect(() => {
+    setLoadingSucursales(true);
     getSucursales()
       .then((data) => {
         const activas = data.filter((s) => s.activa);
@@ -82,7 +84,12 @@ export default function VentaPOS({
 
         // Preseleccionar sucursal: 1) asignada al usuario si existe, 2) principal o primera activa
         if (activas.length > 0) {
-          const userBranchId = user?.sucursalAsignadaId;
+          const rawUserBranchId = user?.sucursalAsignadaId;
+          const userBranchId =
+            typeof rawUserBranchId === "object" && rawUserBranchId !== null
+              ? (rawUserBranchId as { _id?: string })._id
+              : rawUserBranchId;
+
           const matchUserBranch = activas.find((s) => s._id === userBranchId);
           if (matchUserBranch) {
             setSucursalSeleccionadaId(matchUserBranch._id);
@@ -92,7 +99,13 @@ export default function VentaPOS({
           }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("Error al cargar sucursales:", err);
+        toast.error("No se pudieron cargar las sucursales de venta. Intente recargar la página.");
+      })
+      .finally(() => {
+        setLoadingSucursales(false);
+      });
   }, [user]);
 
   const {
@@ -269,13 +282,20 @@ export default function VentaPOS({
                     <select
                       value={sucursalSeleccionadaId}
                       onChange={(e) => setSucursalSeleccionadaId(e.target.value)}
-                      className="w-full sm:w-auto rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                      disabled={loadingSucursales || sucursales.length === 0}
+                      className="w-full sm:w-auto rounded-lg border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-blue-500 cursor-pointer shadow-sm disabled:opacity-60"
                     >
-                      {sucursales.map((s) => (
-                        <option key={s._id} value={s._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
-                          📍 {s.nombre} ({s.codigo}) {s.esAlmacenPrincipal ? "★ Almacén Principal" : ""}
-                        </option>
-                      ))}
+                      {loadingSucursales ? (
+                        <option value="">Cargando sucursales...</option>
+                      ) : sucursales.length === 0 ? (
+                        <option value="">No hay sucursales disponibles</option>
+                      ) : (
+                        sucursales.map((s) => (
+                          <option key={s._id} value={s._id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
+                            📍 {s.nombre} ({s.codigo}) {s.esAlmacenPrincipal ? "★ Almacén Principal" : ""}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                 </div>

@@ -206,9 +206,19 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  // Permitir a personal (VENDEDOR) acceder a endpoints autorizados para staff dentro de /api/admin
+  const isStaffAllowedAdminRoute =
+    ["ADMIN", "VENDEDOR"].includes(role || "") &&
+    (
+      (pathname.startsWith("/api/admin/sucursales") && method === "GET") ||
+      (pathname.startsWith("/api/admin/productos/") && pathname.endsWith("/stock-sucursales") && method === "GET") ||
+      pathname.startsWith("/api/admin/traspasos")
+    );
+
   if (
     adminApiRoutes.some((route) => pathname.startsWith(route)) &&
-    role !== "ADMIN"
+    role !== "ADMIN" &&
+    !isStaffAllowedAdminRoute
   ) {
     return applyCorsHeaders(
       NextResponse.json(
