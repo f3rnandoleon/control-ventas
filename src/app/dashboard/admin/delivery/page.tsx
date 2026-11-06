@@ -67,8 +67,8 @@ export default function AdminDeliveryPage() {
         <button
           onClick={() => setTab("POINTS")}
           className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${tab === "POINTS"
-              ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+            ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+            : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
         >
           Puntos de Encuentro
@@ -76,8 +76,8 @@ export default function AdminDeliveryPage() {
         <button
           onClick={() => setTab("SCHEDULES")}
           className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${tab === "SCHEDULES"
-              ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+            ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+            : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
         >
           Horarios
@@ -85,8 +85,8 @@ export default function AdminDeliveryPage() {
         <button
           onClick={() => setTab("SHIPPING")}
           className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${tab === "SHIPPING"
-              ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+            ? "bg-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+            : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
         >
           Envíos Nacionales
@@ -94,7 +94,7 @@ export default function AdminDeliveryPage() {
       </div>
 
       {/* Content Area */}
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
+      <div className="bg-slate-900/40 border border-white/10 rounded-3xl p-8 shadow-2xl relative group">
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl group-hover:bg-cyan-500/20 transition-all duration-700" />
 
         {tab === "POINTS" && (
