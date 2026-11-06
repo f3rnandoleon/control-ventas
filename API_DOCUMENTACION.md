@@ -46,6 +46,7 @@
    - [6.24 Gestión de Usuarios Administrativos](#624-gestión-de-usuarios-administrativos)
    - [6.25 Uploads Multimedia](#625-uploads-multimedia)
    - [6.26 Operaciones, Mantenimiento y Cron](#626-operaciones-mantenimiento-y-cron)
+   - [6.27 Biblioteca de Banners Web (Carrusel Home y Campañas)](#627-biblioteca-de-banners-web-carrusel-home-y-campañas)
 7. [Variables de Entorno](#7-variables-de-entorno)
 
 ---
@@ -357,6 +358,28 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 }
 ```
 
+### 5.16 Modelo Banner (Biblioteca de Campañas y Carrusel Web)
+Esquema de almacenamiento de banners promocionales gestionados desde `/dashboard/admin/banners` para alimentar el carrusel dinámico inteligente de la tienda web y redirigir consultas de clientes a WhatsApp (+591 67113105):
+```json
+{
+  "_id": "6724a1b0c9e0110001000001",
+  "titulo": "Colección Invierno 2026",
+  "descripcion": "Chompas y poleras térmicas de alpaca.",
+  "imagenDesktopUrl": "https://res.cloudinary.com/dq1jeikev/image/upload/v1778000000/banner_desktop.jpg",
+  "imagenMobileUrl": "https://res.cloudinary.com/dq1jeikev/image/upload/v1778000000/banner_mobile.jpg",
+  "tipoAccion": "WHATSAPP",
+  "whatsappNumero": "67113105",
+  "whatsappMensaje": "¡Hola! Vi el banner de la Colección Invierno y deseo más información.",
+  "enlaceUrl": null,
+  "activo": true,
+  "orden": 1,
+  "fechaInicio": "2026-06-01T00:00:00.000Z",
+  "fechaFin": "2026-08-31T23:59:59.000Z",
+  "createdAt": "2026-11-06T03:00:00.000Z",
+  "updatedAt": "2026-11-06T03:00:00.000Z"
+}
+```
+
 ---
 
 ## 6. Catálogo de Endpoints por Dominio
@@ -376,6 +399,7 @@ Documento de adquisición que incrementa inventario y recalcula atómicamente el
 | `GET` | `/api/productos/by-code/:code` | Pública | Búsqueda directa por código de prenda (código de barra, QR o SKU). Sanitizada para clientes públicos (oculta costos y existencias internas) |
 | `GET` | `/api/delivery-options` | Pública | Lista de puntos de recojo, horarios y empresas de envío por departamento |
 | `GET` | `/api/ubicaciones` | Pública | Lista de sucursales y puntos de retiro públicos (`activa: true`, `visibleEnWebYAgente: true`) con enlace de Google Maps (`googleMapsUrl`), coordenadas (`lat`, `lng`), referencia y horarios de atención. Soporta filtro `?ciudad=` |
+| `GET` | `/api/public/banners` | Pública | Lista de banners promocionales activos y vigentes para el carrusel de la tienda web, con enlace precalculado de WhatsApp (+591 67113105) y URLs de Cloudinary |
 
 ---
 
@@ -640,6 +664,20 @@ Todos los endpoints requieren rol `ADMIN`:
 | `POST` | `/api/admin/ops/verify-core` | `ADMIN` | Test E2E de verificación del núcleo transaccional |
 | `GET` | `/api/admin/audit-events` | `ADMIN` | Consulta de la pista de auditoría inmutable de eventos de dominio |
 | `GET/POST`| `/api/admin/cron/reservas-expiradas`| Cron Secret | Proceso desatendido que libera stock de pedidos vencidos con candado distribuido `CronLock` |
+
+---
+
+### 6.27 Biblioteca de Banners Web (Carrusel Home y Campañas)
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/public/banners` | Pública | Retorna banners activos y vigentes para el carrusel de la tienda web con enlace directo precalculado de WhatsApp (+591 67113105) |
+| `GET` | `/api/admin/banners` | `ADMIN` | Consulta la biblioteca completa de banners (activos e inactivos) ordenados por prioridad |
+| `POST` | `/api/admin/banners` | `ADMIN` | Crea un nuevo banner en la biblioteca (Cloudinary, título, acción de WhatsApp / URL y vigencia) |
+| `GET` | `/api/admin/banners/:id` | `ADMIN` | Obtiene el detalle de un banner por ID |
+| `PUT` | `/api/admin/banners/:id` | `ADMIN` | Actualiza los datos o imágenes de un banner existente |
+| `PATCH` | `/api/admin/banners/:id/toggle` | `ADMIN` | Activa o desactiva instantáneamente el banner en la tienda web con un solo clic |
+| `DELETE`| `/api/admin/banners/:id` | `ADMIN` | Elimina un banner de la biblioteca |
+| `POST` | `/api/uploads/banners` | `ADMIN` | Sube fotografía de banner (desktop o móvil) a Cloudinary (máx. 5 MB) |
 
 ---
 

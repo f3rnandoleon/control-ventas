@@ -19,6 +19,7 @@
    - [5.4 Opciones de Entrega, Horarios y Courier (`GET /api/delivery-options`)](#54-opciones-de-entrega-horarios-y-courier-get-apidelivery-options)
    - [5.5 Políticas Legales y Devoluciones (`GET /api/public/politicas`)](#55-políticas-legales-y-devoluciones-get-apipublicpoliticas)
    - [5.6 Ubicaciones de Tiendas y Google Maps (`GET /api/ubicaciones`)](#56-ubicaciones-de-tiendas-y-google-maps-get-apiubicaciones)
+   - [5.7 Banners Promocionales y Carrusel Home (`GET /api/public/banners`)](#57-banners-promocionales-y-carrusel-home-get-apipublicbanners)
 6. [Módulo 2: Autenticación, Registro y Perfil de Cliente](#6-módulo-2-autenticación-registro-y-perfil-de-cliente)
    - [6.1 Registro de Nueva Cuenta (`POST /api/auth/signup`)](#61-registro-de-nueva-cuenta-post-apiauthsignup)
    - [6.2 Inicio de Sesión Credenciales (`POST /api/auth/login`)](#62-inicio-de-sesión-credenciales-post-apiauthlogin)
@@ -517,6 +518,62 @@ curl -X GET "https://control-ventas-azure.vercel.app/api/ubicaciones?ciudad=La%2
     }
   ]
 }
+```
+
+---
+
+### 5.7 Banners Promocionales y Carrusel Home (`GET /api/public/banners`)
+Retorna la lista de banners promocionales activos y vigentes en el sistema para alimentar el **carrusel dinámico inteligente** de la página de inicio (Home) de la tienda web.
+
+Cada banner incluye la URL de su imagen principal para desktop (Cloudinary), la imagen opcional optimizada para celulares (`imagenMobileUrl`), y la propiedad computada `actionUrl`, que contiene el enlace directo a WhatsApp (al número **+591 67113105**) con el texto predeterminado y la foto del banner precargados, o la URL interna/externa de catálogo según esté configurado.
+
+* **Método:** `GET`
+* **Ruta:** `/api/public/banners`
+* **Autenticación:** Pública (No requiere token).
+* **Rate Limit:** 120 req/min por IP (Cache en CDN/Edge de 60 segundos con revalidación en segundo plano).
+
+#### Comportamiento Recomendado para el Frontend Web (Carrusel Inteligente):
+1. **0 banners:** No renderizar el contenedor del carrusel para evitar espacios vacíos en el Home.
+2. **1 banner:** Mostrarlo como **Hero Banner estático**, sin flechas ni rotación innecesaria.
+3. **2 o más banners:** Activar el **carrusel rotativo automático** (5 a 6 segundos por slide), con pausa al hover/touch, controles de avance/retroceso e indicadores de puntos (dots).
+4. **Al hacer clic:** Redirigir al usuario al valor del atributo `actionUrl` (abre WhatsApp con el mensaje estructurado de consulta al 67113105 o el catálogo).
+
+#### Ejemplo de Petición:
+```bash
+curl -X GET "https://control-ventas-azure.vercel.app/api/public/banners" \
+  -H "Accept: application/json"
+```
+
+#### Respuesta Exitosa (`HTTP 200`):
+```json
+[
+  {
+    "_id": "6724a1b0c9e0110001000001",
+    "titulo": "Nueva Colección Otoño / Invierno 2026",
+    "descripcion": "Prendas térmicas y camperas con envío inmediato a toda Bolivia.",
+    "imagenDesktopUrl": "https://res.cloudinary.com/dq1jeikev/image/upload/v1778000000/banner_invierno_desktop.jpg",
+    "imagenMobileUrl": "https://res.cloudinary.com/dq1jeikev/image/upload/v1778000000/banner_invierno_mobile.jpg",
+    "tipoAccion": "WHATSAPP",
+    "whatsappNumero": "67113105",
+    "whatsappMensaje": "¡Hola! Vi el banner de la Colección Invierno en su página web y deseo consultar disponibilidad.",
+    "actionUrl": "https://wa.me/59167113105?text=%C2%A1Hola!%20Vi%20el%20banner%20de%20la%20Colecci%C3%B3n%20Invierno%20en%20su%20p%C3%A1gina%20web%20y%20deseo%20consultar%20disponibilidad.",
+    "activo": true,
+    "orden": 1,
+    "createdAt": "2026-11-06T03:00:00.000Z"
+  },
+  {
+    "_id": "6724a1b0c9e0110001000002",
+    "titulo": "Liquidación de Poleras y Remeras 2x1",
+    "descripcion": "Aplica para compras en tienda física y pedidos web.",
+    "imagenDesktopUrl": "https://res.cloudinary.com/dq1jeikev/image/upload/v1778000000/banner_poleras_desktop.jpg",
+    "tipoAccion": "WHATSAPP",
+    "whatsappNumero": "67113105",
+    "actionUrl": "https://wa.me/59167113105?text=%C2%A1Hola!%20Vi%20el%20banner%20%22Liquidaci%C3%B3n%20de%20Poleras%20y%20Remeras%202x1%22%20en%20su%20tienda%20web%20y%20deseo%20m%C3%A1s%20informaci%C3%B3n%20de%20las%20prendas.%0AFoto%3A%20https%3A%2F%2Fres.cloudinary.com%2Fdq1jeikev%2Fimage%2Fupload%2Fv1778000000%2Fbanner_poleras_desktop.jpg",
+    "activo": true,
+    "orden": 2,
+    "createdAt": "2026-11-06T03:10:00.000Z"
+  }
+]
 ```
 
 ---

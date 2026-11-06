@@ -95,7 +95,7 @@ export default function AdminDeliveryPage() {
 
       {/* Content Area */}
       <div className="bg-slate-900/40 border border-white/10 rounded-3xl p-8 shadow-2xl relative group">
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl group-hover:bg-cyan-500/20 transition-all duration-700" />
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-cyan-500/20 transition-all duration-700" />
 
         {tab === "POINTS" && (
           <PickupPointsManager

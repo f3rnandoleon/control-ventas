@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/libs/authOptions";
 import SignOutButton from "@/components/SignOutButton";
+import HeroBannerCarousel from "@/components/web/HeroBannerCarousel";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -16,8 +17,12 @@ export default async function Home() {
   }
 
   return (
-    <main className="page-glow min-h-screen px-6 py-16 text-slate-900">
-      <div className="mx-auto flex max-w-6xl flex-col gap-12 lg:flex-row lg:items-center lg:justify-between">
+    <main className="page-glow min-h-screen px-4 sm:px-6 py-8 sm:py-12 text-slate-900">
+      <div className="mx-auto max-w-6xl space-y-8 sm:space-y-12">
+        {/* Carrusel de Banners Promocionales Inteligente */}
+        <HeroBannerCarousel />
+
+        <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:justify-between">
         <section className="max-w-2xl space-y-6">
           <span className="inline-flex rounded-full border border-sky-200 bg-white/80 px-4 py-1 text-sm font-medium text-sky-700 shadow-sm">
             Control Ventas
@@ -70,6 +75,7 @@ export default async function Home() {
             </p>
           </article>
         </section>
+        </div>
       </div>
 
       <footer className="mx-auto mt-20 max-w-6xl border-t border-sky-100/80 pt-8 text-center sm:flex sm:items-center sm:justify-between text-xs text-slate-500">

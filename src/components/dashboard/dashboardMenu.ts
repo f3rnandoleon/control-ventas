@@ -53,10 +53,11 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
     {
       label: "Ajustes",
       href: "/dashboard/admin/ajustes",
-      keywords: ["configuracion", "tipo de cambio", "politicas", "delivery", "finanzas"],
+      keywords: ["configuracion", "tipo de cambio", "politicas", "delivery", "finanzas", "banners"],
       children: [
         { label: "General y Políticas", href: "/dashboard/admin/ajustes" },
         { label: "Opciones Entrega", href: "/dashboard/admin/delivery" },
+        { label: "Banners Web", href: "/dashboard/admin/banners" },
       ],
     },
   ],
