@@ -7,6 +7,7 @@ import { uploadVarianteImages } from "@/services/upload.service";
 import { getVarianteImagenes } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import {
+  ColorOption,
   TALLA_OPTIONS,
   getColorOptions,
   getVariantSelectOptions,
@@ -47,6 +48,25 @@ const normalizeVariantKey = (
   talla: string
 ) =>
   `${color.trim().toLowerCase()}::${(colorSecundario || "").trim().toLowerCase()}::${talla.trim().toLowerCase()}`;
+
+const renderGroupedColorOptions = (options: ColorOption[]) => {
+  const groups: Record<string, ColorOption[]> = {};
+  for (const opt of options) {
+    const fam = opt.family || "Otros";
+    if (!groups[fam]) groups[fam] = [];
+    groups[fam].push(opt);
+  }
+
+  return Object.entries(groups).map(([family, items]) => (
+    <optgroup key={family} label={`── ${family} ──`} className="bg-slate-900 text-cyan-400 font-semibold">
+      {items.map((color) => (
+        <option key={color.value} value={color.value} className="bg-slate-900 text-white font-normal">
+          {color.label}
+        </option>
+      ))}
+    </optgroup>
+  ));
+};
 
 export default function VarianteForm({
   initialData,
@@ -378,9 +398,7 @@ export default function VarianteForm({
           <select className="input" value={sharedForm.color} onChange={(e) =>
             setSharedForm((prev) => ({ ...prev, color: e.target.value }))}>
             <option value="">Selecciona un color</option>
-            {colorOptions.map((color) => (
-              <option key={color.value} value={color.value}>{color.label}</option>
-            ))}
+            {renderGroupedColorOptions(colorOptions)}
           </select>
           <ColorSwatch colorName={sharedForm.color} />
         </div>
@@ -389,9 +407,7 @@ export default function VarianteForm({
           <select className="input" value={sharedForm.colorSecundario} onChange={(e) =>
             setSharedForm((prev) => ({ ...prev, colorSecundario: e.target.value }))}>
             <option value="">Color secundario (opcional)</option>
-            {secondaryColorOptions.map((color) => (
-              <option key={color.value} value={color.value}>{color.label}</option>
-            ))}
+            {renderGroupedColorOptions(secondaryColorOptions)}
           </select>
           <ColorSwatch colorName={sharedForm.colorSecundario} />
         </div>
