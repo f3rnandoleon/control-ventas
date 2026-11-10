@@ -399,8 +399,8 @@ export default function GastosOperativosPage() {
                                     <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Monto (Bs) *</label>
                                     <input
                                         type="number"
-                                        step="0.5"
-                                        min="0.1"
+                                        step="any"
+                                        min="0.01"
                                         required
                                         value={monto || ""}
                                         onChange={(e) => setMonto(parseFloat(e.target.value) || 0)}

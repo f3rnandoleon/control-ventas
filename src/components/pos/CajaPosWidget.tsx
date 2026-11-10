@@ -272,7 +272,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                         <span className="absolute left-3 top-2.5 text-slate-400 dark:text-gray-400 font-bold text-sm">Bs</span>
                                         <input
                                             type="number"
-                                            step="0.5"
+                                            step="any"
                                             min="0"
                                             required
                                             value={montoApertura}
@@ -423,8 +423,8 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                 <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Monto (Bs) *</label>
                                 <input
                                     type="number"
-                                    step="0.5"
-                                    min="0.1"
+                                    step="any"
+                                    min="0.01"
                                     required
                                     value={montoMov || ""}
                                     onChange={(e) => setMontoMov(parseFloat(e.target.value) || 0)}
@@ -512,7 +512,7 @@ export default function CajaPosWidget({ sucursalId, onCajaStatusChange }: CajaPo
                                     <span className="absolute left-3 top-2.5 text-slate-400 dark:text-gray-400 font-bold text-sm">Bs</span>
                                     <input
                                         type="number"
-                                        step="0.5"
+                                        step="any"
                                         min="0"
                                         required
                                         value={montoRealEfectivo}
