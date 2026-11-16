@@ -330,11 +330,10 @@ export default function VentaPOS({
                   key={categoria}
                   type="button"
                   onClick={() => setCategoriaActiva(categoria)}
-                  className={`shrink-0 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition sm:text-sm ${
-                    categoriaActiva === categoria
+                  className={`shrink-0 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition sm:text-sm ${categoriaActiva === categoria
                       ? "border-blue-500 bg-blue-600 text-white shadow-sm"
                       : "border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10"
-                  }`}
+                    }`}
                 >
                   {categoria}
                 </button>
@@ -362,13 +361,12 @@ export default function VentaPOS({
                     key={producto._id}
                     type="button"
                     onClick={() => setProductoActivo(producto)}
-                    className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${
-                      disabled
+                    className={`group relative aspect-[4/5] overflow-hidden rounded-xl border text-left shadow-lg transition hover:-translate-y-0.5 ${disabled
                         ? "border-white/5 opacity-55"
                         : stockDisponible <= 0
-                        ? "border-amber-500/30 hover:border-amber-400/70"
-                        : "border-white/10 hover:border-blue-400/70"
-                    }`}
+                          ? "border-amber-500/30 hover:border-amber-400/70"
+                          : "border-white/10 hover:border-blue-400/70"
+                      }`}
                   >
                     {image ? (
                       <CloudinaryImage
@@ -620,7 +618,7 @@ export default function VentaPOS({
                 type="button"
                 onClick={() => setProductoActivo(null)}
                 aria-label="Cerrar selección de variante"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-bold text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95"
+                className="flex h-9 w-9 shrink-0  items-center justify-center rounded-xl border border-white/10 bg-blue/5 text-sm font-bold text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95"
               >
                 ✕
               </button>
@@ -681,9 +679,8 @@ export default function VentaPOS({
                           <p className="mt-1 text-xs font-semibold text-rose-400">Sin existencias (0 u.)</p>
                         )}
                       </div>
-                      <span className={`self-center rounded-full px-3 py-1 text-lg leading-none text-white ${
-                        stockDisponible > 0 ? "bg-blue-600" : "bg-gray-600"
-                      }`}>
+                      <span className={`self-center rounded-full px-3 py-1 text-lg leading-none text-white ${stockDisponible > 0 ? "bg-blue-600" : "bg-gray-600"
+                        }`}>
                         +
                       </span>
                     </button>
