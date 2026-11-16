@@ -135,6 +135,17 @@ export default function VentaPOS({
   const [tipoDescuento, setTipoDescuento] = useState<"BS" | "PORCENTAJE">("BS");
   const [valorDescuento, setValorDescuento] = useState<number>(0);
 
+  // Cerrar modal de selección de variantes con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && productoActivo) {
+        setProductoActivo(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [productoActivo]);
+
   const watchedItems = watch("items") ?? [];
   const categorias = useMemo(() => {
     const values = productos.map((producto) => producto.categoria?.trim()).filter(Boolean) as string[];
@@ -443,7 +454,8 @@ export default function VentaPOS({
                 type="button"
                 onClick={() => setListaCompleta(false)}
                 aria-label="Ocultar lista de venta"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 text-base font-bold text-slate-600 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition active:scale-95"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-500/40 bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-md shadow-red-950/30 transition active:scale-95"
+                title="Cerrar carrito"
               >
                 ✕
               </button>
@@ -618,7 +630,8 @@ export default function VentaPOS({
                 type="button"
                 onClick={() => setProductoActivo(null)}
                 aria-label="Cerrar selección de variante"
-                className="flex h-9 w-9 shrink-0  items-center justify-center rounded-xl border border-white/10 bg-blue/5 text-sm font-bold text-gray-300 hover:bg-white/10 hover:text-white transition active:scale-95"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/50 bg-red-600 hover:bg-red-500 text-white font-black text-base shadow-lg shadow-red-950/40 transition-all active:scale-90"
+                title="Cerrar selección (Esc)"
               >
                 ✕
               </button>

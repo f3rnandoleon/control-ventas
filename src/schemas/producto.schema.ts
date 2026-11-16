@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
     nonEmptyStringSchema,
     positiveNumberSchema,
+    nonNegativeNumberSchema,
     nonNegativeIntegerSchema,
 } from "./common.schema";
 
@@ -115,12 +116,12 @@ export const createProductoSchema = z.object({
 
     precioVenta: positiveNumberSchema,
 
-    precioCosto: positiveNumberSchema,
+    precioCosto: nonNegativeNumberSchema.optional().default(0),
 
     costoOrigen: z
         .object({
             moneda: z.enum(["PEN", "BOB", "USD"]).default("BOB"),
-            montoOriginal: positiveNumberSchema,
+            montoOriginal: nonNegativeNumberSchema,
             tipoCambioAplicado: positiveNumberSchema,
             fechaRegistro: z.union([z.string(), z.date()]).optional(),
         })
@@ -133,7 +134,13 @@ export const createProductoSchema = z.object({
         .optional()
         .default([]),
 }).refine(
-    (data) => data.precioVenta > data.precioCosto,
+    (data) => {
+        // Solo validar si se ingresó un costo mayor a 0
+        if (data.precioCosto && data.precioCosto > 0) {
+            return data.precioVenta > data.precioCosto;
+        }
+        return true;
+    },
     {
         message: "El precio de venta debe ser mayor al precio de costo",
         path: ["precioVenta"],
@@ -156,12 +163,12 @@ export const updateProductoSchema = z.object({
 
     precioVenta: positiveNumberSchema.optional(),
 
-    precioCosto: positiveNumberSchema.optional(),
+    precioCosto: nonNegativeNumberSchema.optional(),
 
     costoOrigen: z
         .object({
             moneda: z.enum(["PEN", "BOB", "USD"]).default("BOB"),
-            montoOriginal: positiveNumberSchema,
+            montoOriginal: nonNegativeNumberSchema,
             tipoCambioAplicado: positiveNumberSchema,
             fechaRegistro: z.union([z.string(), z.date()]).optional(),
         })
@@ -174,7 +181,7 @@ export const updateProductoSchema = z.object({
         .optional(),
 }).refine(
     (data) => {
-        if (data.precioVenta && data.precioCosto) {
+        if (data.precioVenta && data.precioCosto && data.precioCosto > 0) {
             return data.precioVenta > data.precioCosto;
         }
         return true;

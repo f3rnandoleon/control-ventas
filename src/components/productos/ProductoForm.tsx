@@ -103,24 +103,27 @@ export default function ProductoForm({
   return (
     <form
       onSubmit={handleSubmit((data) => {
-        // Adjuntar el snapshot inmutable de costo de origen
+        // Adjuntar el snapshot inmutable de costo de origen si se ingresó costo > 0
         const costoOrigenSnapshot =
-          monedaCosto === "PEN"
+          monedaCosto === "PEN" && costoPEN > 0
             ? {
                 moneda: "PEN" as const,
                 montoOriginal: costoPEN,
                 tipoCambioAplicado: tipoCambio,
                 fechaRegistro: new Date(),
               }
-            : {
+            : (data.precioCosto && data.precioCosto > 0)
+            ? {
                 moneda: "BOB" as const,
                 montoOriginal: data.precioCosto,
                 tipoCambioAplicado: 1,
                 fechaRegistro: new Date(),
-              };
+              }
+            : undefined;
 
         const payload: Partial<Producto> = {
           ...data,
+          precioCosto: data.precioCosto || 0,
           costoOrigen: costoOrigenSnapshot,
         };
 
@@ -230,11 +233,16 @@ export default function ProductoForm({
         <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <label className="text-xs font-bold text-sky-900 uppercase tracking-wider block">
-                Costo de Referencia Inicial
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-sky-900 uppercase tracking-wider block">
+                  Costo de Referencia Inicial
+                </label>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                  Opcional (Bs. 0)
+                </span>
+              </div>
               <span className="text-[11px] text-slate-500">
-                Estimado para calcular el margen comercial proyectado (el oficial entrará por Compras)
+                Puedes dejarlo en 0. El costo oficial (CPP) se fijará automáticamente con tu primera orden de compra.
               </span>
             </div>
             {/* Toggle de Moneda de Compra */}
@@ -318,13 +326,14 @@ export default function ProductoForm({
             </div>
           ) : (
             <div>
-              <label className="label">Precio costo referencial (Bs)</label>
+              <label className="label">Precio costo referencial (Bs) - Opcional</label>
               <input
                 {...register("precioCosto", { valueAsNumber: true })}
                 type="number"
                 className="input w-full bg-white"
                 step="0.01"
-                placeholder="Ej: 50.00"
+                min="0"
+                placeholder="0.00 (Opcional, se fijará en Compras)"
               />
             </div>
           )}
