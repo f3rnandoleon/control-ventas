@@ -13,6 +13,7 @@
     "migrate:delivery-options:force": "node scripts/migrate-delivery-options-to-mongodb.js --force"
   },
   "dependencies": {
+    "@gradio/client": "^2.8.0",
     "@hookform/resolvers": "^5.2.2",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",

@@ -1348,5 +1348,18 @@ export async function uploadPaymentProof(paymentId: string, imageFile: File) {
 
 ---
 
+### 11.5 Galería de Imágenes de Variantes Producidas con IA (VTON)
+
+Cada variante de producto en `GET /api/public/productos` cuenta con un arreglo de URLs `imagenes: string[]` generado mediante plantillas de Inteligencia Artificial (Gemini + Hugging Face IDM-VTON):
+
+* **Secuencia Estándar Unisex:** Alternada entre variantes (v1: Varón ➔ Colgador ➔ Mujer ➔ Close-up textura; v2: Mujer ➔ Colgador ➔ Varón ➔ Close-up).
+* **Plantilla Tradicional / Pollera:** Intercalada entre Mujer de Pollera y Mujer estándar para resaltar prendas folclóricas bolivianas.
+* **Plantilla Infantil:** Niño ➔ Colgador ➔ Close-up.
+* **Plantilla Familiar:** Varón ➔ Colgador ➔ Mujer ➔ Niño.
+* **Plantillas Varón / Mujer / Polera:** Incluyen vistas posteriores (espaldas) y maniquí invisible en 3D.
+* **Consumo Frontend:** En la tarjeta de producto y en el visor de detalle, el cliente puede deslizar el carrusel de la variante activa viendo al modelo vistiendo la prenda en estudio, la prenda aislada en colgador y el acercamiento macro del tejido.
+
+---
+
 > 📌 **¿Dudas o nuevas integraciones?**  
 > Para consultas sobre la API omnicanal, contacta al equipo de desarrollo central o revisa también [ENDPOINTS_PUBLICOS_Y_EXTERNOS.md](file:///c:/proyectos/control-ventas/ENDPOINTS_PUBLICOS_Y_EXTERNOS.md) y [GUIA_AGENTE_WHATSAPP_ENDPOINTS.md](file:///c:/proyectos/control-ventas/GUIA_AGENTE_WHATSAPP_ENDPOINTS.md).

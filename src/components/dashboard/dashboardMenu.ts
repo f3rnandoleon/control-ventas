@@ -58,6 +58,7 @@ export const dashboardMenu: Record<DashboardRole, DashboardMenuItem[]> = {
         { label: "General y Políticas", href: "/dashboard/admin/ajustes" },
         { label: "Opciones Entrega", href: "/dashboard/admin/delivery" },
         { label: "Banners Web", href: "/dashboard/admin/banners" },
+        { label: "Modelos Base IA", href: "/dashboard/admin/modelos-base" },
       ],
     },
   ],

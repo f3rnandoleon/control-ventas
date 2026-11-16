@@ -681,6 +681,25 @@ Todos los endpoints requieren rol `ADMIN`:
 
 ---
 
+### 6.28 Inteligencia Artificial para Catálogo y Variantes (Gemini + VTON)
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/ai/detect-variant-colors` | `ADMIN` | Analiza con Google Gemini 2.0/3.5 Flash la fotografía de la prenda e identifica de forma automática el `colorPrincipal` y `colorSecundario` emparejados contra las 91 opciones del catálogo |
+| `POST` | `/api/ai/generate-variant-photos` | `ADMIN` | Genera serie fotográfica comercial (Varón, Mujer, Tradicional de Pollera, Niño, Colgador, Maniquí Invisible, Close-up) según la plantilla seleccionada o selección manual, ejecutando Virtual Try-On con Hugging Face IDM-VTON y subiendo directamente los resultados a Cloudinary |
+
+---
+
+### 6.29 Biblioteca de Modelos Base para IA
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/admin/modelos-base` | `ADMIN` | Obtiene el catálogo de modelos base (Varón, Mujer, Mujer de Pollera, Niño, Colgador, Maniquí, etc.) con sus imágenes Cloudinary |
+| `POST` | `/api/admin/modelos-base` | `ADMIN` | Registra un nuevo modelo base personalizado en la biblioteca |
+| `PUT` | `/api/admin/modelos-base/:id` | `ADMIN` | Actualiza un modelo base o lo establece como predeterminado para su pose |
+| `DELETE`| `/api/admin/modelos-base/:id` | `ADMIN` | Elimina un modelo de la biblioteca |
+| `POST` | `/api/uploads/modelos-base` | `ADMIN` | Sube una nueva fotografía de modelo base en alta definición a Cloudinary |
+
+---
+
 ## 7. Variables de Entorno
 
 | Variable | Uso |
@@ -695,6 +714,9 @@ Todos los endpoints requieren rol `ADMIN`:
 | `CLOUDINARY_CLOUD_NAME` | Identificador de Cloudinary |
 | `CLOUDINARY_API_KEY` | Llave pública de Cloudinary |
 | `CLOUDINARY_API_SECRET` | Llave privada de Cloudinary |
+| `HUGGINGFACE_TOKEN` | Token de acceso para inferencia de Virtual Try-On (VTON) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Llave de API de Google Gemini para visión multimodal y detección de colores |
+| `GEMINI_CHAT_MODEL` | Modelo de Gemini utilizado (ej. `gemini-3.5-flash-lite` o `gemini-2.0-flash`) |
 | `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram para notificaciones y links de 1 clic |
 | `TELEGRAM_CHAT_ID` | Identificador del chat o canal administrativo de Telegram |
 | `NEXT_PUBLIC_APP_URL` | URL base pública para generar enlaces de verificación |

@@ -13,6 +13,8 @@ import {
   getVariantSelectOptions,
 } from "@/constants/variant-options";
 import ColorSwatch from "@/components/ui/ColorSwatch";
+import AIGeneratorModal from "@/components/productos/AIGeneratorModal";
+import { detectVariantColors } from "@/services/ai-catalog.service";
 
 type VarianteTallaForm = {
   varianteId?: string;
@@ -141,9 +143,43 @@ export default function VarianteForm({
     return [createEmptySizeRow()];
   });
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [detectingColorsDirectly, setDetectingColorsDirectly] = useState(false);
   const isEdit = editingVariantes.length > 0;
   const colorOptions = getColorOptions(sharedForm.color);
   const secondaryColorOptions = getColorOptions(sharedForm.colorSecundario);
+
+  const handleDirectDetectColors = async () => {
+    const firstImage = sharedForm.imagenes?.[0];
+    if (!firstImage) {
+      toast.error("Sube primero una imagen de la prenda para detectar sus colores");
+      return;
+    }
+
+    try {
+      setDetectingColorsDirectly(true);
+      toast.loading("Analizando prenda con Gemini AI...", { id: "detect-colors-direct" });
+      const res = await detectVariantColors(firstImage);
+      setSharedForm((prev) => ({
+        ...prev,
+        color: res.colorPrincipal,
+        colorSecundario: res.colorSecundario || "",
+      }));
+      toast.success(
+        `Color detectado: ${res.colorPrincipal}${
+          res.colorSecundario ? ` | Secundario: ${res.colorSecundario}` : ""
+        }`,
+        { id: "detect-colors-direct" }
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Error al detectar colores con IA",
+        { id: "detect-colors-direct" }
+      );
+    } finally {
+      setDetectingColorsDirectly(false);
+    }
+  };
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -393,6 +429,27 @@ export default function VarianteForm({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold text-gray-300">
+          Colores de la Variante
+        </label>
+        {(sharedForm.imagenes?.length ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={handleDirectDetectColors}
+            disabled={detectingColorsDirectly}
+            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>✨</span>
+            <span>
+              {detectingColorsDirectly
+                ? "Detectando con Gemini..."
+                : "Detectar colores con Gemini IA"}
+            </span>
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="flex items-center gap-3">
           <select className="input" value={sharedForm.color} onChange={(e) =>
@@ -720,8 +777,21 @@ export default function VarianteForm({
         }
       />
 
-      <div className="space-y-2">
-        <label className="label">Subir imagenes a Cloudinary (opcional)</label>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="label mb-0">Imágenes de la variante</label>
+          {(sharedForm.imagenes?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsAIModalOpen(true)}
+              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>✨</span>
+              <span>Abrir Estudio Fotográfico IA</span>
+            </button>
+          )}
+        </div>
+
         <input
           type="file"
           accept="image/*"
@@ -731,7 +801,33 @@ export default function VarianteForm({
           disabled={uploadingImage}
         />
         {uploadingImage && (
-          <p className="text-sm text-gray-400">Subiendo imagenes...</p>
+          <p className="text-sm text-gray-400">Subiendo imagenes a Cloudinary...</p>
+        )}
+
+        {(sharedForm.imagenes?.length ?? 0) > 0 && (
+          <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-blue-950/20 to-black/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🤖</span>
+              <div>
+                <p className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Estudio Fotográfico & Catálogo con IA</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-cyan-500 text-black">
+                    VTON + GEMINI
+                  </span>
+                </p>
+                <p className="text-[11px] text-gray-300">
+                  Genera fotos comerciales (Varón, Mujer, Colgador, Close-up, Tradicional de Pollera) listas para la web y Cloudinary.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAIModalOpen(true)}
+              className="btn-primary text-xs px-4 py-2 font-bold flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-cyan-500/20"
+            >
+              <span>✨ Generar Fotos con IA</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -813,6 +909,26 @@ export default function VarianteForm({
           Cancelar
         </button>
       </div>
+
+      <AIGeneratorModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        garmentImageUrl={sharedForm.imagenes?.[0] || ""}
+        variantIndex={existingVariantes.length}
+        onApplyColors={(color, sec) =>
+          setSharedForm((prev) => ({
+            ...prev,
+            color,
+            colorSecundario: sec || "",
+          }))
+        }
+        onAddImages={(newUrls) =>
+          setSharedForm((prev) => ({
+            ...prev,
+            imagenes: [...new Set([...(prev.imagenes || []), ...newUrls])],
+          }))
+        }
+      />
     </div>
   );
 }
