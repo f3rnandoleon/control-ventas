@@ -7,6 +7,7 @@ const authPages = ["/login", "/register"];
 const dashboardRoutes = ["/dashboard"];
 const protectedApiRoutes = [
   "/api/admin",
+  "/api/ai",
   "/api/perfil",
   "/api/carrito",
   "/api/clientes",
@@ -23,7 +24,7 @@ const protectedApiRoutes = [
   "/api/compras",
 ];
 
-const adminApiRoutes = ["/api/admin", "/api/reportes", "/api/usuarios", "/api/uploads"];
+const adminApiRoutes = ["/api/admin", "/api/ai", "/api/reportes", "/api/usuarios", "/api/uploads"];
 const staffApiRoutes = ["/api/productos", "/api/inventario", "/api/compras"];
 
 const CORS_HEADERS = {
