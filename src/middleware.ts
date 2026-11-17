@@ -190,11 +190,15 @@ export async function middleware(request: NextRequest) {
   requestHeaders.delete("x-user-id");
   requestHeaders.delete("x-user-role");
 
+  const isGuestAllowedApiRoute =
+    (pathname === "/api/pedidos/checkout" && method === "POST") ||
+    (/^\/api\/pagos\/[^/]+\/upload-comprobante$/.test(pathname) && method === "POST");
+
   if (!token) {
-    // Si no hay sesión NextAuth, verificar si tiene token Bearer para APIs
+    // Si no hay sesión NextAuth, verificar si tiene token Bearer o si es una ruta habilitada para invitados
     const authHeader = request.headers.get("authorization");
-    if (pathname.startsWith("/api/") && authHeader?.startsWith("Bearer ")) {
-      // Permitimos el paso; la ruta en sí usará `resolveApiAuth`
+    if (pathname.startsWith("/api/") && (authHeader?.startsWith("Bearer ") || isGuestAllowedApiRoute)) {
+      // Permitimos el paso; la ruta en sí usará `resolveApiAuth` y validará si es invitado
       const res = NextResponse.next({ request: { headers: requestHeaders } });
       return applyCorsHeaders(res);
     }
