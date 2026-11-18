@@ -86,7 +86,7 @@ export const varianteSchema = z.object({
 
     precioVenta: positiveNumberSchema.optional(),
 
-    precioCosto: positiveNumberSchema.optional(),
+    precioCosto: nonNegativeNumberSchema.optional(),
 
     medidas: medidasPrendaSchema,
 }).refine(

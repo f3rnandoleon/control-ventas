@@ -6,7 +6,9 @@ async function getApiErrorMessage(response: Response, fallback: string) {
 
     if (Array.isArray(data?.errors) && data.errors.length > 0) {
       return data.errors
-        .map((error: { message: string }) => error.message)
+        .map((error: { field?: string; message: string }) =>
+          error.field ? `${error.field}: ${error.message}` : error.message
+        )
         .join(", ");
     }
 
