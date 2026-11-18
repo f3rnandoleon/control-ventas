@@ -14,7 +14,12 @@ import { getVarianteImagenPrincipal, getVarianteSegundaImagen } from "@/utils/va
 import { getEstadoStock, getStockDisponibleVariante, getStockProducto } from "@/utils/stock";
 import { generarReporteStockPDF } from "@/utils/reportes/generarReporteStock";
 import { generarReporteProductoPDF } from "@/utils/reportes/generarReporteProducto";
-import { generarImagenGeneralVariantesDisponibles, generarImagenVariantesDisponibles } from "@/utils/reportes/generarImagenVariantes";
+import {
+  compareTallas,
+  generarImagenGeneralVariantesDisponibles,
+  generarImagenVariantesDisponibles,
+  getVariantesIgualesDisponibles,
+} from "@/utils/reportes/generarImagenVariantes";
 import { formatProductPriceDisplay } from "@/utils/pricing";
 
 export default function AdminProductosPage() {
@@ -30,10 +35,12 @@ export default function AdminProductosPage() {
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const [imageProduct, setImageProduct] = useState<Producto | null>(null);
   const [selectedTallas, setSelectedTallas] = useState<string[]>([]);
+  const [soloVariantesIguales, setSoloVariantesIguales] = useState(false);
   const [generalImageOpen, setGeneralImageOpen] = useState(false);
   const [selectedGeneralProductNames, setSelectedGeneralProductNames] = useState<string[]>([]);
   const [selectedGeneralCategorias, setSelectedGeneralCategorias] = useState<string[]>([]);
   const [selectedGeneralTallas, setSelectedGeneralTallas] = useState<string[]>([]);
+  const [generalSoloVariantesIguales, setGeneralSoloVariantesIguales] = useState(false);
 
   const loadProductos = async () => {
     setLoading(true);
@@ -83,8 +90,13 @@ export default function AdminProductosPage() {
         if (talla) tallas.add(talla);
       }
     });
-    return [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+    return [...tallas].sort(compareTallas);
   }, [imageProduct]);
+
+  const singleImageMatchingGroups = useMemo(() => {
+    if (!imageProduct || !soloVariantesIguales || selectedTallas.length === 0) return [];
+    return getVariantesIgualesDisponibles([imageProduct], { tallas: selectedTallas });
+  }, [imageProduct, soloVariantesIguales, selectedTallas]);
 
   const productosParaImagenGeneral = useMemo(() => productos.filter((producto) =>
     producto.variantes.some((variante) => getVarianteSegundaImagen(variante) && getStockDisponibleVariante(variante) > 0)
@@ -139,8 +151,46 @@ export default function AdminProductosPage() {
         }
       });
     });
-    return [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+    return [...tallas].sort(compareTallas);
   }, [productosParaImagenGeneral]);
+
+  const selectedGeneralProductIds = useMemo(() => {
+    const categoriasSeleccionadas = new Set(selectedGeneralCategorias);
+    const productosSeleccionados = new Set(
+      selectedGeneralProductNames.map((nombre) => nombre.toLocaleLowerCase("es"))
+    );
+    return productosParaImagenGeneral
+      .filter((producto) =>
+        categoriasSeleccionadas.has(producto.categoria?.trim() || "Sin categoria")
+      )
+      .filter((producto) =>
+        productosSeleccionados.has(
+          (producto.nombre.trim() || "Sin nombre").toLocaleLowerCase("es")
+        )
+      )
+      .map((producto) => producto._id);
+  }, [productosParaImagenGeneral, selectedGeneralCategorias, selectedGeneralProductNames]);
+
+  const generalMatchingGroups = useMemo(() => {
+    if (
+      !generalImageOpen ||
+      !generalSoloVariantesIguales ||
+      selectedGeneralProductIds.length === 0 ||
+      selectedGeneralTallas.length === 0
+    ) {
+      return [];
+    }
+    return getVariantesIgualesDisponibles(productos, {
+      productoIds: selectedGeneralProductIds,
+      tallas: selectedGeneralTallas,
+    });
+  }, [
+    generalImageOpen,
+    generalSoloVariantesIguales,
+    productos,
+    selectedGeneralProductIds,
+    selectedGeneralTallas,
+  ]);
 
   const handleSave = async (data: Partial<Producto>) => {
     try {
@@ -164,13 +214,14 @@ export default function AdminProductosPage() {
         if (talla) tallas.add(talla);
       }
     });
-    const availableTallas = [...tallas].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+    const availableTallas = [...tallas].sort(compareTallas);
     if (availableTallas.length === 0) {
       toast.error("No hay variantes disponibles con segunda imagen");
       return;
     }
     setImageProduct(producto);
     setSelectedTallas(availableTallas);
+    setSoloVariantesIguales(false);
   };
 
   const toggleSelectedTalla = (talla: string) => {
@@ -189,6 +240,7 @@ export default function AdminProductosPage() {
     setSelectedGeneralCategorias(categoriasParaImagenGeneral);
     setSelectedGeneralProductNames(nombresProductosParaImagenGeneral);
     setSelectedGeneralTallas(tallasParaImagenGeneral);
+    setGeneralSoloVariantesIguales(false);
     setGeneralImageOpen(true);
   };
 
@@ -225,7 +277,10 @@ export default function AdminProductosPage() {
     const producto = imageProduct;
     setDownloadingImageId(producto._id);
     try {
-      await generarImagenVariantesDisponibles(producto, { tallas: selectedTallas });
+      await generarImagenVariantesDisponibles(producto, {
+        tallas: selectedTallas,
+        agruparVariantesIguales: soloVariantesIguales,
+      });
       toast.success("Imagen de variantes descargada");
       setImageProduct(null);
     } catch (error) {
@@ -248,21 +303,16 @@ export default function AdminProductosPage() {
       toast.error("Selecciona al menos una talla");
       return;
     }
-    const categoriasSeleccionadas = new Set(selectedGeneralCategorias);
-    const productosSeleccionados = new Set(selectedGeneralProductNames.map((nombre) => nombre.toLocaleLowerCase("es")));
-    const selectedProductIds = productosParaImagenGeneral
-      .filter((producto) => categoriasSeleccionadas.has(producto.categoria?.trim() || "Sin categoria"))
-      .filter((producto) => productosSeleccionados.has((producto.nombre.trim() || "Sin nombre").toLocaleLowerCase("es")))
-      .map((producto) => producto._id);
-    if (selectedProductIds.length === 0) {
+    if (selectedGeneralProductIds.length === 0) {
       toast.error("No hay modelos disponibles para esa seleccion");
       return;
     }
     setDownloadingImageId("GENERAL");
     try {
       await generarImagenGeneralVariantesDisponibles(productos, {
-        productoIds: selectedProductIds,
+        productoIds: selectedGeneralProductIds,
         tallas: selectedGeneralTallas,
+        agruparVariantesIguales: generalSoloVariantesIguales,
       });
       toast.success("Imagen general descargada");
       setGeneralImageOpen(false);
@@ -481,9 +531,47 @@ export default function AdminProductosPage() {
                 </label>
               ))}
             </div>
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-sky-200 dark:border-cyan-500/30 bg-sky-50/70 dark:bg-cyan-950/30 p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={soloVariantesIguales}
+                onChange={(e) => setSoloVariantesIguales(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0"
+              />
+              <span>
+                <span className="block font-medium text-slate-900 dark:text-white">
+                  Solo variantes iguales (todas las tallas elegidas)
+                </span>
+                <span className="block text-xs text-slate-600 dark:text-gray-300 mt-0.5">
+                  Agrupa en 1 tarjeta por color mostrando todas las tallas elegidas. Si a un color le falta alguna talla, se oculta.
+                </span>
+                {soloVariantesIguales && selectedTallas.length > 0 && (
+                  <span
+                    className={`mt-1.5 block text-xs font-semibold ${
+                      singleImageMatchingGroups.length > 0
+                        ? "text-sky-700 dark:text-cyan-300"
+                        : "text-rose-600 dark:text-rose-400"
+                    }`}
+                  >
+                    {singleImageMatchingGroups.length > 0
+                      ? `${singleImageMatchingGroups.length} ${singleImageMatchingGroups.length === 1 ? "color coincide" : "colores coinciden"} con todas las tallas`
+                      : "Ningun color tiene todas las tallas seleccionadas"}
+                  </span>
+                )}
+              </span>
+            </label>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" className="btn-secondary" onClick={() => setImageProduct(null)}>Cancelar</button>
-              <button type="button" className="btn-primary" disabled={selectedTallas.length === 0 || downloadingImageId === imageProduct._id} onClick={() => void handleDownloadVariantsImage()}>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={
+                  selectedTallas.length === 0 ||
+                  downloadingImageId === imageProduct._id ||
+                  (soloVariantesIguales && singleImageMatchingGroups.length === 0)
+                }
+                onClick={() => void handleDownloadVariantsImage()}
+              >
                 {downloadingImageId === imageProduct._id ? "Generando..." : "Descargar imagen"}
               </button>
             </div>
@@ -496,6 +584,35 @@ export default function AdminProductosPage() {
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Imagen general de variantes</h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">Elige categorias, productos y tallas que quieres incluir.</p>
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-sky-200 dark:border-cyan-500/30 bg-sky-50/70 dark:bg-cyan-950/30 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={generalSoloVariantesIguales}
+                  onChange={(e) => setGeneralSoloVariantesIguales(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span>
+                  <span className="block font-medium text-slate-900 dark:text-white">
+                    Solo variantes iguales (mismo modelo y color en todas las tallas elegidas)
+                  </span>
+                  <span className="block text-xs text-slate-600 dark:text-gray-300 mt-0.5">
+                    Muestra 1 tarjeta por modelo y color con las tallas elegidas y su stock. Si falta alguna talla, ese modelo/color no se muestra.
+                  </span>
+                  {generalSoloVariantesIguales && selectedGeneralProductIds.length > 0 && selectedGeneralTallas.length > 0 && (
+                    <span
+                      className={`mt-1.5 block text-xs font-semibold ${
+                        generalMatchingGroups.length > 0
+                          ? "text-sky-700 dark:text-cyan-300"
+                          : "text-rose-600 dark:text-rose-400"
+                      }`}
+                    >
+                      {generalMatchingGroups.length > 0
+                        ? `${generalMatchingGroups.length} ${generalMatchingGroups.length === 1 ? "variante igual coincide" : "variantes iguales coinciden"} con todas las tallas`
+                        : "Ningun modelo y color tiene todas las tallas seleccionadas"}
+                    </span>
+                  )}
+                </span>
+              </label>
             </div>
             <div className="grid gap-6 xl:grid-cols-[240px_1fr_280px]">
               <section>
@@ -573,7 +690,18 @@ export default function AdminProductosPage() {
             </div>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className="btn-secondary" onClick={() => setGeneralImageOpen(false)}>Cancelar</button>
-              <button type="button" className="btn-primary" disabled={downloadingImageId === "GENERAL"} onClick={() => void handleDownloadGeneralVariantsImage()}>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={
+                  downloadingImageId === "GENERAL" ||
+                  (generalSoloVariantesIguales &&
+                    selectedGeneralProductIds.length > 0 &&
+                    selectedGeneralTallas.length > 0 &&
+                    generalMatchingGroups.length === 0)
+                }
+                onClick={() => void handleDownloadGeneralVariantsImage()}
+              >
                 {downloadingImageId === "GENERAL" ? "Generando..." : "Descargar imagen"}
               </button>
             </div>
