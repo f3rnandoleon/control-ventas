@@ -44,8 +44,14 @@ import { generateOrderedId } from "@/utils/generarId";
 import { assertObjectId } from "@/utils/validacion";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import type { Variante } from "@/types/producto";
-import { getVariantPricing } from "@/utils/pricing";
+import { getVariantPricing, getWebVariantPricing } from "@/utils/pricing";
 import type { SalesQueryInput } from "@/schemas/sales-query.schema";
+import {
+    evaluateWebResolvedItems,
+    reservePromotionsForOrder,
+    revertPromotionsForOrder,
+} from "@/modules/promotions/application/promotions.service";
+import type { EngineLineInput } from "@/modules/promotions/domain/promotion-engine";
 
 function createPedidoNumber(prefix = "P") {
     return generateOrderedId(prefix);
@@ -181,6 +187,7 @@ export async function releaseExpiredReservations(limit = 100) {
                         }
 
                         await releasePedidoReservation(pedido, session);
+                        await revertPromotionsForOrder(pedido._id, session);
 
                         pedido.estadoReservaStock = "RELEASED";
                         pedido.estadoPedido = "CANCELLED";
@@ -277,8 +284,10 @@ export async function crearPedidoCheckout(
 
     const result = await runInTransaction(async (session) => {
         const webDispatchBranchId = await getWebDispatchBranchId(session);
-        let itemsProcesados: Array<{
-            productoId: unknown;
+        const checkoutNow = new Date();
+        let cartCuponCodigo: string | null = null;
+        const rawPreparedItems: Array<{
+            productoId: mongoose.Types.ObjectId;
             variante: {
                 varianteId?: string;
                 color: string;
@@ -293,15 +302,8 @@ export async function crearPedidoCheckout(
                 sku?: string;
                 imagen?: string;
             };
-            cantidad: number;
-            precioUnitario: number;
-            totalLinea: number;
-            precioCosto: number;
-            ganancia: number;
+            engineLine: EngineLineInput;
         }> = [];
-
-        let subtotal = 0;
-        let gananciaTotal = 0;
 
         if (payload.items && payload.items.length > 0) {
             for (const itemInput of payload.items) {
@@ -351,16 +353,9 @@ export async function crearPedidoCheckout(
                     session
                 );
 
-                const pricing = getVariantPricing(producto, variante);
-                const effectivePrecioVenta = pricing.precioVenta;
-                const effectivePrecioCosto = pricing.precioCosto;
-                const totalLinea = effectivePrecioVenta * itemInput.cantidad;
-                const ganancia = (effectivePrecioVenta - effectivePrecioCosto) * itemInput.cantidad;
+                const webPricing = getWebVariantPricing(producto, variante, checkoutNow);
 
-                subtotal += totalLinea;
-                gananciaTotal += ganancia;
-
-                itemsProcesados.push({
+                rawPreparedItems.push({
                     productoId: producto._id,
                     variante: {
                         varianteId: variante.varianteId,
@@ -376,18 +371,26 @@ export async function crearPedidoCheckout(
                         sku: producto.sku,
                         imagen: (variante.imagenes && variante.imagenes[0]) || variante.imagen || producto.imagen,
                     },
-                    cantidad: itemInput.cantidad,
-                    precioUnitario: effectivePrecioVenta,
-                    totalLinea,
-                    precioCosto: effectivePrecioCosto,
-                    ganancia,
+                    engineLine: {
+                        productoId: producto._id.toString(),
+                        varianteId: variante.varianteId,
+                        color: variante.color,
+                        colorSecundario: variante.colorSecundario,
+                        talla: variante.talla,
+                        categoria: producto.categoria,
+                        cantidad: itemInput.cantidad,
+                        precioUnitarioLista: webPricing.precioLista,
+                        precioWebEfectivo: webPricing.precioVenta,
+                        precioCosto: webPricing.precioCosto,
+                        tieneRebajaCatalogo: webPricing.tieneRebaja,
+                    },
                 });
             }
         } else if (customerId) {
-            const { validatedItems } = await getValidatedCartForCheckout(customerId, session);
-            subtotal = validatedItems.reduce((sum, item) => sum + item.subtotal, 0);
+            const { cart, validatedItems } = await getValidatedCartForCheckout(customerId, session);
+            cartCuponCodigo = cart.cuponCodigo || null;
 
-            for (const { producto, variante, cartItem } of validatedItems) {
+            for (const { producto, variante, cartItem, webPricing } of validatedItems) {
                 if (getAvailableStockForVariant(variante) < cartItem.cantidad) {
                     throw new AppError(
                         `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
@@ -403,13 +406,8 @@ export async function crearPedidoCheckout(
                     },
                     session
                 );
-            }
 
-            itemsProcesados = validatedItems.map(({ producto, variante, cartItem, precioUnitario }) => {
-                const pricing = getVariantPricing(producto, variante);
-                const effectivePrecioCosto = pricing.precioCosto;
-                const ganancia = (precioUnitario - effectivePrecioCosto) * cartItem.cantidad;
-                return {
+                rawPreparedItems.push({
                     productoId: producto._id,
                     variante: {
                         varianteId: variante.varianteId,
@@ -425,20 +423,75 @@ export async function crearPedidoCheckout(
                         sku: producto.sku,
                         imagen: cartItem.productoSnapshot.imagen,
                     },
-                    cantidad: cartItem.cantidad,
-                    precioUnitario,
-                    totalLinea: precioUnitario * cartItem.cantidad,
-                    precioCosto: effectivePrecioCosto,
-                    ganancia,
-                };
-            });
-
-            gananciaTotal = itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0);
+                    engineLine: {
+                        productoId: producto._id.toString(),
+                        varianteId: variante.varianteId,
+                        color: variante.color,
+                        colorSecundario: variante.colorSecundario,
+                        talla: variante.talla,
+                        categoria: producto.categoria,
+                        cantidad: cartItem.cantidad,
+                        precioUnitarioLista: webPricing.precioLista,
+                        precioWebEfectivo: webPricing.precioVenta,
+                        precioCosto: webPricing.precioCosto,
+                        tieneRebajaCatalogo: webPricing.tieneRebaja,
+                    },
+                });
+            }
         } else {
             throw new AppError("No se proporcionaron items para el pedido", 400);
         }
 
-        const total = subtotal;
+        const telefonoContactoEvaluacion =
+            (snapshotEntrega?.telefono as string) ||
+            payload.clienteInvitado?.telefono ||
+            customer?.profile?.telefono ||
+            customer?.defaultAddress?.telefono ||
+            null;
+
+        const cuponCodigoFinal = payload.cuponCodigo || cartCuponCodigo || null;
+
+        const pricingEvaluation = await evaluateWebResolvedItems({
+            items: rawPreparedItems.map((item) => item.engineLine),
+            costoEnvio: 0,
+            cuponCodigo: cuponCodigoFinal,
+            clienteId: customer ? customer.user._id.toString() : null,
+            telefonoInvitado: telefonoContactoEvaluacion,
+            session,
+            now: checkoutNow,
+        });
+
+        if (payload.cuponCodigo && !pricingEvaluation.cuponValido) {
+            throw new AppError(
+                pricingEvaluation.cuponErrorMensaje ||
+                    `El cupón "${payload.cuponCodigo}" no es válido para este pedido`,
+                400
+            );
+        }
+
+        const itemsProcesados = rawPreparedItems.map((prepared, idx) => {
+            const evaluated = pricingEvaluation.items[idx];
+            return {
+                productoId: prepared.productoId,
+                variante: prepared.variante,
+                productoSnapshot: prepared.productoSnapshot,
+                cantidad: evaluated.cantidad,
+                precioUnitario: evaluated.precioUnitarioLista,
+                precioUnitarioLista: evaluated.precioUnitarioLista,
+                descuentoCatalogo: evaluated.descuentoCatalogo,
+                descuentoLinea: evaluated.descuentoLinea,
+                descuentoProrrateado: evaluated.descuentoProrrateado,
+                totalLinea: evaluated.totalLineaBruto,
+                totalLineaNeto: evaluated.totalLineaNeto,
+                precioCosto: evaluated.precioCosto,
+                ganancia: evaluated.gananciaNeta,
+            };
+        });
+
+        const subtotal = pricingEvaluation.subtotalLista;
+        const descuento = pricingEvaluation.descuentoTotal;
+        const total = pricingEvaluation.totalFinal;
+        const gananciaTotal = pricingEvaluation.gananciaTotalNeta;
         const estadoEntrega = metodoEntrega === "WHATSAPP" ? "NOT_APPLICABLE" : "PENDING";
 
         const snapshotCliente = customer
@@ -487,11 +540,26 @@ export async function crearPedidoCheckout(
             snapshotEntrega,
             items: itemsProcesados,
             subtotal,
-            descuento: 0,
+            descuento,
+            descuentoCatalogo: pricingEvaluation.descuentoCatalogo,
+            descuentoPromociones: pricingEvaluation.descuentoPromociones,
+            promocionesAplicadas: pricingEvaluation.promocionesAplicadas,
             total,
             gananciaTotal,
             notas: payload.notas || null,
         }, session);
+
+        if (pricingEvaluation.promocionesAplicadas.length > 0) {
+            await reservePromotionsForOrder(
+                pricingEvaluation.promocionesAplicadas,
+                pedido._id,
+                {
+                    clienteId: customer ? customer.user._id.toString() : null,
+                    telefonoInvitado: telefonoContactoEvaluacion,
+                },
+                session
+            );
+        }
 
         await syncFulfillmentForOrder(pedido, session);
 
@@ -841,6 +909,8 @@ export async function updateEstadoPedidoForStaff(
                 nextPayload.reservadoEn = null;
                 nextPayload.reservaExpiraEn = null;
             }
+
+            await revertPromotionsForOrder(currentPedido._id, session);
         }
 
         Object.assign(currentPedido, nextPayload);
@@ -884,6 +954,8 @@ export async function cancelPedidoForCustomer(id: string, customerId: string) {
         if (pedido.estadoReservaStock === "RESERVED") {
             await releasePedidoReservation(pedido, session);
         }
+
+        await revertPromotionsForOrder(pedido._id, session);
 
         pedido.estadoPedido = "CANCELLED";
         pedido.estadoPago = "FAILED";

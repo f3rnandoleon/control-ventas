@@ -5,7 +5,10 @@ import {
 } from "@/middleware/validate.middleware";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { addCartItemSchema } from "@/schemas/cart.schema";
-import { addCartItemByUserId } from "@/modules/cart/application/cart.service";
+import {
+  addCartItemByUserId,
+  enrichCartWithWebPricing,
+} from "@/modules/cart/application/cart.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
 export const runtime = "nodejs";
@@ -28,7 +31,8 @@ export async function POST(request: Request) {
       return validationErrorResponse(validation.errors);
     }
 
-    const cart = await addCartItemByUserId(userAuth.id, validation.data);
+    const rawCart = await addCartItemByUserId(userAuth.id, validation.data);
+    const cart = await enrichCartWithWebPricing(rawCart, userAuth.id);
 
     return NextResponse.json(
       {

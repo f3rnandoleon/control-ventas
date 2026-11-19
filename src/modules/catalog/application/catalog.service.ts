@@ -27,7 +27,7 @@ import Pedido from "@/models/pedido";
 import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sales";
 import type { Variante, Producto } from "@/types/producto";
 
-import { getVariantPricing } from "@/utils/pricing";
+import { getVariantPricing, getWebVariantPricing } from "@/utils/pricing";
 
 type ProductoPayload = Partial<Producto> & {
   variantes?: Variante[];
@@ -508,6 +508,7 @@ export type PublicCatalogFilters = {
   color?: string;
   talla?: string;
   soloDisponible?: boolean;
+  soloOfertas?: boolean;
   page?: number;
   limit?: number;
 };
@@ -610,6 +611,10 @@ export async function getPublicCatalog(filters: PublicCatalogFilters = {}) {
       .filter((producto) => producto.variantes.length > 0);
   }
 
+  if (filters.soloOfertas) {
+    procesados = procesados.filter((producto) => Boolean(producto.tieneRebaja));
+  }
+
   const total = procesados.length;
   const isPaged =
     (filters.page !== undefined && filters.page >= 1) ||
@@ -706,6 +711,7 @@ export async function findCatalogProductByCode(
   const pricing = getVariantPricing(producto, variante);
 
   if (isPublicOrClient) {
+    const webPricing = getWebVariantPricing(producto, variante);
     return {
       _id: producto._id,
       nombre: producto.nombre,
@@ -713,14 +719,20 @@ export async function findCatalogProductByCode(
       sku: producto.sku,
       descripcion: producto.descripcion || "",
       categoria: producto.categoria,
-      precioVenta: pricing.precioVenta,
+      precioLista: webPricing.precioLista,
+      precioVenta: webPricing.precioVenta,
+      tieneRebaja: webPricing.tieneRebaja,
+      porcentajeDescuento: webPricing.porcentajeDescuento,
       variante: {
         varianteId: variante.varianteId || "",
         color: variante.color,
         colorSecundario: variante.colorSecundario || null,
         talla: variante.talla,
         stockDisponible,
-        precioVenta: pricing.precioVenta,
+        precioLista: webPricing.precioLista,
+        precioVenta: webPricing.precioVenta,
+        tieneRebaja: webPricing.tieneRebaja,
+        porcentajeDescuento: webPricing.porcentajeDescuento,
         medidas: variante.medidas || {},
         imagen: getVarianteImagenPrincipal(variante) || null,
         imagenes: getVarianteImagenes(variante) || [],

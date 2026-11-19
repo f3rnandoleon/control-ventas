@@ -1,3 +1,5 @@
+import type { PromocionAplicadaSnapshot } from "@/types/promocion";
+
 export type CanalPedido = "WEB" | "APP_QR" | "TIENDA" | "WHATSAPP";
 export type EstadoPedido =
   | "PENDING_PAYMENT"
@@ -39,7 +41,12 @@ export interface PedidoItem {
   };
   cantidad: number;
   precioUnitario: number;
+  precioUnitarioLista?: number;
+  descuentoCatalogo?: number;
+  descuentoLinea?: number;
+  descuentoProrrateado?: number;
   totalLinea: number;
+  totalLineaNeto?: number;
   precioCosto: number;
   ganancia: number;
 }
@@ -56,6 +63,9 @@ export interface Pedido {
   subtotal: number;
   costoEnvio?: number;
   descuento: number;
+  descuentoCatalogo?: number;
+  descuentoPromociones?: number;
+  promocionesAplicadas?: PromocionAplicadaSnapshot[];
   total: number;
   gananciaTotal: number;
   idempotencyKey?: string | null;

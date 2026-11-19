@@ -31,10 +31,35 @@ const pedidoItemSchema = new Schema(
       required: true,
       min: 0,
     },
+    precioUnitarioLista: {
+      type: Number,
+      min: 0,
+      default: undefined,
+    },
+    descuentoCatalogo: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    descuentoLinea: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    descuentoProrrateado: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     totalLinea: {
       type: Number,
       required: true,
       min: 0,
+    },
+    totalLineaNeto: {
+      type: Number,
+      min: 0,
+      default: undefined,
     },
     precioCosto: {
       type: Number,
@@ -44,8 +69,28 @@ const pedidoItemSchema = new Schema(
     ganancia: {
       type: Number,
       required: true,
-      min: 0,
     },
+  },
+  { _id: false }
+);
+
+const promocionAplicadaSchema = new Schema(
+  {
+    promocionId: { type: Types.ObjectId, ref: "Promocion", required: true },
+    cuponId: { type: Types.ObjectId, ref: "Cupon", default: null },
+    codigoCupon: { type: String, default: null },
+    nombre: { type: String, required: true },
+    tipo: {
+      type: String,
+      enum: ["PORCENTAJE", "MONTO_FIJO", "NXM", "SEGUNDA_UNIDAD", "ENVIO_GRATIS"],
+      required: true,
+    },
+    alcance: {
+      type: String,
+      enum: ["PEDIDO", "PRODUCTOS", "CATEGORIAS", "ENVIO"],
+      required: true,
+    },
+    montoDescontado: { type: Number, required: true, min: 0 },
   },
   { _id: false }
 );
@@ -218,6 +263,20 @@ const pedidoSchema = new Schema(
       default: 0,
       min: 0,
     },
+    descuentoCatalogo: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    descuentoPromociones: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    promocionesAplicadas: {
+      type: [promocionAplicadaSchema],
+      default: [],
+    },
     total: {
       type: Number,
       required: true,
@@ -226,7 +285,6 @@ const pedidoSchema = new Schema(
     gananciaTotal: {
       type: Number,
       required: true,
-      min: 0,
     },
     idempotencyKey: {
       type: String,

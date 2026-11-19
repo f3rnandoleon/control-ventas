@@ -40,6 +40,55 @@ const varianteImageValueSchema = z.preprocess(
 // SCHEMAS DE PRODUCTO
 // ============================================
 
+const optionalDateSchema = z.preprocess(
+    (value) => {
+        if (value === "" || value === undefined || value === null) {
+            return null;
+        }
+        return value;
+    },
+    z.union([z.string(), z.date()]).nullable().optional()
+);
+
+/**
+ * Schema para rebaja de catálogo exclusiva Web ("Antes / Ahora")
+ */
+export const rebajaWebSchema = z
+    .object({
+        activa: z.boolean().default(false),
+        tipo: z.enum(["PORCENTAJE", "PRECIO_FIJO"]).default("PORCENTAJE"),
+        valor: nonNegativeNumberSchema.default(0),
+        fechaInicio: optionalDateSchema,
+        fechaFin: optionalDateSchema,
+    })
+    .superRefine((data, ctx) => {
+        if (data.activa && data.valor <= 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El valor de la rebaja web debe ser mayor a 0 cuando está activa",
+                path: ["valor"],
+            });
+        }
+        if (data.tipo === "PORCENTAJE" && data.valor > 95) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El porcentaje de rebaja web no puede superar el 95%",
+                path: ["valor"],
+            });
+        }
+        if (data.fechaInicio && data.fechaFin) {
+            const inicio = new Date(data.fechaInicio);
+            const fin = new Date(data.fechaFin);
+            if (!Number.isNaN(inicio.getTime()) && !Number.isNaN(fin.getTime()) && fin < inicio) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "La fecha fin debe ser posterior o igual a la fecha inicio",
+                    path: ["fechaFin"],
+                });
+            }
+        }
+    });
+
 /**
  * Schema para medidas de prenda (en centímetros)
  */
@@ -88,6 +137,11 @@ export const varianteSchema = z.object({
 
     precioCosto: nonNegativeNumberSchema.optional(),
 
+    precioOfertaWeb: z.preprocess(
+        (value) => (value === "" || value === undefined ? null : value),
+        nonNegativeNumberSchema.nullable().optional()
+    ),
+
     medidas: medidasPrendaSchema,
 }).refine(
     (data) => {
@@ -128,6 +182,8 @@ export const createProductoSchema = z.object({
         .optional(),
 
     categoria: z.string().optional().default("Chompas"),
+
+    rebajaWeb: rebajaWebSchema.optional().nullable(),
 
     variantes: z
         .array(varianteSchema)
@@ -175,6 +231,8 @@ export const updateProductoSchema = z.object({
         .optional(),
 
     categoria: z.string().optional(),
+
+    rebajaWeb: rebajaWebSchema.optional().nullable(),
 
     variantes: z
         .array(varianteSchema)

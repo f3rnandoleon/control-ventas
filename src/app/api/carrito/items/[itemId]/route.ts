@@ -6,6 +6,7 @@ import {
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { updateCartItemSchema } from "@/schemas/cart.schema";
 import {
+  enrichCartWithWebPricing,
   removeCartItemByUserId,
   updateCartItemByUserId,
 } from "@/modules/cart/application/cart.service";
@@ -36,7 +37,8 @@ export async function PUT(request: Request, context: Context) {
     }
 
     const { itemId } = await context.params;
-    const cart = await updateCartItemByUserId(userAuth.id, itemId, validation.data);
+    const rawCart = await updateCartItemByUserId(userAuth.id, itemId, validation.data);
+    const cart = await enrichCartWithWebPricing(rawCart, userAuth.id);
 
     return NextResponse.json({
       message: "Carrito actualizado correctamente",
@@ -63,7 +65,8 @@ export async function DELETE(request: Request, context: Context) {
     }
 
     const { itemId } = await context.params;
-    const cart = await removeCartItemByUserId(userAuth.id, itemId);
+    const rawCart = await removeCartItemByUserId(userAuth.id, itemId);
+    const cart = await enrichCartWithWebPricing(rawCart, userAuth.id);
 
     return NextResponse.json({
       message: "Item eliminado del carrito",

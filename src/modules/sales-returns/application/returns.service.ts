@@ -59,7 +59,33 @@ export async function procesarDevolucionCambio(
       const cant = Number(item.cantidad);
       if (cant <= 0) throw new AppError("Cantidad inválida para devolución", 400);
 
-      const precioUnit = Number(item.precioUnitario);
+      // Si el pedido original registró totalLineaNeto (prorrateo de rebajas/promociones web),
+      // reembolsar siempre el precio unitario neto realmente pagado por el cliente.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pedidoItemMatch = (pedido.items || []).find((pItem: any) => {
+        const sameProduct = String(pItem.productoId) === String(item.productoId);
+        if (!sameProduct) return false;
+        if (item.varianteId && pItem.variante?.varianteId) {
+          return String(pItem.variante.varianteId) === String(item.varianteId);
+        }
+        return (
+          (pItem.variante?.color || "") === (item.color || "") &&
+          (pItem.variante?.talla || "") === (item.talla || "")
+        );
+      });
+
+      const precioUnitarioNetoPedido =
+        pedidoItemMatch &&
+        pedidoItemMatch.totalLineaNeto !== undefined &&
+        pedidoItemMatch.totalLineaNeto !== null &&
+        Number(pedidoItemMatch.cantidad) > 0
+          ? Number((Number(pedidoItemMatch.totalLineaNeto) / Number(pedidoItemMatch.cantidad)).toFixed(2))
+          : null;
+
+      const precioUnit =
+        precioUnitarioNetoPedido !== null
+          ? precioUnitarioNetoPedido
+          : Number(item.precioUnitario);
       const subtotalItem = Number((cant * precioUnit).toFixed(2));
       montoDevolucion += subtotalItem;
 

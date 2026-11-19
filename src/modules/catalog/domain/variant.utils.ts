@@ -1,14 +1,14 @@
-import type { Variante } from "@/types/producto";
+import type { RebajaWeb, Variante } from "@/types/producto";
 import {
-  getVariantPricing,
-  getProductPriceRange,
-  formatProductPriceDisplay,
+  formatMoney,
+  getWebVariantPricing,
 } from "@/utils/pricing";
 
 type VariantStockShape = {
   stock?: number | null;
   stockReservado?: number | null;
   precioVenta?: number | null;
+  precioOfertaWeb?: number | null;
   varianteId?: string | null;
 };
 
@@ -58,22 +58,36 @@ export interface WebVariantStockRef {
 /**
  * Transforma un producto para la vista pública de catálogo/tienda web:
  * 1. Calcula las existencias reales basándose exclusivamente en sucursales autorizadas para despacho web.
- * 2. Resuelve el precioVenta efectivo por variante (fallback automático al precio base del producto).
- * 3. Incorpora métricas consolidadas: precioMinimo, precioMaximo, tieneRangoPrecios, precioDisplay y stockDisponible.
+ * 2. Resuelve el precioLista ("Antes") y precioVenta efectivo ("Ahora") por variante (exclusivo web).
+ * 3. Incorpora métricas consolidadas: precioMinimo, precioMaximo, precioMinimoLista, precioMaximoLista,
+ *    tieneRebaja, porcentajeDescuentoMaximo, tieneRangoPrecios, precioDisplay y stockDisponible.
  */
 export const withWebVariantAvailability = <
   T extends {
     _id?: unknown;
     precioVenta?: number;
+    rebajaWeb?: RebajaWeb | null;
+    descuento?: number | null;
     variantes?: Array<Record<string, unknown> & VariantStockShape>;
     stockTotal?: number;
   },
 >(
   producto: T,
-  webStockMap?: Map<string, WebVariantStockRef>
+  webStockMap?: Map<string, WebVariantStockRef>,
+  now: Date = new Date()
 ) => {
   const baseProductPrice = Number(producto.precioVenta || 0);
   const isTrackedByBranches = Boolean(webStockMap);
+
+  const productBasePricing = getWebVariantPricing(
+    {
+      precioVenta: baseProductPrice,
+      rebajaWeb: producto.rebajaWeb,
+      descuento: producto.descuento,
+    },
+    null,
+    now
+  );
 
   const variantesProcesadas = (producto.variantes ?? []).map((variante) => {
     const varKey = (variante.varianteId as string) || "";
@@ -97,40 +111,75 @@ export const withWebVariantAvailability = <
       stockDisponible = getVariantAvailableStock(variante);
     }
 
-    const pricing = getVariantPricing({ precioVenta: baseProductPrice }, variante);
-    const precioVenta = pricing.precioVenta;
+    const webPricing = getWebVariantPricing(
+      {
+        precioVenta: baseProductPrice,
+        rebajaWeb: producto.rebajaWeb,
+        descuento: producto.descuento,
+      },
+      variante,
+      now
+    );
 
     return {
       ...variante,
-      precioVenta,
+      precioLista: webPricing.precioLista,
+      precioVenta: webPricing.precioVenta,
+      tieneRebaja: webPricing.tieneRebaja,
+      porcentajeDescuento: webPricing.porcentajeDescuento,
       stock,
       stockReservado,
       stockDisponible,
     };
   });
 
-
   const stockTotalWeb = variantesProcesadas.reduce((acc, v) => acc + (v.stock || 0), 0);
   const stockReservadoWeb = variantesProcesadas.reduce((acc, v) => acc + (v.stockReservado || 0), 0);
   const stockDisponibleWeb = variantesProcesadas.reduce((acc, v) => acc + (v.stockDisponible || 0), 0);
 
-  const priceRange = getProductPriceRange({
-    precioVenta: baseProductPrice,
-    variantes: variantesProcesadas,
-  });
+  const effectivePrices =
+    variantesProcesadas.length > 0
+      ? variantesProcesadas.map((v) => v.precioVenta).filter((p) => Number.isFinite(p) && p > 0)
+      : [productBasePricing.precioVenta];
+  const listPrices =
+    variantesProcesadas.length > 0
+      ? variantesProcesadas.map((v) => v.precioLista).filter((p) => Number.isFinite(p) && p > 0)
+      : [productBasePricing.precioLista];
+
+  const precioMinimo = effectivePrices.length > 0 ? Math.min(...effectivePrices) : productBasePricing.precioVenta;
+  const precioMaximo = effectivePrices.length > 0 ? Math.max(...effectivePrices) : productBasePricing.precioVenta;
+  const precioMinimoLista = listPrices.length > 0 ? Math.min(...listPrices) : productBasePricing.precioLista;
+  const precioMaximoLista = listPrices.length > 0 ? Math.max(...listPrices) : productBasePricing.precioLista;
+
+  const tieneRangoPrecios = precioMinimo !== precioMaximo;
+  const precioDisplay = tieneRangoPrecios
+    ? `${formatMoney(precioMinimo)} - ${formatMoney(precioMaximo)}`
+    : formatMoney(precioMinimo);
+
+  const tieneRebaja =
+    variantesProcesadas.length > 0
+      ? variantesProcesadas.some((v) => v.tieneRebaja)
+      : productBasePricing.tieneRebaja;
+  const porcentajeDescuentoMaximo =
+    variantesProcesadas.length > 0
+      ? Math.max(0, ...variantesProcesadas.map((v) => v.porcentajeDescuento || 0))
+      : productBasePricing.porcentajeDescuento;
 
   return {
     ...producto,
+    precioLista: productBasePricing.precioLista,
+    precioVenta: productBasePricing.precioVenta,
+    tieneRebaja,
+    porcentajeDescuentoMaximo,
     stockTotal: stockTotalWeb,
     stockReservadoTotal: stockReservadoWeb,
     stockDisponible: stockDisponibleWeb,
-    precioMinimo: priceRange.precioMinimo,
-    precioMaximo: priceRange.precioMaximo,
-    tieneRangoPrecios: priceRange.tieneRango,
-    precioDisplay: formatProductPriceDisplay({
-      precioVenta: baseProductPrice,
-      variantes: variantesProcesadas,
-    }),
+    precioMinimo,
+    precioMaximo,
+    precioMinimoLista,
+    precioMaximoLista,
+    tieneRangoPrecios,
+    precioDisplay,
     variantes: variantesProcesadas,
   };
 };

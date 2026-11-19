@@ -28,6 +28,7 @@ const varianteSchema = new Schema(
     qrCode: { type: String },
     precioVenta: { type: Number, min: 0 },
     precioCosto: { type: Number, min: 0 },
+    precioOfertaWeb: { type: Number, min: 0, default: null },
     medidas: { type: medidasSchema, default: undefined },
   },
   { _id: false }
@@ -101,11 +102,29 @@ const productoSchema = new Schema(
       },
     },
 
-    descuento: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
+    rebajaWeb: {
+      activa: {
+        type: Boolean,
+        default: false,
+      },
+      tipo: {
+        type: String,
+        enum: ["PORCENTAJE", "PRECIO_FIJO"],
+        default: "PORCENTAJE",
+      },
+      valor: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      fechaInicio: {
+        type: Date,
+        default: null,
+      },
+      fechaFin: {
+        type: Date,
+        default: null,
+      },
     },
 
 

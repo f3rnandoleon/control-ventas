@@ -64,6 +64,12 @@ const carritoSchema = new Schema(
       default: 0,
       min: 0,
     },
+    cuponCodigo: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      default: null,
+    },
   },
   {
     timestamps: true,

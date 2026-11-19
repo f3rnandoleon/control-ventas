@@ -66,6 +66,13 @@ export const checkoutCartSchema = z
     items: z.array(checkoutItemSchema).optional(),
     metodoPago: z.enum(["EFECTIVO", "QR"]),
     direccionId: optionalObjectIdSchema,
+    cuponCodigo: z
+      .string()
+      .trim()
+      .max(40, "El código de cupón no puede exceder 40 caracteres")
+      .transform((val) => (val ? val.toUpperCase() : null))
+      .nullable()
+      .optional(),
     notas: nonEmptyStringSchema
       .max(300, "Las notas no pueden exceder 300 caracteres")
       .optional(),

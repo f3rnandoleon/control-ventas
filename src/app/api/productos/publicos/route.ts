@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const color = searchParams.get("color") || undefined;
     const talla = searchParams.get("talla") || undefined;
     const soloDisponible = searchParams.get("soloDisponible") === "true";
+    const soloOfertas = searchParams.get("soloOfertas") === "true";
     const pageParam = searchParams.get("page");
     const limitParam = searchParams.get("limit");
 
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
       color,
       talla,
       soloDisponible,
+      soloOfertas,
       page,
       limit,
     });

@@ -4,9 +4,18 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Producto } from "@/types/producto";
+import { Producto, RebajaWeb } from "@/types/producto";
 import { createProductoSchema } from "@/schemas/producto.schema";
 import { getAjustesAdmin } from "@/services/ajustes.service";
+import { getWebVariantPricing } from "@/utils/pricing";
+
+function toDateTimeLocalValue(date?: string | Date | null): string {
+  if (!date) return "";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 type ProductoFormValues = z.input<typeof createProductoSchema>;
 type ProductoFormSubmitValues = z.output<typeof createProductoSchema>;
@@ -87,6 +96,22 @@ export default function ProductoForm({
     }
   }, [costoPEN, tipoCambio, monedaCosto, setValue]);
 
+  const [rebajaActiva, setRebajaActiva] = useState<boolean>(
+    Boolean(initialData?.rebajaWeb?.activa)
+  );
+  const [rebajaTipo, setRebajaTipo] = useState<"PORCENTAJE" | "PRECIO_FIJO">(
+    initialData?.rebajaWeb?.tipo === "PRECIO_FIJO" ? "PRECIO_FIJO" : "PORCENTAJE"
+  );
+  const [rebajaValor, setRebajaValor] = useState<number>(
+    Number(initialData?.rebajaWeb?.valor || 0)
+  );
+  const [rebajaFechaInicio, setRebajaFechaInicio] = useState<string>(
+    toDateTimeLocalValue(initialData?.rebajaWeb?.fechaInicio)
+  );
+  const [rebajaFechaFin, setRebajaFechaFin] = useState<string>(
+    toDateTimeLocalValue(initialData?.rebajaWeb?.fechaFin)
+  );
+
   const [categoriaSelect, setCategoriaSelect] = useState(() => {
     const isKnown = ["Chompas", "Poleras", "Ponchos"].includes(
       initialData?.categoria || "Chompas"
@@ -99,6 +124,24 @@ export default function ProductoForm({
     precioVentaWatched > 0
       ? Math.round((gananciaEstimada / precioVentaWatched) * 100)
       : 0;
+
+  const rebajaPreviewDraft: RebajaWeb = {
+    activa: rebajaActiva,
+    tipo: rebajaTipo,
+    valor: rebajaValor,
+    fechaInicio: rebajaFechaInicio ? new Date(rebajaFechaInicio).toISOString() : null,
+    fechaFin: rebajaFechaFin ? new Date(rebajaFechaFin).toISOString() : null,
+  };
+  const webPricingPreview = getWebVariantPricing(
+    {
+      precioVenta: precioVentaWatched,
+      precioCosto: precioCostoWatched,
+      rebajaWeb: rebajaActiva
+        ? { ...rebajaPreviewDraft, fechaInicio: null, fechaFin: null }
+        : null,
+    },
+    null
+  );
 
   return (
     <form
@@ -125,6 +168,19 @@ export default function ProductoForm({
           ...data,
           precioCosto: data.precioCosto || 0,
           costoOrigen: costoOrigenSnapshot,
+          rebajaWeb: {
+            activa: rebajaActiva,
+            tipo: rebajaTipo,
+            valor: rebajaActiva ? Math.max(0, Number(rebajaValor || 0)) : 0,
+            fechaInicio:
+              rebajaActiva && rebajaFechaInicio
+                ? new Date(rebajaFechaInicio).toISOString()
+                : null,
+            fechaFin:
+              rebajaActiva && rebajaFechaFin
+                ? new Date(rebajaFechaFin).toISOString()
+                : null,
+          },
         };
 
         if (initialData?._id) {
@@ -389,6 +445,112 @@ export default function ProductoForm({
           </span>
         </div>
       )}
+
+      {/* Sección: Rebaja de Catálogo Exclusiva Web ("Antes / Ahora") */}
+      <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 space-y-3 dark:border-amber-500/30 dark:bg-amber-950/20">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Rebaja Web (&quot;Antes / Ahora&quot;)
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Solo aplica en la tienda online. El precio del POS físico no cambia.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rebajaActiva}
+              onChange={(e) => setRebajaActiva(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+              {rebajaActiva ? "Activa" : "Inactiva"}
+            </span>
+          </label>
+        </div>
+
+        {rebajaActiva && (
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label text-xs">Tipo de rebaja</label>
+                <select
+                  value={rebajaTipo}
+                  onChange={(e) =>
+                    setRebajaTipo(e.target.value as "PORCENTAJE" | "PRECIO_FIJO")
+                  }
+                  className="input w-full text-sm"
+                >
+                  <option value="PORCENTAJE">Porcentaje (% OFF)</option>
+                  <option value="PRECIO_FIJO">Precio oferta fijo (Bs)</option>
+                </select>
+              </div>
+              <div>
+                <label className="label text-xs">
+                  {rebajaTipo === "PORCENTAJE" ? "Descuento (%)" : "Precio Ahora (Bs)"}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={rebajaTipo === "PORCENTAJE" ? 95 : undefined}
+                  step="0.01"
+                  value={rebajaValor || ""}
+                  onChange={(e) => setRebajaValor(Number(e.target.value) || 0)}
+                  placeholder={rebajaTipo === "PORCENTAJE" ? "Ej: 20" : "Ej: 150.00"}
+                  className="input w-full text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label text-xs">Desde (Opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={rebajaFechaInicio}
+                  onChange={(e) => setRebajaFechaInicio(e.target.value)}
+                  className="input w-full text-xs"
+                />
+              </div>
+              <div>
+                <label className="label text-xs">Hasta (Opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={rebajaFechaFin}
+                  onChange={(e) => setRebajaFechaFin(e.target.value)}
+                  className="input w-full text-xs"
+                />
+              </div>
+            </div>
+
+            {precioVentaWatched > 0 && (
+              <div className="rounded-lg bg-white/80 dark:bg-slate-900/60 border border-amber-200/70 dark:border-white/10 p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-600 dark:text-slate-300">
+                  POS: <strong>Bs {precioVentaWatched.toFixed(2)}</strong>
+                </span>
+                <span className="text-slate-700 dark:text-slate-200">
+                  Web:{" "}
+                  {webPricingPreview.tieneRebaja ? (
+                    <>
+                      <span className="line-through text-slate-400 mr-1.5">
+                        Bs {webPricingPreview.precioLista.toFixed(2)}
+                      </span>
+                      <strong className="text-emerald-600 dark:text-emerald-400">
+                        Bs {webPricingPreview.precioVenta.toFixed(2)} (-{webPricingPreview.porcentajeDescuento}%)
+                      </strong>
+                    </>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      Ingrese un valor válido menor al precio lista
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <button type="submit" className="btn-primary w-full justify-center">
         {initialData?._id ? "Actualizar producto" : "Guardar producto"}

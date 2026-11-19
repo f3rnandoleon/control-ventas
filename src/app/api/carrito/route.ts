@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import {
   clearCartByUserId,
-  getCartByUserId,
+  enrichCartWithWebPricing,
+  getCartWithPricingByUserId,
 } from "@/modules/cart/application/cart.service";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 
-    const cart = await getCartByUserId(userAuth.id);
+    const cart = await getCartWithPricingByUserId(userAuth.id);
     return NextResponse.json(cart);
   } catch (error) {
     return handleRouteError(error, {
@@ -42,7 +43,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ message: "No autorizado" }, { status: 403 });
     }
 
-    const cart = await clearCartByUserId(userAuth.id);
+    const rawCart = await clearCartByUserId(userAuth.id);
+    const cart = await enrichCartWithWebPricing(rawCart, userAuth.id);
     return NextResponse.json({
       message: "Carrito vaciado correctamente",
       cart,

@@ -1,4 +1,4 @@
-import { Producto, Variante } from "@/types/producto";
+import { Producto, RebajaWeb, Variante } from "@/types/producto";
 
 export const formatMoney = (value: number) => `Bs ${Number(value || 0).toFixed(2)}`;
 
@@ -7,6 +7,13 @@ export interface VariantPricingResult {
   precioCosto: number;
   ganancia: number;
   tienePrecioDiferenciado: boolean;
+}
+
+export interface WebVariantPricingResult extends VariantPricingResult {
+  precioLista: number;
+  descuentoUnitario: number;
+  porcentajeDescuento: number;
+  tieneRebaja: boolean;
 }
 
 export interface ProductPriceRangeResult {
@@ -51,6 +58,115 @@ export function getVariantPricing(
     precioCosto,
     ganancia,
     tienePrecioDiferenciado,
+  };
+}
+
+/**
+ * Determina si una rebaja de catálogo web está activa y vigente en el instante `now`.
+ */
+export function isRebajaWebVigente(
+  rebajaWeb?: RebajaWeb | null,
+  now: Date = new Date()
+): boolean {
+  if (!rebajaWeb || !rebajaWeb.activa) return false;
+  if (!Number.isFinite(Number(rebajaWeb.valor)) || Number(rebajaWeb.valor) <= 0) {
+    return false;
+  }
+
+  const nowMs = now.getTime();
+
+  if (rebajaWeb.fechaInicio) {
+    const inicio = new Date(rebajaWeb.fechaInicio);
+    if (!Number.isNaN(inicio.getTime()) && nowMs < inicio.getTime()) {
+      return false;
+    }
+  }
+
+  if (rebajaWeb.fechaFin) {
+    const fin = new Date(rebajaWeb.fechaFin);
+    if (!Number.isNaN(fin.getTime()) && nowMs > fin.getTime()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Calcula el precio efectivo exclusivo para el canal WEB ("Antes / Ahora").
+ * No altera el comportamiento de `getVariantPricing` usado por el POS físico.
+ * Prioridad:
+ * 1. `variante.precioOfertaWeb` si es > 0 y < precioLista (y sin fechas vencidas o rebaja activa)
+ * 2. `producto.rebajaWeb` si está activa y vigente
+ * 3. Fallback legado `producto.descuento` (0..100) si aún existiera en documentos sin migrar
+ */
+export function getWebVariantPricing(
+  producto: {
+    precioVenta: number;
+    precioCosto?: number | null;
+    rebajaWeb?: RebajaWeb | null;
+    descuento?: number | null;
+  },
+  variante?:
+    | {
+        precioVenta?: number | null;
+        precioCosto?: number | null;
+        precioOfertaWeb?: number | null;
+      }
+    | Record<string, unknown>
+    | null,
+  now: Date = new Date()
+): WebVariantPricingResult {
+  const base = getVariantPricing(producto, variante);
+  const precioLista = Number(base.precioVenta.toFixed(2));
+  const v = variante as { precioOfertaWeb?: number | null } | null | undefined;
+
+  let precioFinal = precioLista;
+
+  const variantOffer =
+    v?.precioOfertaWeb !== undefined && v?.precioOfertaWeb !== null
+      ? Number(v.precioOfertaWeb)
+      : 0;
+
+  if (variantOffer > 0 && variantOffer < precioLista) {
+    precioFinal = Number(variantOffer.toFixed(2));
+  } else if (isRebajaWebVigente(producto.rebajaWeb, now)) {
+    const rebaja = producto.rebajaWeb!;
+    const valor = Number(rebaja.valor || 0);
+    if (rebaja.tipo === "PRECIO_FIJO") {
+      if (valor > 0 && valor < precioLista) {
+        precioFinal = Number(valor.toFixed(2));
+      }
+    } else {
+      const pct = Math.min(95, Math.max(0, valor));
+      precioFinal = Number(Math.max(0, precioLista * (1 - pct / 100)).toFixed(2));
+    }
+  } else if (
+    !producto.rebajaWeb &&
+    producto.descuento !== undefined &&
+    producto.descuento !== null &&
+    Number(producto.descuento) > 0 &&
+    Number(producto.descuento) < 100
+  ) {
+    const pct = Math.min(95, Math.max(0, Number(producto.descuento)));
+    precioFinal = Number(Math.max(0, precioLista * (1 - pct / 100)).toFixed(2));
+  }
+
+  const descuentoUnitario = Number(Math.max(0, precioLista - precioFinal).toFixed(2));
+  const tieneRebaja = descuentoUnitario > 0 && precioLista > 0;
+  const porcentajeDescuento = tieneRebaja
+    ? Math.round((descuentoUnitario / precioLista) * 100)
+    : 0;
+
+  return {
+    precioLista,
+    precioVenta: precioFinal,
+    precioCosto: base.precioCosto,
+    ganancia: Number((precioFinal - base.precioCosto).toFixed(2)),
+    tienePrecioDiferenciado: base.tienePrecioDiferenciado,
+    descuentoUnitario,
+    porcentajeDescuento,
+    tieneRebaja,
   };
 }
 

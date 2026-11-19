@@ -1361,5 +1361,63 @@ Cada variante de producto en `GET /api/public/productos` cuenta con un arreglo d
 
 ---
 
+---
+
+## 12. Módulo 7: Rebajas de Catálogo ("Antes / Ahora"), Promociones y Cupones Web
+
+> **Regla de arquitectura (SSOT):** Todas las rebajas de catálogo web, promociones automáticas y cupones se configuran en el Sistema Central (`control-ventas`) y se evalúan exclusivamente en el servidor. La web **nunca** envía montos de descuento al checkout; solo envía `cuponCodigo` opcional.
+
+### 12.1 Rebajas de Catálogo ("Antes / Ahora") en `GET /api/productos/publicos`
+* Filtro opcional: `GET /api/productos/publicos?soloOfertas=true` para obtener únicamente prendas con rebaja web vigente.
+* Campos adicionales expuestos en cada producto y variante (exclusivo canal `WEB`, el POS mantiene el precio de lista):
+  * Producto: `precioLista`, `precioVenta` (efectivo web), `tieneRebaja`, `porcentajeDescuentoMaximo`, `precioMinimoLista`, `precioMaximoLista`, `precioMinimo`, `precioMaximo`.
+  * Variante: `precioLista` ("Antes"), `precioVenta` ("Ahora"), `tieneRebaja`, `porcentajeDescuento`.
+
+### 12.2 Promociones Automáticas Activas (`GET /api/public/promociones`)
+* **Autenticación:** Pública.
+* **Respuesta:** Arreglo de promociones `AUTOMATICA` vigentes para el canal `WEB` (`nombre`, `descripcion`, `tipo`, `valor`, `reglaNxM`, `descuentoMaximo`, `alcance`, `categoriasIncluidas`, `productosIncluidos`, `condiciones`, `acumulable`, `acumulableConRebajasCatalogo`, `fechaInicio`, `fechaFin`).
+
+### 12.3 Evaluar Preview de Carrito / Invitado (`POST /api/public/promociones/evaluar`)
+* **Autenticación:** Pública (o Bearer `CLIENTE` opcional para validar límites por cliente / primera compra).
+* **Body:**
+```json
+{
+  "items": [
+    {
+      "productoId": "67...",
+      "varianteId": "67...",
+      "color": "Negro",
+      "talla": "M",
+      "cantidad": 2
+    }
+  ],
+  "cuponCodigo": "INVIERNO15",
+  "costoEnvio": 0,
+  "telefonoInvitado": "71234567"
+}
+```
+* **Respuesta (`200`):** Devuelve `subtotalLista`, `subtotalPostCatalogo`, `descuentoCatalogo`, `descuentoPromociones`, `descuentoEnvio`, `descuentoTotal`, `totalFinal`, `promocionesAplicadas[]`, `cuponValido`, `cuponErrorCodigo`, `cuponErrorMensaje` y el prorrateo por línea (`items[]`).
+* **Códigos de rechazo de cupón (`cuponErrorCodigo`):** `CUPON_INVALIDO`, `CUPON_EXPIRADO`, `CUPON_LIMITE_ALCANZADO`, `SOLO_PRIMERA_COMPRA`, `MONTO_MINIMO_NO_ALCANZADO`, `CANTIDAD_MINIMA_NO_ALCANZADA`, `NO_APLICA_A_PRODUCTOS`, `NO_ACUMULABLE`.
+
+### 12.4 Aplicar o Quitar Cupón en Carrito Autenticado
+* `POST /api/carrito/cupon` (Bearer `CLIENTE`): Body `{ "codigo": "INVIERNO15" }` → valida el cupón contra el carrito actual, lo guarda en `Carrito.cuponCodigo` y devuelve `{ message, cart }` con `cart.resumenPrecios`.
+* `DELETE /api/carrito/cupon` (Bearer `CLIENTE`): Quita el cupón y devuelve `{ message, cart }` recalculado.
+* `GET /api/carrito` incluye `cuponCodigo` y `resumenPrecios` calculados en vivo.
+
+### 12.5 Checkout con Cupón (`POST /api/pedidos/checkout`)
+* Agregar campo opcional `"cuponCodigo": "INVIERNO15"` en el payload del checkout (válido para clientes autenticados e invitados).
+* El servidor revalida rebajas "Antes/Ahora", promociones automáticas y cupón dentro de la misma transacción ACID que reserva stock y crea `TransaccionPago`.
+* Si la reserva de 30 minutos expira o el pedido se cancela, el uso del cupón/promoción se revierte automáticamente.
+
+### 12.6 Gestión Admin por API (Rol `ADMIN`)
+* `GET / POST /api/admin/promociones`
+* `GET / PATCH / DELETE /api/admin/promociones/:id`
+* `PATCH /api/admin/promociones/:id/toggle`
+* `GET /api/admin/promociones/:id/usos`
+* `GET / POST /api/admin/cupones`
+* `PATCH / DELETE /api/admin/cupones/:id`
+
+---
+
 > 📌 **¿Dudas o nuevas integraciones?**  
 > Para consultas sobre la API omnicanal, contacta al equipo de desarrollo central o revisa también [ENDPOINTS_PUBLICOS_Y_EXTERNOS.md](file:///c:/proyectos/control-ventas/ENDPOINTS_PUBLICOS_Y_EXTERNOS.md) y [GUIA_AGENTE_WHATSAPP_ENDPOINTS.md](file:///c:/proyectos/control-ventas/GUIA_AGENTE_WHATSAPP_ENDPOINTS.md).

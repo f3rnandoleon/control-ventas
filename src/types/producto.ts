@@ -18,6 +18,14 @@ export interface SucursalStockInfo {
   stockDisponible: number;
 }
 
+export interface RebajaWeb {
+  activa: boolean;
+  tipo: "PORCENTAJE" | "PRECIO_FIJO";
+  valor: number;
+  fechaInicio?: string | Date | null;
+  fechaFin?: string | Date | null;
+}
+
 export interface Variante {
   varianteId?: string;
   color: string;
@@ -34,6 +42,10 @@ export interface Variante {
   qrCode?: string;
   precioVenta?: number;      // Opcional: sobreescribe Producto.precioVenta si se define
   precioCosto?: number;      // Opcional: sobreescribe Producto.precioCosto si se define
+  precioOfertaWeb?: number | null; // Opcional: precio fijo "Ahora" exclusivo web para esta variante
+  precioLista?: number;      // Calculado en catálogo público web ("Antes")
+  tieneRebaja?: boolean;     // Calculado en catálogo público web
+  porcentajeDescuento?: number; // Calculado en catálogo público web
   medidas?: MedidasPrenda;   // Opcional: medidas en cm
 }
 
@@ -46,6 +58,11 @@ export interface Producto {
   precioCosto: number;
   totalVendidos: number;
   categoria?: string;
+  rebajaWeb?: RebajaWeb | null;
+  tieneRebaja?: boolean;
+  porcentajeDescuentoMaximo?: number;
+  precioMinimoLista?: number;
+  precioMaximoLista?: number;
   variantes: Variante[];
   stockTotal?: number;
   stockReservadoTotal?: number;
