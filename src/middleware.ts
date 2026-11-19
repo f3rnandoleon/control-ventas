@@ -71,6 +71,8 @@ export async function middleware(request: NextRequest) {
     pathname === "/register"
   ) {
     rlResult = checkRateLimit(`auth:${ip}`, RATE_LIMIT_CONFIGS.AUTH);
+  } else if (pathname === "/api/public/promociones/evaluar" && method === "POST") {
+    rlResult = checkRateLimit(`promo-eval:${ip}`, RATE_LIMIT_CONFIGS.WRITE);
   } else if (
     pathname.startsWith("/api/productos/publicos") ||
     pathname.startsWith("/api/productos/by-code") ||

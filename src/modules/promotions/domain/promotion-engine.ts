@@ -187,6 +187,51 @@ function allocateProportionally(
   return allocatedSoFar;
 }
 
+function distributeUnitDiscounts(
+  lineRawDiscounts: Map<MutableLineState, number>,
+  rawTotalInput: number,
+  descuentoMaximo?: number | null
+): number {
+  const rawTotal = roundMoney(rawTotalInput);
+  const cappedTotal =
+    descuentoMaximo && descuentoMaximo > 0 ? roundMoney(Math.min(rawTotal, descuentoMaximo)) : rawTotal;
+  if (cappedTotal <= 0 || rawTotal <= 0) return 0;
+
+  const ratio = cappedTotal / rawTotal;
+  const entries = Array.from(lineRawDiscounts.entries());
+  let appliedTotal = 0;
+
+  for (let i = 0; i < entries.length; i++) {
+    const [line, rawLineDisc] = entries[i];
+    const isLast = i === entries.length - 1;
+    const share = isLast
+      ? roundMoney(Math.min(line.remaining, cappedTotal - appliedTotal))
+      : roundMoney(Math.min(line.remaining, rawLineDisc * ratio));
+
+    if (share > 0) {
+      line.descuentoLinea = roundMoney(line.descuentoLinea + share);
+      line.remaining = roundMoney(Math.max(0, line.remaining - share));
+      appliedTotal = roundMoney(appliedTotal + share);
+    }
+  }
+
+  let diff = roundMoney(cappedTotal - appliedTotal);
+  if (diff > 0) {
+    for (const [line] of entries) {
+      if (diff <= 0) break;
+      const extra = roundMoney(Math.min(line.remaining, diff));
+      if (extra > 0) {
+        line.descuentoLinea = roundMoney(line.descuentoLinea + extra);
+        line.remaining = roundMoney(Math.max(0, line.remaining - extra));
+        appliedTotal = roundMoney(appliedTotal + extra);
+        diff = roundMoney(cappedTotal - appliedTotal);
+      }
+    }
+  }
+
+  return appliedTotal;
+}
+
 function applyNxMDiscount(
   eligibleLines: MutableLineState[],
   regla: ReglaNxM,
@@ -223,30 +268,7 @@ function applyNxMDiscount(
     rawTotal += target.unitRemaining;
   }
 
-  rawTotal = roundMoney(rawTotal);
-  const cappedTotal =
-    descuentoMaximo && descuentoMaximo > 0 ? roundMoney(Math.min(rawTotal, descuentoMaximo)) : rawTotal;
-  if (cappedTotal <= 0) return 0;
-
-  const ratio = rawTotal > 0 ? cappedTotal / rawTotal : 0;
-  const entries = Array.from(lineRawDiscounts.entries());
-  let appliedTotal = 0;
-
-  for (let i = 0; i < entries.length; i++) {
-    const [line, rawLineDisc] = entries[i];
-    const isLast = i === entries.length - 1;
-    const share = isLast
-      ? roundMoney(Math.min(line.remaining, cappedTotal - appliedTotal))
-      : roundMoney(Math.min(line.remaining, rawLineDisc * ratio));
-
-    if (share > 0) {
-      line.descuentoLinea = roundMoney(line.descuentoLinea + share);
-      line.remaining = roundMoney(Math.max(0, line.remaining - share));
-      appliedTotal = roundMoney(appliedTotal + share);
-    }
-  }
-
-  return appliedTotal;
+  return distributeUnitDiscounts(lineRawDiscounts, rawTotal, descuentoMaximo);
 }
 
 function applySecondUnitDiscount(
@@ -282,30 +304,7 @@ function applySecondUnitDiscount(
     rawTotal += disc;
   }
 
-  rawTotal = roundMoney(rawTotal);
-  const cappedTotal =
-    descuentoMaximo && descuentoMaximo > 0 ? roundMoney(Math.min(rawTotal, descuentoMaximo)) : rawTotal;
-  if (cappedTotal <= 0) return 0;
-
-  const ratio = rawTotal > 0 ? cappedTotal / rawTotal : 0;
-  const entries = Array.from(lineRawDiscounts.entries());
-  let appliedTotal = 0;
-
-  for (let i = 0; i < entries.length; i++) {
-    const [line, rawLineDisc] = entries[i];
-    const isLast = i === entries.length - 1;
-    const share = isLast
-      ? roundMoney(Math.min(line.remaining, cappedTotal - appliedTotal))
-      : roundMoney(Math.min(line.remaining, rawLineDisc * ratio));
-
-    if (share > 0) {
-      line.descuentoLinea = roundMoney(line.descuentoLinea + share);
-      line.remaining = roundMoney(Math.max(0, line.remaining - share));
-      appliedTotal = roundMoney(appliedTotal + share);
-    }
-  }
-
-  return appliedTotal;
+  return distributeUnitDiscounts(lineRawDiscounts, rawTotal, descuentoMaximo);
 }
 
 interface EvaluationFailure {
@@ -498,8 +497,9 @@ export function evaluatePromotionsEngine(
   let cuponErrorMensaje: string | null = null;
 
   // 1. Construir cola ordenada de candidatos:
-  //    Las promociones de nivel línea/combo (PRODUCTOS/CATEGORIAS/NXM/SEGUNDA_UNIDAD) se evalúan
-  //    antes que las de carrito (PEDIDO), y dentro de cada grupo por prioridad ascendente.
+  //    Prioridad explícita ascendente (menor número = mayor prioridad); ante empate,
+  //    reglas de línea/combo (phase 1) antes que carrito (phase 2) y envío (phase 3),
+  //    y finalmente el cupón explícito del cliente.
   interface CandidateRule {
     promo: EnginePromocionRule;
     cupon?: EngineCuponContext | null;
@@ -540,9 +540,9 @@ export function evaluatePromotionsEngine(
   }
 
   candidates.sort((a, b) => {
-    if (a.phase !== b.phase) return a.phase - b.phase;
     if (a.promo.prioridad !== b.promo.prioridad) return a.promo.prioridad - b.promo.prioridad;
-    // Si empatan en fase y prioridad, priorizar el cupón que ingresó explícitamente el cliente
+    if (a.phase !== b.phase) return a.phase - b.phase;
+    // Si empatan en prioridad y fase, priorizar el cupón que ingresó explícitamente el cliente
     const aIsCoupon = a.cupon ? 0 : 1;
     const bIsCoupon = b.cupon ? 0 : 1;
     return aIsCoupon - bIsCoupon;

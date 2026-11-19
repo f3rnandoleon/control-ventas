@@ -156,6 +156,93 @@ export const varianteSchema = z.object({
     }
 );
 
+export interface ProductWebDiscountIssue {
+    path: (string | number)[];
+    message: string;
+}
+
+export function getProductWebDiscountIssues(data: {
+    precioVenta?: number | null;
+    precioCosto?: number | null;
+    rebajaWeb?: {
+        activa?: boolean;
+        tipo?: "PORCENTAJE" | "PRECIO_FIJO";
+        valor?: number;
+    } | null;
+    variantes?: Array<{
+        color?: string;
+        talla?: string;
+        precioVenta?: number | null;
+        precioCosto?: number | null;
+        precioOfertaWeb?: number | null;
+    }>;
+}): ProductWebDiscountIssue[] {
+    const issues: ProductWebDiscountIssue[] = [];
+    const basePrice = Number(data.precioVenta || 0);
+    const baseCost = Number(data.precioCosto || 0);
+
+    if (data.rebajaWeb?.activa && basePrice > 0) {
+        const valor = Number(data.rebajaWeb.valor || 0);
+        if (data.rebajaWeb.tipo === "PRECIO_FIJO" && valor >= basePrice) {
+            issues.push({
+                path: ["rebajaWeb", "valor"],
+                message: "El precio oferta fijo debe ser menor al precio de venta",
+            });
+        }
+        const effectiveWebPrice =
+            data.rebajaWeb.tipo === "PRECIO_FIJO"
+                ? valor
+                : Number((basePrice * (1 - Math.min(95, Math.max(0, valor)) / 100)).toFixed(2));
+        if (baseCost > 0 && effectiveWebPrice < baseCost) {
+            issues.push({
+                path: ["rebajaWeb", "valor"],
+                message: "La rebaja web no puede dejar el precio por debajo del precio de costo",
+            });
+        }
+    }
+
+    (data.variantes || []).forEach((v, idx) => {
+        const offer = v.precioOfertaWeb;
+        if (offer !== null && offer !== undefined && Number(offer) > 0) {
+            const varPrice = v.precioVenta && Number(v.precioVenta) > 0 ? Number(v.precioVenta) : basePrice;
+            const varCost = v.precioCosto && Number(v.precioCosto) > 0 ? Number(v.precioCosto) : baseCost;
+            const variantLabel = v.color && v.talla ? ` (${v.color}/${v.talla})` : "";
+            if (varPrice > 0 && Number(offer) >= varPrice) {
+                issues.push({
+                    path: ["variantes", idx, "precioOfertaWeb"],
+                    message: `El precio oferta web de la variante${variantLabel} debe ser menor al precio de venta`,
+                });
+            }
+            if (varCost > 0 && Number(offer) < varCost) {
+                issues.push({
+                    path: ["variantes", idx, "precioOfertaWeb"],
+                    message: `El precio oferta web de la variante${variantLabel} no puede ser menor al precio de costo`,
+                });
+            }
+        }
+    });
+
+    return issues;
+}
+
+function validateWebDiscountsOnProduct(
+    data: {
+        precioVenta?: number;
+        precioCosto?: number;
+        rebajaWeb?: z.infer<typeof rebajaWebSchema> | null;
+        variantes?: Array<z.infer<typeof varianteSchema>>;
+    },
+    ctx: z.RefinementCtx
+) {
+    for (const issue of getProductWebDiscountIssues(data)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: issue.message,
+            path: issue.path,
+        });
+    }
+}
+
 /**
  * Schema para crear un producto
  */
@@ -201,7 +288,7 @@ export const createProductoSchema = z.object({
         message: "El precio de venta debe ser mayor al precio de costo",
         path: ["precioVenta"],
     }
-);
+).superRefine(validateWebDiscountsOnProduct);
 
 /**
  * Schema para actualizar un producto
@@ -248,7 +335,7 @@ export const updateProductoSchema = z.object({
         message: "El precio de venta debe ser mayor al precio de costo",
         path: ["precioVenta"],
     }
-);
+).superRefine(validateWebDiscountsOnProduct);
 
 // ============================================
 // TIPOS INFERIDOS

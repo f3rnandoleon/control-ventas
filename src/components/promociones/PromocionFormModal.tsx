@@ -135,13 +135,20 @@ export default function PromocionFormModal({
         nombre: nombre.trim(),
         descripcion: descripcion.trim(),
         estado,
-        canales: ["WEB"],
+        canales:
+          editing?.canales && editing.canales.length > 0 ? editing.canales : ["WEB"],
         metodoActivacion,
         tipo,
         valor: tipo === "NXM" || tipo === "ENVIO_GRATIS" ? 0 : Number(valor || 0),
         reglaNxM: tipo === "NXM" ? { lleva: Number(lleva), paga: Number(paga) } : null,
         descuentoMaximo: descuentoMaximo ? Number(descuentoMaximo) : null,
         alcance: tipo === "ENVIO_GRATIS" ? "ENVIO" : alcance,
+        ...(editing?.productosIncluidos
+          ? { productosIncluidos: editing.productosIncluidos }
+          : {}),
+        ...(editing?.productosExcluidos
+          ? { productosExcluidos: editing.productosExcluidos }
+          : {}),
         categoriasIncluidas,
         condiciones: {
           montoMinimoCompra: Number(montoMinimoCompra || 0),
@@ -321,6 +328,11 @@ export default function PromocionFormModal({
                 >
                   <option value="PEDIDO">Todo el pedido</option>
                   <option value="CATEGORIAS">Por categorías</option>
+                  {editing?.alcance === "PRODUCTOS" && (
+                    <option value="PRODUCTOS">
+                      Por productos ({editing.productosIncluidos?.length || 0})
+                    </option>
+                  )}
                 </select>
               </div>
             )}
