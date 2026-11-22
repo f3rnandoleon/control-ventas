@@ -11,6 +11,18 @@ const medidasSchema = new Schema(
   { _id: false }
 );
 
+const medidaTallaSchema = new Schema(
+  {
+    talla: { type: String, required: true, trim: true },
+    anchoPecho: { type: Number, min: 0 },
+    anchoHombros: { type: Number, min: 0 },
+    largoTotal: { type: Number, min: 0 },
+    largoMangaAxila: { type: Number, min: 0 },
+    largoMangaHombro: { type: Number, min: 0 },
+  },
+  { _id: false }
+);
+
 const varianteSchema = new Schema(
   {
     varianteId: {
@@ -128,6 +140,11 @@ const productoSchema = new Schema(
     },
 
 
+
+    medidasPorTalla: {
+      type: [medidaTallaSchema],
+      default: [],
+    },
 
     variantes: {
       type: [varianteSchema],

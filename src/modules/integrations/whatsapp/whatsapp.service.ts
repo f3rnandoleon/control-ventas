@@ -846,12 +846,36 @@ export async function getWhatsAppProductMeasurements(productoId: string) {
     nombre?: string;
     modelo?: string;
     categoria?: string;
+    medidasPorTalla?: Array<{
+      talla?: string;
+      anchoPecho?: number;
+      anchoHombros?: number;
+      largoTotal?: number;
+      largoMangaAxila?: number;
+      largoMangaHombro?: number;
+    }>;
     variantes?: Array<{
       talla?: string;
       color?: string;
       medidas?: Record<string, unknown>;
     }>;
   };
+
+  // Mapa de medidas oficiales definidas a nivel de producto por talla
+  const productoMedidasMap = new Map<string, Record<string, unknown>>();
+  for (const item of prod.medidasPorTalla || []) {
+    const tKey = typeof item?.talla === "string" ? item.talla.trim().toLowerCase() : "";
+    if (!tKey) continue;
+    const clean: Record<string, unknown> = {};
+    if (typeof item.anchoPecho === "number" && item.anchoPecho > 0) clean.anchoPecho = item.anchoPecho;
+    if (typeof item.anchoHombros === "number" && item.anchoHombros > 0) clean.anchoHombros = item.anchoHombros;
+    if (typeof item.largoTotal === "number" && item.largoTotal > 0) clean.largoTotal = item.largoTotal;
+    if (typeof item.largoMangaAxila === "number" && item.largoMangaAxila > 0) clean.largoMangaAxila = item.largoMangaAxila;
+    if (typeof item.largoMangaHombro === "number" && item.largoMangaHombro > 0) clean.largoMangaHombro = item.largoMangaHombro;
+    if (Object.keys(clean).length > 0) {
+      productoMedidasMap.set(tKey, clean);
+    }
+  }
 
   const tallasMap = new Map<
     string,
@@ -869,16 +893,35 @@ export async function getWhatsAppProductMeasurements(productoId: string) {
 
   for (const v of variantes) {
     const t = v.talla || "Única";
+    const medidasProducto = productoMedidasMap.get(t.trim().toLowerCase());
     if (!tallasMap.has(t)) {
       tallasMap.set(t, {
         colores: new Set<string>(),
-        medidas: v.medidas || undefined,
+        medidas: medidasProducto || v.medidas || undefined,
       });
     }
     const entry = tallasMap.get(t)!;
     if (v.color) entry.colores.add(v.color);
-    if (!entry.medidas && v.medidas) {
-      entry.medidas = v.medidas;
+    if (!entry.medidas && (medidasProducto || v.medidas)) {
+      entry.medidas = medidasProducto || v.medidas;
+    }
+  }
+
+  // Incluir tallas que existan en medidasPorTalla aunque todavía no tengan variantes registradas
+  for (const item of prod.medidasPorTalla || []) {
+    const t = typeof item?.talla === "string" ? item.talla.trim() : "";
+    if (!t) continue;
+    const alreadyExists = Array.from(tallasMap.keys()).some(
+      (existing) => existing.trim().toLowerCase() === t.toLowerCase()
+    );
+    if (!alreadyExists) {
+      const m = productoMedidasMap.get(t.toLowerCase());
+      if (m) {
+        tallasMap.set(t, {
+          colores: new Set<string>(),
+          medidas: m,
+        });
+      }
     }
   }
 

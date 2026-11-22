@@ -28,6 +28,11 @@ import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sa
 import type { Variante, Producto } from "@/types/producto";
 
 import { getVariantPricing, getWebVariantPricing } from "@/utils/pricing";
+import {
+  buildEffectiveMedidasPorTalla,
+  resolveMedidasForTalla,
+  sanitizeMedidasPorTalla,
+} from "@/utils/medidas";
 import { getProductWebDiscountIssues } from "@/schemas/producto.schema";
 
 type ProductoPayload = Partial<Producto> & {
@@ -142,7 +147,8 @@ export async function getCatalogProductById(id: string) {
     throw new AppError("Producto no encontrado", 404);
   }
 
-  return producto;
+  const raw = typeof producto.toObject === "function" ? producto.toObject() : producto;
+  return withVariantAvailability(raw as CatalogProductLike);
 }
 
 export async function createCatalogProduct(
@@ -196,6 +202,9 @@ export async function createCatalogProduct(
     ...data,
     sku,
     creadoPor: userId,
+    ...(Array.isArray(data.medidasPorTalla)
+      ? { medidasPorTalla: sanitizeMedidasPorTalla(data.medidasPorTalla) }
+      : {}),
     variantes: variantesProcesadas,
   });
 
@@ -331,11 +340,33 @@ export async function updateCatalogProduct(
     throw new AppError(discountIssues[0].message, 400);
   }
 
+  // Si se actualiza explícitamente la guía de tallas a nivel de producto, sanitizarla y
+  // limpiar medidas legacy duplicadas en variantes para mantener una única fuente de verdad
+  const hasExplicitMedidasPorTalla = Array.isArray(data.medidasPorTalla);
+  const medidasPorTallaSanitizadas = hasExplicitMedidasPorTalla
+    ? sanitizeMedidasPorTalla(data.medidasPorTalla)
+    : undefined;
+
+  let variantesFinales = variantesProcesadas;
+  if (hasExplicitMedidasPorTalla) {
+    const baseVariantes = Array.isArray(variantesProcesadas)
+      ? variantesProcesadas
+      : ((typeof productoAntes.toObject === "function"
+          ? productoAntes.toObject().variantes
+          : productoAntes.variantes) as Variante[]);
+    variantesFinales = (baseVariantes || []).map((v) => {
+      const rest = { ...v };
+      delete rest.medidas;
+      return rest;
+    });
+  }
+
   const updatePayload = {
     ...data,
     precioCosto: precioCostoSeguro,
     sku: nuevoSKU,
-    ...(Array.isArray(variantesProcesadas) ? { variantes: variantesProcesadas } : {}),
+    ...(hasExplicitMedidasPorTalla ? { medidasPorTalla: medidasPorTallaSanitizadas } : {}),
+    ...(Array.isArray(variantesFinales) ? { variantes: variantesFinales } : {}),
   };
 
   const productoDespues = await catalogRepository.updateById(id, updatePayload);
@@ -728,6 +759,12 @@ export async function findCatalogProductByCode(
   }
 
   const pricing = getVariantPricing(producto, variante);
+  const effectiveMedidasPorTalla = buildEffectiveMedidasPorTalla(producto);
+  const resolvedVariantMedidas = resolveMedidasForTalla(
+    { medidasPorTalla: effectiveMedidasPorTalla, variantes: producto.variantes as Variante[] },
+    variante.talla,
+    variante.medidas
+  );
 
   if (isPublicOrClient) {
     const webPricing = getWebVariantPricing(producto, variante);
@@ -738,6 +775,7 @@ export async function findCatalogProductByCode(
       sku: producto.sku,
       descripcion: producto.descripcion || "",
       categoria: producto.categoria,
+      medidasPorTalla: effectiveMedidasPorTalla,
       precioLista: webPricing.precioLista,
       precioVenta: webPricing.precioVenta,
       tieneRebaja: webPricing.tieneRebaja,
@@ -752,7 +790,7 @@ export async function findCatalogProductByCode(
         precioVenta: webPricing.precioVenta,
         tieneRebaja: webPricing.tieneRebaja,
         porcentajeDescuento: webPricing.porcentajeDescuento,
-        medidas: variante.medidas || {},
+        medidas: resolvedVariantMedidas || {},
         imagen: getVarianteImagenPrincipal(variante) || null,
         imagenes: getVarianteImagenes(variante) || [],
         codigoBarra: variante.codigoBarra || null,
@@ -768,6 +806,7 @@ export async function findCatalogProductByCode(
     sku: producto.sku,
     descripcion: producto.descripcion,
     categoria: producto.categoria,
+    medidasPorTalla: effectiveMedidasPorTalla,
     precioVenta: pricing.precioVenta,
     variante: {
       varianteId: variante.varianteId || "",
@@ -779,7 +818,7 @@ export async function findCatalogProductByCode(
       stockDisponible,
       precioVenta: pricing.precioVenta,
       precioCosto: pricing.precioCosto,
-      medidas: variante.medidas,
+      medidas: resolvedVariantMedidas,
       imagen: getVarianteImagenPrincipal(variante),
       imagenes: getVarianteImagenes(variante),
       codigoBarra: variante.codigoBarra,

@@ -6,6 +6,10 @@ export interface MedidasPrenda {
   largoMangaHombro?: number; // Largo de manga (hombro a manga) en cm
 }
 
+export interface MedidaTallaItem extends MedidasPrenda {
+  talla: string;
+}
+
 export interface SucursalStockInfo {
   sucursalId: string;
   nombre: string;
@@ -63,6 +67,7 @@ export interface Producto {
   porcentajeDescuentoMaximo?: number;
   precioMinimoLista?: number;
   precioMaximoLista?: number;
+  medidasPorTalla?: MedidaTallaItem[]; // Guía de tallas compartida a nivel de producto (aplica a todos los colores)
   variantes: Variante[];
   stockTotal?: number;
   stockReservadoTotal?: number;

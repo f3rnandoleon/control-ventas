@@ -183,6 +183,14 @@ Los clientes no reciben `precioCosto`, `variantes.codigoBarra` ni `variantes.qrC
   "stockReservadoTotal": 1,
   "stockDisponible": 13,
   "estado": "ACTIVO",
+  "medidasPorTalla": [
+    {
+      "talla": "M",
+      "anchoPecho": 52,
+      "anchoHombros": 44,
+      "largoTotal": 68
+    }
+  ],
   "variantes": [
     {
       "varianteId": "var-alp-neg-m",

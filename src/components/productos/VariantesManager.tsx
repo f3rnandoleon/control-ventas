@@ -11,6 +11,7 @@ import { generarPDFQrs } from "@/utils/generarPDFQrs";
 import { generarPDFCodigosBarras } from "@/utils/generarPDFCodigosBarras";
 import GuiaTallasModal from "./GuiaTallasModal";
 import ColorSwatch from "@/components/ui/ColorSwatch";
+import { buildEffectiveMedidasPorTalla, resolveMedidasForTalla } from "@/utils/medidas";
 
 type Mode = "LIST" | "ADD" | "EDIT";
 
@@ -21,10 +22,12 @@ const getVariantGroupKey = (variante: Pick<Variante, "color" | "colorSecundario"
 
 export default function VariantesManager({
   producto,
+  allProductos = [],
   onUpdated,
 }: {
   producto: Producto;
-  onUpdated: () => void;
+  allProductos?: Producto[];
+  onUpdated: () => void | Promise<void>;
 }) {
   const [mode, setMode] = useState<Mode>("LIST");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -55,6 +58,11 @@ export default function VariantesManager({
       setLoading(false);
     }
   };
+
+  const effectiveMedidasPorTalla = useMemo(
+    () => buildEffectiveMedidasPorTalla(producto),
+    [producto]
+  );
 
   // KPIs y estadísticas resumidas
   const { totalVariantes, totalStock, coloresUnicos, variantesConQRCount, variantesConBarCodeCount } =
@@ -155,6 +163,7 @@ export default function VariantesManager({
           }
           initialVariantes={mode === "EDIT" ? variantesDelGrupo : undefined}
           existingVariantes={producto.variantes}
+          medidasPorTalla={effectiveMedidasPorTalla}
           precioBaseVenta={producto.precioVenta}
           precioBaseCosto={producto.precioCosto}
           onSave={(data) => {
@@ -319,11 +328,17 @@ export default function VariantesManager({
 
         <button
           type="button"
-          className="flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-gray-200 font-semibold text-xs px-3 py-2 transition active:scale-95 cursor-pointer shadow-sm"
+          className="flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-sky-200 dark:border-cyan-500/30 bg-sky-50 hover:bg-sky-100 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 text-sky-800 dark:text-cyan-300 font-bold text-xs px-3 py-2 transition active:scale-95 cursor-pointer shadow-sm"
           onClick={() => setShowGuiaTallas(true)}
+          title="Configurar medidas en cm por talla (aplica a todos los colores)"
         >
           <span>📏</span>
-          <span>Guía de tallas</span>
+          <span>
+            Guía de tallas{" "}
+            {effectiveMedidasPorTalla.length > 0
+              ? `(${effectiveMedidasPorTalla.length})`
+              : "(Configurar)"}
+          </span>
         </button>
       </div>
 
@@ -446,11 +461,16 @@ export default function VariantesManager({
           {variantesFiltradas.map((v, index) => {
             // Ubicar el índice original en producto.variantes para onDelete
             const originalIndex = producto.variantes.indexOf(v);
+            const medidasResueltas = resolveMedidasForTalla(
+              { medidasPorTalla: effectiveMedidasPorTalla, variantes: producto.variantes },
+              v.talla,
+              v.medidas
+            );
 
             return (
               <VarianteCard
                 key={v.varianteId || `${v.color}-${v.colorSecundario || ""}-${v.talla}-${index}`}
-                variante={v}
+                variante={{ ...v, medidas: medidasResueltas }}
                 precioBaseVenta={producto.precioVenta}
                 precioBaseCosto={producto.precioCosto}
                 onEdit={() => {
@@ -486,11 +506,16 @@ export default function VariantesManager({
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {variantesFiltradas.map((v, index) => {
                 const originalIndex = producto.variantes.indexOf(v);
+                const medidasResueltas = resolveMedidasForTalla(
+                  { medidasPorTalla: effectiveMedidasPorTalla, variantes: producto.variantes },
+                  v.talla,
+                  v.medidas
+                );
 
                 return (
                   <VarianteRow
                     key={v.varianteId || `${v.color}-${v.colorSecundario || ""}-${v.talla}-${index}`}
-                    variante={v}
+                    variante={{ ...v, medidas: medidasResueltas }}
                     precioBaseVenta={producto.precioVenta}
                     precioBaseCosto={producto.precioCosto}
                     onEdit={() => {
@@ -511,11 +536,13 @@ export default function VariantesManager({
         </div>
       )}
 
-      {/* Modal Guía de Tallas */}
+      {/* Modal Guía de Tallas (Editable a nivel de producto) */}
       <GuiaTallasModal
         producto={producto}
+        allProductos={allProductos}
         isOpen={showGuiaTallas}
         onClose={() => setShowGuiaTallas(false)}
+        onUpdated={onUpdated}
       />
     </div>
   );

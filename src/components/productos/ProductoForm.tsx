@@ -1,13 +1,59 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Producto, RebajaWeb } from "@/types/producto";
+import { MedidaTallaItem, Producto, RebajaWeb } from "@/types/producto";
 import { createProductoSchema } from "@/schemas/producto.schema";
 import { getAjustesAdmin } from "@/services/ajustes.service";
 import { getWebVariantPricing } from "@/utils/pricing";
+import { TALLA_OPTIONS } from "@/constants/variant-options";
+import {
+  buildEffectiveMedidasPorTalla,
+  compareTallasOrden,
+  hasMedidasValues,
+  sanitizeMedidasPorTalla,
+} from "@/utils/medidas";
+
+type MedidaRowDraft = {
+  talla: string;
+  anchoPecho: string;
+  anchoHombros: string;
+  largoTotal: string;
+  largoMangaAxila: string;
+  largoMangaHombro: string;
+};
+
+const numToInput = (v?: number) => (typeof v === "number" && v > 0 ? String(v) : "");
+const inputToNum = (v: string) => {
+  const n = Number(v.trim());
+  return v.trim() && Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+function initMedidasRows(initialData?: Partial<Producto>): MedidaRowDraft[] {
+  const effective = buildEffectiveMedidasPorTalla(initialData);
+  const byKey = new Map<string, MedidaTallaItem>();
+  for (const item of effective) {
+    byKey.set(item.talla.trim().toLowerCase(), item);
+  }
+  for (const v of initialData?.variantes || []) {
+    const t = v.talla?.trim();
+    if (t && !byKey.has(t.toLowerCase())) {
+      byKey.set(t.toLowerCase(), { talla: t });
+    }
+  }
+  return Array.from(byKey.values())
+    .sort((a, b) => compareTallasOrden(a.talla, b.talla))
+    .map((m) => ({
+      talla: m.talla,
+      anchoPecho: numToInput(m.anchoPecho),
+      anchoHombros: numToInput(m.anchoHombros),
+      largoTotal: numToInput(m.largoTotal),
+      largoMangaAxila: numToInput(m.largoMangaAxila),
+      largoMangaHombro: numToInput(m.largoMangaHombro),
+    }));
+}
 
 function toDateTimeLocalValue(date?: string | Date | null): string {
   if (!date) return "";
@@ -22,9 +68,11 @@ type ProductoFormSubmitValues = z.output<typeof createProductoSchema>;
 
 export default function ProductoForm({
   initialData,
+  allProductos = [],
   onSubmit,
 }: {
   initialData?: Partial<Producto>;
+  allProductos?: Producto[];
   onSubmit: (data: Partial<Producto>) => void;
 }) {
   // Modalidad de moneda de costo: "PEN" (Soles) o "BOB" (Bolivianos)
@@ -119,6 +167,36 @@ export default function ProductoForm({
     return isKnown ? initialData?.categoria || "Chompas" : "Otra";
   });
 
+  // Guía de tallas a nivel de producto (se llena 1 vez por talla, aplica a todos los colores)
+  const [medidasRows, setMedidasRows] = useState<MedidaRowDraft[]>(() =>
+    initMedidasRows(initialData)
+  );
+  const [showGuiaTallasSection, setShowGuiaTallasSection] = useState<boolean>(() =>
+    buildEffectiveMedidasPorTalla(initialData).length > 0
+  );
+  const [medidasDirty, setMedidasDirty] = useState<boolean>(false);
+  const [tallaNuevaMedida, setTallaNuevaMedida] = useState<string>("");
+
+  const productosConMedidas = useMemo(() => {
+    return allProductos
+      .filter((p) => p._id !== initialData?._id)
+      .map((p) => ({
+        producto: p,
+        medidas: buildEffectiveMedidasPorTalla(p),
+      }))
+      .filter((entry) => entry.medidas.length > 0);
+  }, [allProductos, initialData?._id]);
+
+  const medidasConfiguradasCount = medidasRows.filter((r) =>
+    hasMedidasValues({
+      anchoPecho: inputToNum(r.anchoPecho),
+      anchoHombros: inputToNum(r.anchoHombros),
+      largoTotal: inputToNum(r.largoTotal),
+      largoMangaAxila: inputToNum(r.largoMangaAxila),
+      largoMangaHombro: inputToNum(r.largoMangaHombro),
+    })
+  ).length;
+
   const gananciaEstimada = precioVentaWatched - precioCostoWatched;
   const margenPorcentaje =
     precioVentaWatched > 0
@@ -181,6 +259,20 @@ export default function ProductoForm({
                 ? new Date(rebajaFechaFin).toISOString()
                 : null,
           },
+          ...((!initialData?._id || medidasDirty)
+            ? {
+                medidasPorTalla: sanitizeMedidasPorTalla(
+                  medidasRows.map((r) => ({
+                    talla: r.talla,
+                    anchoPecho: inputToNum(r.anchoPecho),
+                    anchoHombros: inputToNum(r.anchoHombros),
+                    largoTotal: inputToNum(r.largoTotal),
+                    largoMangaAxila: inputToNum(r.largoMangaAxila),
+                    largoMangaHombro: inputToNum(r.largoMangaHombro),
+                  }))
+                ),
+              }
+            : {}),
         };
 
         if (initialData?._id) {
@@ -546,6 +638,192 @@ export default function ProductoForm({
                     </span>
                   )}
                 </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Sección: Guía de Tallas y Medidas por Producto */}
+      <div className="rounded-xl border border-sky-200/80 bg-sky-50/40 p-4 space-y-3 dark:border-cyan-500/25 dark:bg-cyan-950/15">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span>📏</span>
+              <span>Guía de Tallas y Medidas (opcional)</span>
+              {medidasConfiguradasCount > 0 && (
+                <span className="rounded-full bg-sky-100 dark:bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-800 dark:text-cyan-300">
+                  {medidasConfiguradasCount} {medidasConfiguradasCount === 1 ? "talla" : "tallas"}
+                </span>
+              )}
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Llena las medidas en cm una sola vez por talla y aplicarán a todos los colores del producto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowGuiaTallasSection((prev) => !prev)}
+            className="shrink-0 rounded-lg border border-sky-200 dark:border-cyan-500/30 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-cyan-300 hover:bg-sky-50 dark:hover:bg-slate-700 transition cursor-pointer"
+          >
+            {showGuiaTallasSection ? "Ocultar" : "Configurar"}
+          </button>
+        </div>
+
+        {showGuiaTallasSection && (
+          <div className="space-y-3 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <select
+                  value={tallaNuevaMedida}
+                  onChange={(e) => setTallaNuevaMedida(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="">+ Agregar talla...</option>
+                  {TALLA_OPTIONS.map((t) => (
+                    <option
+                      key={t}
+                      value={t}
+                      disabled={medidasRows.some(
+                        (r) => r.talla.toLowerCase() === t.toLowerCase()
+                      )}
+                    >
+                      Talla {t}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!tallaNuevaMedida}
+                  onClick={() => {
+                    if (!tallaNuevaMedida) return;
+                    setMedidasDirty(true);
+                    setMedidasRows((prev) =>
+                      [
+                        ...prev,
+                        {
+                          talla: tallaNuevaMedida,
+                          anchoPecho: "",
+                          anchoHombros: "",
+                          largoTotal: "",
+                          largoMangaAxila: "",
+                          largoMangaHombro: "",
+                        },
+                      ].sort((a, b) => compareTallasOrden(a.talla, b.talla))
+                    );
+                    setTallaNuevaMedida("");
+                  }}
+                  className="rounded-lg bg-sky-600 hover:bg-sky-500 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-40 cursor-pointer"
+                >
+                  Añadir
+                </button>
+              </div>
+
+              {productosConMedidas.length > 0 && (
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    const source = productosConMedidas.find(
+                      (p) => p.producto._id === e.target.value
+                    );
+                    if (!source) return;
+                    setMedidasDirty(true);
+                    setMedidasRows(
+                      source.medidas.map((m) => ({
+                        talla: m.talla,
+                        anchoPecho: numToInput(m.anchoPecho),
+                        anchoHombros: numToInput(m.anchoHombros),
+                        largoTotal: numToInput(m.largoTotal),
+                        largoMangaAxila: numToInput(m.largoMangaAxila),
+                        largoMangaHombro: numToInput(m.largoMangaHombro),
+                      }))
+                    );
+                    e.target.value = "";
+                  }}
+                  className="max-w-[220px] rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="">📋 Copiar de otro producto...</option>
+                  {productosConMedidas.map(({ producto: p, medidas }) => (
+                    <option key={p._id} value={p._id}>
+                      {p.nombre} ({p.modelo}) · {medidas.length} tallas
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {medidasRows.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-300 dark:border-white/15 p-3 text-center text-xs text-slate-500 dark:text-gray-400">
+                Agrega una talla (S, M, L, XL, 4, 6...) para registrar sus medidas en cm.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/70">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-gray-400 uppercase font-semibold">
+                    <tr>
+                      <th className="py-2 px-2">Talla</th>
+                      <th className="py-2 px-1.5">Pecho</th>
+                      <th className="py-2 px-1.5">Hombros</th>
+                      <th className="py-2 px-1.5">Largo</th>
+                      <th className="py-2 px-1.5">M. Axila</th>
+                      <th className="py-2 px-1.5">M. Hombro</th>
+                      <th className="py-2 px-1.5 text-center">✕</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                    {medidasRows.map((row, idx) => (
+                      <tr key={row.talla}>
+                        <td className="py-1.5 px-2 font-mono font-bold text-sky-700 dark:text-cyan-300">
+                          {row.talla}
+                        </td>
+                        {(
+                          [
+                            "anchoPecho",
+                            "anchoHombros",
+                            "largoTotal",
+                            "largoMangaAxila",
+                            "largoMangaHombro",
+                          ] as const
+                        ).map((field) => (
+                          <td key={field} className="py-1.5 px-1">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              placeholder="cm"
+                              value={row[field]}
+                              onChange={(e) => {
+                                setMedidasDirty(true);
+                                const val = e.target.value;
+                                setMedidasRows((prev) =>
+                                  prev.map((r, i) =>
+                                    i === idx ? { ...r, [field]: val } : r
+                                  )
+                                );
+                              }}
+                              className="w-16 rounded border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 px-1.5 py-1 text-xs font-mono text-slate-900 dark:text-white"
+                            />
+                          </td>
+                        ))}
+                        <td className="py-1.5 px-1 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMedidasDirty(true);
+                              setMedidasRows((prev) =>
+                                prev.filter((_, i) => i !== idx)
+                              );
+                            }}
+                            className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
+                            title="Quitar talla"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

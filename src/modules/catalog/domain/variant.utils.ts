@@ -1,15 +1,21 @@
-import type { RebajaWeb, Variante } from "@/types/producto";
+import type { MedidaTallaItem, MedidasPrenda, RebajaWeb, Variante } from "@/types/producto";
 import {
   formatMoney,
   getWebVariantPricing,
 } from "@/utils/pricing";
+import {
+  buildEffectiveMedidasPorTalla,
+  resolveMedidasForTalla,
+} from "@/utils/medidas";
 
 type VariantStockShape = {
+  talla?: string | null;
   stock?: number | null;
   stockReservado?: number | null;
   precioVenta?: number | null;
   precioOfertaWeb?: number | null;
   varianteId?: string | null;
+  medidas?: MedidasPrenda | null;
 };
 
 export const matchesVariant = (current: Variante, target: Variante) => {
@@ -35,19 +41,30 @@ export const getVariantAvailableStock = (
 
 export const withVariantAvailability = <
   T extends {
+    medidasPorTalla?: MedidaTallaItem[] | null;
     variantes?: Array<Record<string, unknown> & VariantStockShape>;
     stockTotal?: number;
   },
 >(
   producto: T
-) => ({
-  ...producto,
-  variantes: (producto.variantes ?? []).map((variante) => ({
-    ...variante,
-    stockReservado: getVariantReservedStock(variante),
-    stockDisponible: getVariantAvailableStock(variante),
-  })),
-});
+) => {
+  const effectiveMedidasPorTalla = buildEffectiveMedidasPorTalla(producto);
+
+  return {
+    ...producto,
+    medidasPorTalla: effectiveMedidasPorTalla,
+    variantes: (producto.variantes ?? []).map((variante) => ({
+      ...variante,
+      medidas: resolveMedidasForTalla(
+        { medidasPorTalla: effectiveMedidasPorTalla, variantes: producto.variantes },
+        variante.talla,
+        variante.medidas
+      ),
+      stockReservado: getVariantReservedStock(variante),
+      stockDisponible: getVariantAvailableStock(variante),
+    })),
+  };
+};
 
 export interface WebVariantStockRef {
   stockFisico: number;
@@ -68,6 +85,7 @@ export const withWebVariantAvailability = <
     precioVenta?: number;
     rebajaWeb?: RebajaWeb | null;
     descuento?: number | null;
+    medidasPorTalla?: MedidaTallaItem[] | null;
     variantes?: Array<Record<string, unknown> & VariantStockShape>;
     stockTotal?: number;
   },
@@ -78,6 +96,7 @@ export const withWebVariantAvailability = <
 ) => {
   const baseProductPrice = Number(producto.precioVenta || 0);
   const isTrackedByBranches = Boolean(webStockMap);
+  const effectiveMedidasPorTalla = buildEffectiveMedidasPorTalla(producto);
 
   const productBasePricing = getWebVariantPricing(
     {
@@ -123,6 +142,11 @@ export const withWebVariantAvailability = <
 
     return {
       ...variante,
+      medidas: resolveMedidasForTalla(
+        { medidasPorTalla: effectiveMedidasPorTalla, variantes: producto.variantes },
+        variante.talla,
+        variante.medidas
+      ),
       precioLista: webPricing.precioLista,
       precioVenta: webPricing.precioVenta,
       tieneRebaja: webPricing.tieneRebaja,
@@ -167,6 +191,7 @@ export const withWebVariantAvailability = <
 
   return {
     ...producto,
+    medidasPorTalla: effectiveMedidasPorTalla,
     precioLista: productBasePricing.precioLista,
     precioVenta: productBasePricing.precioVenta,
     tieneRebaja,

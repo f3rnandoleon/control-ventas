@@ -499,8 +499,20 @@ export default function AdminProductosPage() {
         title={view === "PRODUCTO" ? (editing ? "Editar producto" : "Nuevo producto") : (editing ? `Variantes: ${editing.nombre}` : "Gestionar variantes")}
         maxWidth={view === "VARIANTES" ? "max-w-4xl" : "max-w-2xl"}
       >
-        {view === "PRODUCTO" && <ProductoForm initialData={editing || undefined} onSubmit={handleSave} />}
-        {view === "VARIANTES" && editing && <VariantesManager producto={editing} onUpdated={loadProductos} />}
+        {view === "PRODUCTO" && (
+          <ProductoForm
+            initialData={editing || undefined}
+            allProductos={productos}
+            onSubmit={handleSave}
+          />
+        )}
+        {view === "VARIANTES" && editing && (
+          <VariantesManager
+            producto={editing}
+            allProductos={productos}
+            onUpdated={loadProductos}
+          />
+        )}
       </ProductoModal>
       <StockSucursalesModal
         producto={stockModalProduct}

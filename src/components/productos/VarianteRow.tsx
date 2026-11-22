@@ -251,7 +251,7 @@ export default function VarianteRow({
                   Medidas de Prenda
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-gray-400">
-                  Talla {variante.talla} ({colorLabel})
+                  Talla {variante.talla} · Guía del producto (aplica a todos los colores)
                 </p>
               </div>
               <button

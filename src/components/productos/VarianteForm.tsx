@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useState } from "react";
 import { toast } from "sonner";
-import { Variante, MedidasPrenda } from "@/types/producto";
+import { MedidaTallaItem, Variante } from "@/types/producto";
 import { uploadVarianteImages } from "@/services/upload.service";
 import { getVarianteImagenes } from "@/utils/varianteImagen";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
@@ -24,8 +24,6 @@ type VarianteTallaForm = {
   qrCode?: string;
   precioVenta?: number | "";
   precioCosto?: number | "";
-  medidas?: MedidasPrenda;
-  showMedidas?: boolean;
 };
 
 type VarianteSharedForm = {
@@ -40,8 +38,6 @@ const createEmptySizeRow = (): VarianteTallaForm => ({
   stock: 0,
   precioVenta: "",
   precioCosto: "",
-  medidas: {},
-  showMedidas: false,
 });
 
 const normalizeVariantKey = (
@@ -74,6 +70,7 @@ export default function VarianteForm({
   initialData,
   initialVariantes,
   existingVariantes = [],
+  medidasPorTalla = [],
   precioBaseVenta,
   precioBaseCosto,
   onSave,
@@ -82,6 +79,7 @@ export default function VarianteForm({
   initialData?: Variante;
   initialVariantes?: Variante[];
   existingVariantes?: Variante[];
+  medidasPorTalla?: MedidaTallaItem[];
   precioBaseVenta?: number;
   precioBaseCosto?: number;
   onSave: (data: Variante[]) => void;
@@ -130,13 +128,6 @@ export default function VarianteForm({
           variante.precioCosto !== undefined && variante.precioCosto !== null
             ? variante.precioCosto
             : "",
-        medidas: variante.medidas || {},
-        showMedidas: Boolean(
-          variante.medidas &&
-            Object.values(variante.medidas).some(
-              (v) => typeof v === "number" && v > 0
-            )
-        ),
       }));
     }
 
@@ -248,30 +239,6 @@ export default function VarianteForm({
     );
   };
 
-  const updateMedidaField = (
-    index: number,
-    medidaKey: keyof MedidasPrenda,
-    value: string
-  ) => {
-    const numValue = value === "" ? undefined : Number(value);
-    setSizeRows((prev) =>
-      prev.map((row, rowIndex) => {
-        if (rowIndex !== index) return row;
-        const currentMedidas = row.medidas || {};
-        return {
-          ...row,
-          medidas: {
-            ...currentMedidas,
-            [medidaKey]:
-              numValue !== undefined && !Number.isNaN(numValue)
-                ? numValue
-                : undefined,
-          },
-        };
-      })
-    );
-  };
-
   const addSizeRow = () => {
     setSizeRows((prev) => [...prev, createEmptySizeRow()]);
   };
@@ -280,9 +247,10 @@ export default function VarianteForm({
     setSizeRows((prev) => prev.filter((_, rowIndex) => rowIndex !== index));
   };
 
-  const hasAnyMedida = (medidas?: MedidasPrenda) => {
-    if (!medidas) return false;
-    return Object.values(medidas).some((v) => typeof v === "number" && v > 0);
+  const getGuiaMedidaParaTalla = (talla: string) => {
+    const norm = talla.trim().toLowerCase();
+    if (!norm) return undefined;
+    return medidasPorTalla.find((m) => m.talla.trim().toLowerCase() === norm);
   };
 
   const handleSave = () => {
@@ -297,21 +265,6 @@ export default function VarianteForm({
     }
 
     const sanitizedRows = sizeRows.map((row) => {
-      // Limpiar y estructurar medidas
-      const cleanMedidas: MedidasPrenda = {};
-      if (row.medidas?.anchoPecho && Number(row.medidas.anchoPecho) > 0)
-        cleanMedidas.anchoPecho = Number(row.medidas.anchoPecho);
-      if (row.medidas?.anchoHombros && Number(row.medidas.anchoHombros) > 0)
-        cleanMedidas.anchoHombros = Number(row.medidas.anchoHombros);
-      if (row.medidas?.largoTotal && Number(row.medidas.largoTotal) > 0)
-        cleanMedidas.largoTotal = Number(row.medidas.largoTotal);
-      if (row.medidas?.largoMangaAxila && Number(row.medidas.largoMangaAxila) > 0)
-        cleanMedidas.largoMangaAxila = Number(row.medidas.largoMangaAxila);
-      if (row.medidas?.largoMangaHombro && Number(row.medidas.largoMangaHombro) > 0)
-        cleanMedidas.largoMangaHombro = Number(row.medidas.largoMangaHombro);
-
-      const hasMedidas = Object.keys(cleanMedidas).length > 0;
-
       const pVentaNum =
         row.precioVenta === "" || row.precioVenta === undefined || row.precioVenta === null
           ? undefined
@@ -333,7 +286,6 @@ export default function VarianteForm({
           pCostoNum !== undefined && !Number.isNaN(pCostoNum) && pCostoNum > 0
             ? pCostoNum
             : undefined,
-        medidas: hasMedidas ? cleanMedidas : undefined,
       };
     });
 
@@ -422,7 +374,6 @@ export default function VarianteForm({
         qrCode: row.qrCode || undefined,
         precioVenta: row.precioVenta,
         precioCosto: row.precioCosto,
-        medidas: row.medidas,
       }))
     );
   };
@@ -473,9 +424,10 @@ export default function VarianteForm({
       <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-medium text-white">Tallas, Precios y Medidas</p>
+            <p className="text-sm font-medium text-white">Tallas y Precios</p>
             <p className="text-xs text-gray-400">
-              El stock físico y el costo contable oficial se gestionan mediante el módulo de Compras.
+              El stock y costo oficial (CPP) se gestionan en Compras. Las medidas en cm se configuran una sola vez por talla en{" "}
+              <span className="text-cyan-400 font-semibold">📏 Guía de tallas</span> del producto.
             </p>
           </div>
 
@@ -490,13 +442,13 @@ export default function VarianteForm({
 
         <div className="space-y-3">
           {sizeRows.map((row, index) => {
-            const rowHasMedidas = hasAnyMedida(row.medidas);
+            const guiaMedida = getGuiaMedidaParaTalla(row.talla);
             const isExistingVariant = Boolean(row.varianteId);
 
             return (
               <div
                 key={`${index}-${row.codigoBarra || "new"}`}
-                className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3"
+                className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
               >
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-12 md:items-center">
                   {/* Selector Talla */}
@@ -598,23 +550,24 @@ export default function VarianteForm({
                     />
                   </div>
 
-                  {/* Botón Medidas y Quitar */}
+                  {/* Estado Guía de Tallas y Quitar */}
                   <div className="flex items-center gap-2 md:col-span-3 md:justify-end">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateSizeRow(index, "showMedidas", !row.showMedidas)
-                      }
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1 ${
-                        rowHasMedidas
-                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/30"
-                          : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
-                      }`}
-                      title="Configurar medidas de la prenda para esta talla"
-                    >
-                      <span>📏</span>
-                      <span>{rowHasMedidas ? "✓ Medidas" : "Medidas"}</span>
-                    </button>
+                    {row.talla && (
+                      <span
+                        className={`px-2 py-1 rounded-lg text-[10px] font-medium border ${
+                          guiaMedida
+                            ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                            : "bg-white/5 text-gray-400 border-white/10"
+                        }`}
+                        title={
+                          guiaMedida
+                            ? `Medidas de la guía del producto para talla ${row.talla}`
+                            : "Configura las medidas en '📏 Guía de tallas' del producto"
+                        }
+                      >
+                        {guiaMedida ? "📏 Con medidas" : "📏 Sin guía"}
+                      </span>
+                    )}
 
                     {sizeRows.length > 1 && (
                       <button
@@ -628,140 +581,6 @@ export default function VarianteForm({
                     )}
                   </div>
                 </div>
-
-                {/* Acordeón Desplegable de Medidas */}
-                {row.showMedidas && (
-                  <div className="rounded-lg border border-cyan-500/20 bg-black/40 p-3 space-y-2 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-cyan-400">
-                        Medidas en centímetros {row.talla ? `— Talla ${row.talla}` : ""} (opcional)
-                      </p>
-                      <span className="text-[11px] text-gray-400">
-                        Ingresa solo las medidas que apliquen
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 text-xs">
-                      <div>
-                        <label className="text-[11px] text-gray-400 block mb-1">
-                          Pecho (axila-axila)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="input w-full pr-7 py-1 text-xs"
-                            placeholder="Ej: 54"
-                            value={row.medidas?.anchoPecho ?? ""}
-                            onChange={(e) =>
-                              updateMedidaField(index, "anchoPecho", e.target.value)
-                            }
-                          />
-                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
-                            cm
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] text-gray-400 block mb-1">
-                          Ancho hombros
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="input w-full pr-7 py-1 text-xs"
-                            placeholder="Ej: 46"
-                            value={row.medidas?.anchoHombros ?? ""}
-                            onChange={(e) =>
-                              updateMedidaField(index, "anchoHombros", e.target.value)
-                            }
-                          />
-                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
-                            cm
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] text-gray-400 block mb-1">
-                          Largo total
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="input w-full pr-7 py-1 text-xs"
-                            placeholder="Ej: 70"
-                            value={row.medidas?.largoTotal ?? ""}
-                            onChange={(e) =>
-                              updateMedidaField(index, "largoTotal", e.target.value)
-                            }
-                          />
-                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
-                            cm
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] text-gray-400 block mb-1">
-                          Manga (axila-puño)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="input w-full pr-7 py-1 text-xs"
-                            placeholder="Ej: 52"
-                            value={row.medidas?.largoMangaAxila ?? ""}
-                            onChange={(e) =>
-                              updateMedidaField(
-                                index,
-                                "largoMangaAxila",
-                                e.target.value
-                              )
-                            }
-                          />
-                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
-                            cm
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] text-gray-400 block mb-1">
-                          Manga (hombro-puño)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="input w-full pr-7 py-1 text-xs"
-                            placeholder="Ej: 64"
-                            value={row.medidas?.largoMangaHombro ?? ""}
-                            onChange={(e) =>
-                              updateMedidaField(
-                                index,
-                                "largoMangaHombro",
-                                e.target.value
-                              )
-                            }
-                          />
-                          <span className="absolute right-2 top-2 text-[10px] text-gray-500">
-                            cm
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}

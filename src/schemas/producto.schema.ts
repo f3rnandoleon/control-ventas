@@ -103,6 +103,18 @@ export const medidasPrendaSchema = z
     .optional();
 
 /**
+ * Schema para entrada de guía de tallas a nivel de producto
+ */
+export const medidaTallaItemSchema = z.object({
+    talla: nonEmptyStringSchema.max(20, "La talla no puede exceder 20 caracteres"),
+    anchoPecho: positiveNumberSchema.optional(),
+    anchoHombros: positiveNumberSchema.optional(),
+    largoTotal: positiveNumberSchema.optional(),
+    largoMangaAxila: positiveNumberSchema.optional(),
+    largoMangaHombro: positiveNumberSchema.optional(),
+});
+
+/**
  * Schema para variante de producto
  */
 export const varianteSchema = z.object({
@@ -272,6 +284,8 @@ export const createProductoSchema = z.object({
 
     rebajaWeb: rebajaWebSchema.optional().nullable(),
 
+    medidasPorTalla: z.array(medidaTallaItemSchema).optional(),
+
     variantes: z
         .array(varianteSchema)
         .optional()
@@ -320,6 +334,8 @@ export const updateProductoSchema = z.object({
     categoria: z.string().optional(),
 
     rebajaWeb: rebajaWebSchema.optional().nullable(),
+
+    medidasPorTalla: z.array(medidaTallaItemSchema).optional(),
 
     variantes: z
         .array(varianteSchema)
