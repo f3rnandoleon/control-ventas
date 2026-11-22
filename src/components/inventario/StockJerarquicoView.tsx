@@ -11,6 +11,7 @@ import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import { useAuth } from "@/context/AuthContext";
 import VarianteDetalleDrawer from "./VarianteDetalleDrawer";
 import AjusteStockModal from "./AjusteStockModal";
+import ReclasificarVarianteModal from "./ReclasificarVarianteModal";
 
 interface StockJerarquicoViewProps {
   productos: ProductoInventario[];
@@ -52,6 +53,31 @@ export default function StockJerarquicoView({
     producto: ProductoInventario;
     variante: Variante;
   } | null>(null);
+
+  // Modal de reclasificación de talla / variante
+  const [reclasificarTarget, setReclasificarTarget] = useState<{
+    producto: ProductoInventario;
+    variante: Variante;
+  } | null>(null);
+
+  // Mantener drawer sincronizado cuando se recargan productos tras un ajuste o reclasificación
+  const activeDrawerVariante = useMemo(() => {
+    if (!drawerVariante) return null;
+    const prodActualizado =
+      productos.find((p) => p._id === drawerVariante.producto._id) ||
+      drawerVariante.producto;
+    const varActualizada =
+      prodActualizado.variantes?.find((v) =>
+        drawerVariante.variante.varianteId
+          ? v.varianteId === drawerVariante.variante.varianteId
+          : v.color === drawerVariante.variante.color &&
+            v.talla === drawerVariante.variante.talla
+      ) || drawerVariante.variante;
+    return {
+      producto: prodActualizado,
+      variante: varActualizada,
+    };
+  }, [drawerVariante, productos]);
 
   // Tipo de cambio público
   const [tipoCambioOficial, setTipoCambioOficial] = useState<number>(1.85);
@@ -699,16 +725,31 @@ export default function StockJerarquicoView({
                               </div>
                             )}
 
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDrawerVariante({ producto, variante });
-                              }}
-                              className="w-full flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-bold transition active:scale-98 cursor-pointer"
-                            >
-                              <span>🔍</span> Ver Análisis & Costo
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {isAdmin && stockDisp > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReclasificarTarget({ producto, variante });
+                                  }}
+                                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:hover:bg-violet-500/20 dark:text-violet-300 px-3 text-xs font-bold transition active:scale-98 cursor-pointer"
+                                  title="Cambiar talla o variante de prendas existentes"
+                                >
+                                  <span>🔄</span> Talla
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDrawerVariante({ producto, variante });
+                                }}
+                                className="flex-1 flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-bold transition active:scale-98 cursor-pointer"
+                              >
+                                <span>🔍</span> Ver Análisis & Costo
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -833,17 +874,35 @@ export default function StockJerarquicoView({
                                 <td className="px-3 py-2.5 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
                                     {isAdmin && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setAjusteTarget({ producto, variante });
-                                        }}
-                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30 text-[11px] font-bold transition inline-flex items-center gap-1 cursor-pointer"
-                                        title="Ajustar stock físico (sobrante o faltante)"
-                                      >
-                                        <span>⚖️</span> Ajustar
-                                      </button>
+                                      <>
+                                        <button
+                                          type="button"
+                                          disabled={stockDisp <= 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setReclasificarTarget({ producto, variante });
+                                          }}
+                                          className="px-2.5 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 dark:bg-violet-500/10 dark:hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-500/30 text-[11px] font-bold transition inline-flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                          title={
+                                            stockDisp > 0
+                                              ? "Reclasificar talla o variante (ej. L → M, S, XL)"
+                                              : "Sin stock disponible para reclasificar"
+                                          }
+                                        >
+                                          <span>🔄</span> Reclasificar
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setAjusteTarget({ producto, variante });
+                                          }}
+                                          className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30 text-[11px] font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                                          title="Ajustar stock físico (sobrante o faltante)"
+                                        >
+                                          <span>⚖️</span> Ajustar
+                                        </button>
+                                      </>
                                     )}
                                     <button
                                       type="button"
@@ -872,10 +931,10 @@ export default function StockJerarquicoView({
       )}
 
       {/* 4. DRAWER DETALLE LATERAL DE VARIANTE */}
-      {drawerVariante && (
+      {activeDrawerVariante && (
         <VarianteDetalleDrawer
-          producto={drawerVariante.producto}
-          variante={drawerVariante.variante}
+          producto={activeDrawerVariante.producto}
+          variante={activeDrawerVariante.variante}
           tipoCambioOficial={tipoCambioOficial}
           onClose={() => setDrawerVariante(null)}
           onStockUpdated={onStockUpdated}
@@ -891,6 +950,21 @@ export default function StockJerarquicoView({
           onClose={() => setAjusteTarget(null)}
           onSuccess={() => {
             setAjusteTarget(null);
+            if (onStockUpdated) onStockUpdated();
+          }}
+        />
+      )}
+
+      {/* 6. MODAL DE RECLASIFICACIÓN DE TALLA / VARIANTE */}
+      {reclasificarTarget && (
+        <ReclasificarVarianteModal
+          isOpen={Boolean(reclasificarTarget)}
+          producto={reclasificarTarget.producto}
+          variante={reclasificarTarget.variante}
+          initialSucursalId={sucursalSeleccionadaId}
+          onClose={() => setReclasificarTarget(null)}
+          onSuccess={() => {
+            setReclasificarTarget(null);
             if (onStockUpdated) onStockUpdated();
           }}
         />

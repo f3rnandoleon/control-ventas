@@ -49,3 +49,64 @@ export async function ajustarStockInventario(payload: AjustarStockPayload) {
   return data;
 }
 
+export interface ReclasificarVariantePayload {
+  productoId: string;
+  sucursalId?: string;
+  varianteOrigenId?: string;
+  origenColor?: string;
+  origenColorSecundario?: string;
+  origenTalla?: string;
+  varianteDestinoId?: string;
+  crearNuevaVariante?: boolean;
+  destinoColor?: string;
+  destinoColorSecundario?: string;
+  destinoTalla?: string;
+  cantidad: number;
+  motivo?: string;
+  referencia?: string;
+}
+
+export interface ReclasificarVarianteResponse {
+  message: string;
+  creadaNuevaVariante: boolean;
+  referencia: string;
+  varianteOrigen: {
+    varianteId?: string;
+    color: string;
+    colorSecundario?: string;
+    talla: string;
+    stock: number;
+    codigoBarra?: string;
+  };
+  varianteDestino: {
+    varianteId?: string;
+    color: string;
+    colorSecundario?: string;
+    talla: string;
+    stock: number;
+    precioCosto?: number;
+    codigoBarra?: string;
+    qrCode?: string;
+  };
+}
+
+export async function reclasificarVarianteInventario(
+  payload: ReclasificarVariantePayload
+): Promise<ReclasificarVarianteResponse> {
+  const res = await fetch("/api/inventario/reclasificar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.message || data.error || "Error al reclasificar la variante"
+    );
+  }
+
+  return data;
+}
+

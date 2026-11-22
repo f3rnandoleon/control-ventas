@@ -62,8 +62,77 @@ export const ajusteStockSchema = z.object({
         .optional(),
 });
 
+const optionalVariantIdSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") {
+            return value;
+        }
+
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+    },
+    z.string().min(1).max(100).optional()
+);
+
+/**
+ * Schema para reclasificar prendas entre variantes (ej. cambio de talla L -> M, XL, S o cambio de color)
+ */
+export const reclasificarVarianteSchema = z
+    .object({
+        productoId: objectIdSchema,
+        sucursalId: optionalObjectIdSchema,
+
+        // Variante origen
+        varianteOrigenId: optionalVariantIdSchema,
+        origenColor: z.string().trim().max(50).optional(),
+        origenColorSecundario: z.string().trim().max(50).optional(),
+        origenTalla: z.string().trim().max(20).optional(),
+
+        // Variante destino (existente o nueva)
+        varianteDestinoId: optionalVariantIdSchema,
+        crearNuevaVariante: z.boolean().optional().default(false),
+        destinoColor: z.string().trim().max(50).optional(),
+        destinoColorSecundario: z.string().trim().max(50).optional(),
+        destinoTalla: z.string().trim().max(20).optional(),
+
+        cantidad: z.coerce
+            .number()
+            .int("La cantidad debe ser un número entero")
+            .min(1, "La cantidad debe ser al menos 1"),
+
+        motivo: z
+            .string()
+            .trim()
+            .max(200, "El motivo no puede exceder 200 caracteres")
+            .optional(),
+
+        referencia: z
+            .string()
+            .trim()
+            .max(100, "La referencia no puede exceder 100 caracteres")
+            .optional(),
+    })
+    .superRefine((data, ctx) => {
+        if (!data.varianteOrigenId && (!data.origenColor || !data.origenTalla)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["varianteOrigenId"],
+                message: "Debes especificar la variante origen",
+            });
+        }
+
+        if (!data.varianteDestinoId && (!data.destinoTalla || data.destinoTalla.trim() === "")) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["destinoTalla"],
+                message: "Debes seleccionar una variante destino o indicar la nueva talla",
+            });
+        }
+    });
+
 // ============================================
 // TIPOS INFERIDOS
 // ============================================
 
 export type AjusteStockInput = z.infer<typeof ajusteStockSchema>;
+export type ReclasificarVarianteInput = z.infer<typeof reclasificarVarianteSchema>;

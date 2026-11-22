@@ -9,6 +9,7 @@ import type { ProductoInventario } from "@/types/inventario";
 import type { Variante } from "@/types/producto";
 import { getVarianteImagenPrincipal } from "@/utils/varianteImagen";
 import AjusteStockModal from "./AjusteStockModal";
+import ReclasificarVarianteModal from "./ReclasificarVarianteModal";
 
 interface NivelStockSucursal {
   _id: string;
@@ -45,6 +46,7 @@ export default function VarianteDetalleDrawer({
   const isAdmin = user?.rol === "ADMIN";
 
   const [modalAjusteAbierto, setModalAjusteAbierto] = useState(false);
+  const [modalReclasificarAbierto, setModalReclasificarAbierto] = useState(false);
   const [nivelesSucursal, setNivelesSucursal] = useState<NivelStockSucursal[]>([]);
   const [loadingSucursales, setLoadingSucursales] = useState(false);
 
@@ -326,28 +328,41 @@ export default function VarianteDetalleDrawer({
           </div>
 
           {/* FOOTER DE ACCIONES */}
-          <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex items-center justify-between gap-2.5 shrink-0">
+          <div className="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex flex-wrap items-center justify-between gap-2 shrink-0">
             {isAdmin && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Link
                   href={`/dashboard/admin/inventario/kardex?productoId=${producto._id}&varianteId=${variante.varianteId}`}
-                  className="px-3 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-2.5 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:hover:bg-cyan-500/20 dark:text-cyan-300 text-xs font-semibold transition inline-flex items-center gap-1 cursor-pointer"
                 >
                   <span>📊</span> Kardex
                 </Link>
                 <button
                   type="button"
                   onClick={() => setModalAjusteAbierto(true)}
-                  className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-2.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <span>⚖️</span> Ajustar Stock
+                  <span>⚖️</span> Ajustar
+                </button>
+                <button
+                  type="button"
+                  disabled={stockDisponible <= 0}
+                  onClick={() => setModalReclasificarAbierto(true)}
+                  className="px-2.5 py-2 rounded-xl border border-violet-300 bg-violet-50 hover:bg-violet-100 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:hover:bg-violet-500/20 dark:text-violet-300 text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={
+                    stockDisponible > 0
+                      ? "Cambiar talla o variante de prendas existentes"
+                      : "Sin stock disponible para reclasificar"
+                  }
+                >
+                  <span>🔄</span> Reclasificar
                 </button>
               </div>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-white text-xs font-semibold transition ml-auto cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-white text-xs font-semibold transition ml-auto cursor-pointer"
             >
               Cerrar
             </button>
@@ -366,6 +381,28 @@ export default function VarianteDetalleDrawer({
             setModalAjusteAbierto(false);
             if (onStockUpdated) onStockUpdated();
             // Recargar niveles de sucursal
+            fetch(`/api/admin/productos/${producto._id}/stock-sucursales`)
+              .then((res) => (res.ok ? res.json() : []))
+              .then((data: NivelStockSucursal[]) => {
+                const varId = variante.varianteId || `${variante.color}-${variante.talla}`;
+                const filtrados = data.filter((n) => n.varianteId === varId);
+                setNivelesSucursal(filtrados);
+              })
+              .catch(() => { });
+          }}
+        />
+      )}
+
+      {/* MODAL DE RECLASIFICACIÓN DE TALLA / VARIANTE */}
+      {modalReclasificarAbierto && (
+        <ReclasificarVarianteModal
+          isOpen={modalReclasificarAbierto}
+          producto={producto}
+          variante={variante}
+          onClose={() => setModalReclasificarAbierto(false)}
+          onSuccess={() => {
+            setModalReclasificarAbierto(false);
+            if (onStockUpdated) onStockUpdated();
             fetch(`/api/admin/productos/${producto._id}/stock-sucursales`)
               .then((res) => (res.ok ? res.json() : []))
               .then((data: NivelStockSucursal[]) => {

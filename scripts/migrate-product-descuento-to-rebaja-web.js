@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Script de migración:
  * Migra el campo legado `descuento` (0..100) de la colección `productos` al subdocumento
@@ -7,9 +8,20 @@
  * Uso:
  *   node scripts/migrate-product-descuento-to-rebaja-web.js
  */
-const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+const dns = require("dns");
+const mongoose = require("mongoose");
+
+// El driver de MongoDB usa consultas SRV. Algunos DNS de Windows o del ISP las
+// rechazan aunque los resolvers públicos funcionen correctamente.
+const dnsServers = (process.env.MONGODB_DNS_SERVERS || "1.1.1.1,8.8.8.8")
+  .split(",")
+  .map((server) => server.trim())
+  .filter(Boolean);
+if (dnsServers.length > 0) {
+  dns.setServers(dnsServers);
+}
 
 function loadEnvLocal() {
   const envPath = path.resolve(process.cwd(), ".env.local");
@@ -34,15 +46,47 @@ function loadEnvLocal() {
   }
 }
 
+function resolveMongoUrl() {
+  const raw = process.env.MONGODB_URL || process.env.MONGODB_URI;
+  if (!raw) {
+    throw new Error("No se encontró MONGODB_URL (ni MONGODB_URI) en .env.local ni en el entorno");
+  }
+  return raw;
+}
+
+function buildDirectShardFallback(srvUrl) {
+  if (!srvUrl.includes("cluster0.z7gxvd8.mongodb.net")) return null;
+  const match = srvUrl.match(/^mongodb\+srv:\/\/([^@]+)@[^/]+(\/[^?]*)?/);
+  if (!match) return null;
+  const auth = match[1];
+  const dbPath = match[2] || "/";
+  return `mongodb://${auth}@ac-ut9r8my-shard-00-00.z7gxvd8.mongodb.net:27017,ac-ut9r8my-shard-00-01.z7gxvd8.mongodb.net:27017,ac-ut9r8my-shard-00-02.z7gxvd8.mongodb.net:27017${dbPath}?ssl=true&replicaSet=atlas-110gix-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0`;
+}
+
+async function connectWithFallback(uri) {
+  try {
+    await mongoose.connect(uri);
+  } catch (err) {
+    if (err && (err.code === "ECONNREFUSED" || err.syscall === "querySrv")) {
+      const fallback = buildDirectShardFallback(uri);
+      if (fallback) {
+        console.warn("Fallo querySrv; reintentando conexión directa a shards...");
+        await mongoose.connect(fallback);
+        return;
+      }
+    }
+    throw err;
+  }
+}
+
 async function run() {
   loadEnvLocal();
-  const uri = process.env.MONGODB_URL;
-  if (!uri) {
-    console.error("ERROR: MONGODB_URI no está definida en el entorno ni en .env.local");
-    process.exit(1);
-  }
+  const uri = resolveMongoUrl();
 
-  await mongoose.connect(uri);
+  console.log("Conectando a MongoDB...");
+  await connectWithFallback(uri);
+  console.log(`Conectado a la base de datos: ${mongoose.connection.name}`);
+
   const collection = mongoose.connection.db.collection("productos");
 
   const cursor = collection.find({ descuento: { $exists: true } });

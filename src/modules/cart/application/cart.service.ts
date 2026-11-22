@@ -127,22 +127,22 @@ export async function enrichCartWithWebPricing(cart: any, userId: string, sessio
       const producto = prodMap.get(String(item.productoId));
       const variante = producto
         ? findVariantByIdentity((producto.variantes || []) as Variante[], {
-            varianteId: item.variante?.varianteId,
-            color: item.variante?.color,
-            colorSecundario: item.variante?.colorSecundario,
-            talla: item.variante?.talla,
-          })
+          varianteId: item.variante?.varianteId,
+          color: item.variante?.color,
+          colorSecundario: item.variante?.colorSecundario,
+          talla: item.variante?.talla,
+        })
         : null;
 
       const webPricing = producto
         ? getWebVariantPricing(producto, variante, now)
         : {
-            precioLista: Number(item.precioUnitario || 0),
-            precioVenta: Number(item.precioUnitario || 0),
-            precioCosto: 0,
-            tieneRebaja: false,
-            porcentajeDescuento: 0,
-          };
+          precioLista: Number(item.precioUnitario || 0),
+          precioVenta: Number(item.precioUnitario || 0),
+          precioCosto: 0,
+          tieneRebaja: false,
+          porcentajeDescuento: 0,
+        };
 
       engineItems.push({
         productoId: String(item.productoId),
@@ -273,7 +273,7 @@ export async function addCartItemByUserId(
       item.productoId.toString() === input.productoId &&
       item.variante.color === variante.color &&
       (item.variante.colorSecundario || "") ===
-        (variante.colorSecundario || "") &&
+      (variante.colorSecundario || "") &&
       item.variante.talla === variante.talla &&
       (item.variante.varianteId || "") === (variante.varianteId || "")
   );

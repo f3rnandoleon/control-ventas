@@ -536,6 +536,7 @@ Esquema de almacenamiento de banners promocionales gestionados desde `/dashboard
 |---|---|---|---|
 | `GET` | `/api/inventario` | `ADMIN`, `VENDEDOR` | Historial de movimientos de inventario con filtros por fecha, tipo de movimiento y producto |
 | `POST` | `/api/inventario` | `ADMIN` | Registro manual de ajuste de inventario (`AJUSTE_POSITIVO` o `AJUSTE_NEGATIVO`) con afectación a Kárdex |
+| `POST` | `/api/inventario/reclasificar` | `ADMIN` | Reclasifica atómicamente unidades de una variante origen a otra talla/color del mismo producto (existente o creada al vuelo) en la misma sucursal, transfiriendo el CPP y registrando `SALIDA`/`ENTRADA` vinculadas en Kárdex |
 | `GET` | `/api/inventario/:productoId` | `ADMIN`, `VENDEDOR` | Kárdex cronológico específico de un producto (entradas, salidas, traspasos, ajustes) |
 | `GET` | `/api/inventario/kardex/consolidado` | `ADMIN` | Kárdex físico y valorado consolidado del negocio con cálculo de stock actual y costo total valorado |
 
