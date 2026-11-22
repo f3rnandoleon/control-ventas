@@ -201,7 +201,15 @@ export async function getTopProductsReport(request: Request) {
         cantidadVendida: { $sum: "$items.cantidad" },
         totalVendido: {
           $sum: {
-            $multiply: ["$items.cantidad", "$items.precioUnitario"],
+            $ifNull: [
+              "$items.totalLineaNeto",
+              {
+                $ifNull: [
+                  "$items.totalLinea",
+                  { $multiply: ["$items.cantidad", "$items.precioUnitario"] },
+                ],
+              },
+            ],
           },
         },
         ganancia: { $sum: "$items.ganancia" },
@@ -235,7 +243,15 @@ export async function getTopVariantsReport(request: Request) {
         cantidadVendida: { $sum: "$items.cantidad" },
         totalVendido: {
           $sum: {
-            $multiply: ["$items.cantidad", "$items.precioUnitario"],
+            $ifNull: [
+              "$items.totalLineaNeto",
+              {
+                $ifNull: [
+                  "$items.totalLinea",
+                  { $multiply: ["$items.cantidad", "$items.precioUnitario"] },
+                ],
+              },
+            ],
           },
         },
         ganancia: { $sum: "$items.ganancia" },

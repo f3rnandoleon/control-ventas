@@ -291,7 +291,147 @@ function runTests() {
     assert.equal(res.totalFinal, 270);
   }
 
-  console.log("ALL PROMOTIONS ENGINE & WEB PRICING TESTS PASSED (6/6)");
+  // 7. Cupón con mayor prioridad (prioridad 1) gana sobre promo automática de categoría con menor prioridad (prioridad 50)
+  {
+    const items: EngineLineInput[] = [
+      {
+        productoId: "p-cat",
+        color: "Negro",
+        talla: "M",
+        categoria: "Chompas",
+        cantidad: 1,
+        precioUnitarioLista: 200,
+        precioWebEfectivo: 200,
+        precioCosto: 80,
+        tieneRebajaCatalogo: false,
+      },
+    ];
+    const autoLowPrio = makePromo({
+      _id: "promo-auto-low",
+      nombre: "10% Chompas",
+      tipo: "PORCENTAJE",
+      valor: 10,
+      alcance: "CATEGORIAS",
+      categoriasIncluidas: ["Chompas"],
+      prioridad: 50,
+      acumulable: false,
+    });
+    const couponHighPrio = makePromo({
+      _id: "promo-cup-high",
+      nombre: "VIP 25%",
+      metodoActivacion: "CUPON",
+      tipo: "PORCENTAJE",
+      valor: 25,
+      alcance: "PEDIDO",
+      prioridad: 1,
+      acumulable: false,
+    });
+
+    const res = evaluatePromotionsEngine({
+      items,
+      promocionesAutomaticas: [autoLowPrio],
+      cuponCodigoSolicitado: "VIP25",
+      cuponContext: {
+        _id: "cup-vip",
+        codigo: "VIP25",
+        activo: true,
+        usosActuales: 0,
+        usosClienteActuales: 0,
+        promocion: couponHighPrio,
+      },
+      now,
+    });
+
+    assert.equal(res.cuponValido, true);
+    assert.equal(res.descuentoPromociones, 50);
+    assert.equal(res.totalFinal, 150);
+    assert.equal(res.promocionesAplicadas.length, 1);
+    assert.equal(res.promocionesAplicadas[0].codigoCupon, "VIP25");
+  }
+
+  // 8. NxM con descuentoMaximo distribuye exactamente sin perder centavos residuales
+  {
+    const items: EngineLineInput[] = [
+      {
+        productoId: "x1",
+        color: "Negro",
+        talla: "M",
+        cantidad: 1,
+        precioUnitarioLista: 100,
+        precioWebEfectivo: 100,
+        precioCosto: 40,
+        tieneRebajaCatalogo: false,
+      },
+      {
+        productoId: "x2",
+        color: "Azul",
+        talla: "M",
+        cantidad: 1,
+        precioUnitarioLista: 100,
+        precioWebEfectivo: 100,
+        precioCosto: 40,
+        tieneRebajaCatalogo: false,
+      },
+      {
+        productoId: "x3",
+        color: "Gris",
+        talla: "M",
+        cantidad: 1,
+        precioUnitarioLista: 100,
+        precioWebEfectivo: 100,
+        precioCosto: 40,
+        tieneRebajaCatalogo: false,
+      },
+      {
+        productoId: "x4",
+        color: "Rojo",
+        talla: "M",
+        cantidad: 1,
+        precioUnitarioLista: 100,
+        precioWebEfectivo: 100,
+        precioCosto: 40,
+        tieneRebajaCatalogo: false,
+      },
+      {
+        productoId: "x5",
+        color: "Verde",
+        talla: "M",
+        cantidad: 1,
+        precioUnitarioLista: 100,
+        precioWebEfectivo: 100,
+        precioCosto: 40,
+        tieneRebajaCatalogo: false,
+      },
+      {
+        productoId: "x6",
+        color: "Blanco",
+        talla: "M",
+        cantidad: 1,
+        precioUnitarioLista: 100,
+        precioWebEfectivo: 100,
+        precioCosto: 40,
+        tieneRebajaCatalogo: false,
+      },
+    ];
+    const promo2x1Capped = makePromo({
+      _id: "promo-2x1-cap",
+      nombre: "2x1 tope 100",
+      tipo: "NXM",
+      reglaNxM: { lleva: 2, paga: 1 },
+      descuentoMaximo: 100,
+    });
+
+    const res = evaluatePromotionsEngine({
+      items,
+      promocionesAutomaticas: [promo2x1Capped],
+      now,
+    });
+
+    assert.equal(res.descuentoPromociones, 100);
+    assert.equal(res.totalFinal, 500);
+  }
+
+  console.log("ALL PROMOTIONS ENGINE & WEB PRICING TESTS PASSED (8/8)");
 }
 
 runTests();

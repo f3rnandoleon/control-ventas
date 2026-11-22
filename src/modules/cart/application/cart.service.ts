@@ -12,9 +12,12 @@ import { AppError } from "@/shared/errors/AppError";
 import { cartRepository } from "@/modules/cart/infrastructure/cart.repository";
 import { getAvailableWebStockForVariant } from "@/modules/inventory/application/branch-stock.service";
 import { getWebVariantPricing } from "@/utils/pricing";
-import { evaluateWebResolvedItems } from "@/modules/promotions/application/promotions.service";
+import {
+  evaluateWebResolvedItems,
+  validateCouponPreconditions,
+} from "@/modules/promotions/application/promotions.service";
 import type { EngineLineInput } from "@/modules/promotions/domain/promotion-engine";
-import Cupon from "@/models/cupon";
+import PerfilCliente from "@/models/perfilCliente";
 
 
 function assertObjectId(value: string, message: string) {
@@ -169,11 +172,17 @@ export async function enrichCartWithWebPricing(cart: any, userId: string, sessio
     }
   );
 
+  const perfil = (await PerfilCliente.findOne({ usuarioId: userId })
+    .select("telefono")
+    .session(session ?? null)
+    .lean()) as { telefono?: string | null } | null;
+
   const evaluation = await evaluateWebResolvedItems({
     items: engineItems,
     costoEnvio: 0,
     cuponCodigo: plainCart.cuponCodigo || null,
     clienteId: userId,
+    telefonoInvitado: perfil?.telefono || null,
     session,
     now,
   });
@@ -218,12 +227,16 @@ export async function applyCouponToCartByUserId(
   await connectDB();
 
   const codigo = codigoRaw.trim().toUpperCase();
-  const cuponDoc = await Cupon.findOne({ codigo, activo: true })
+  const perfil = (await PerfilCliente.findOne({ usuarioId: userId })
+    .select("telefono")
     .session(session ?? null)
-    .lean();
-  if (!cuponDoc) {
-    throw new AppError(`El cupón "${codigo}" no existe o no está activo`, 400);
-  }
+    .lean()) as { telefono?: string | null } | null;
+
+  await validateCouponPreconditions(
+    codigo,
+    { clienteId: userId, telefonoInvitado: perfil?.telefono || null },
+    session
+  );
 
   const cart = await cartRepository.upsertEmptyCart(userId, session);
   cart.cuponCodigo = codigo;

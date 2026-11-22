@@ -13,12 +13,13 @@ import type {
   EvaluacionPromocionesResult,
   PromocionAplicadaSnapshot,
 } from "@/types/promocion";
-import type {
-  CreateCuponInput,
-  CreatePromocionInput,
-  EvaluatePromotionsInput,
-  UpdateCuponInput,
-  UpdatePromocionInput,
+import {
+  createPromocionSchema,
+  type CreateCuponInput,
+  type CreatePromocionInput,
+  type EvaluatePromotionsInput,
+  type UpdateCuponInput,
+  type UpdatePromocionInput,
 } from "@/schemas/promocion.schema";
 import {
   evaluatePromotionsEngine,
@@ -33,10 +34,26 @@ function assertObjectId(id: string, message: string) {
   }
 }
 
-function normalizePhone(phone?: string | null): string | null {
+export function normalizePhone(phone?: string | null): string | null {
   if (!phone) return null;
-  const cleaned = phone.replace(/[\s\-()]/g, "").trim();
-  return cleaned.length > 0 ? cleaned : null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 0) return null;
+  if (digits.length === 11 && digits.startsWith("591")) {
+    return digits.slice(3);
+  }
+  return digits;
+}
+
+function buildPhoneMatchVariants(phone: string): string[] {
+  return Array.from(new Set([phone, `591${phone}`, `+591${phone}`]));
+}
+
+function buildPhoneOrderRegex(phone: string): RegExp {
+  const escapedDigits = phone
+    .split("")
+    .map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("[\\s\\-()]*");
+  return new RegExp(`^(?:\\+?591[\\s\\-()]*)?${escapedDigits}$`);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,7 +110,7 @@ async function countCustomerUsages(
   }
   const phone = normalizePhone(customer.telefonoInvitado);
   if (phone) {
-    identityOr.push({ telefonoInvitado: phone });
+    identityOr.push({ telefonoInvitado: { $in: buildPhoneMatchVariants(phone) } });
   }
   if (identityOr.length === 0) return 0;
 
@@ -121,8 +138,9 @@ async function isCustomerFirstPurchase(
   }
   const phone = normalizePhone(customer.telefonoInvitado);
   if (phone) {
-    identityOr.push({ "snapshotCliente.telefono": phone });
-    identityOr.push({ "datosClienteInvitado.telefono": phone });
+    const phoneRegex = buildPhoneOrderRegex(phone);
+    identityOr.push({ "snapshotCliente.telefono": phoneRegex });
+    identityOr.push({ "datosClienteInvitado.telefono": phoneRegex });
   }
   if (identityOr.length === 0) {
     return true;
@@ -134,6 +152,90 @@ async function isCustomerFirstPurchase(
   }).session(session ?? null);
 
   return !existingOrder;
+}
+
+export async function validateCouponPreconditions(
+  codigoRaw: string,
+  customer: { clienteId?: string | null; telefonoInvitado?: string | null },
+  session?: ClientSession
+) {
+  await connectDB();
+  const codigo = codigoRaw.trim().toUpperCase();
+  const now = new Date();
+
+  const cuponDoc = await Cupon.findOne({ codigo })
+    .populate("promocionId")
+    .session(session ?? null)
+    .lean();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawCupon = cuponDoc as any;
+  if (!rawCupon || !rawCupon.activo) {
+    throw new AppError(`El cupón "${codigo}" no existe o no está activo`, 400);
+  }
+
+  if (!rawCupon.promocionId || typeof rawCupon.promocionId !== "object") {
+    throw new AppError(`El cupón "${codigo}" no tiene una promoción válida asociada`, 400);
+  }
+
+  const promo = mapPromocionDocToRule(rawCupon.promocionId);
+  if (promo.estado !== "ACTIVA") {
+    throw new AppError("La promoción asociada a este cupón no está activa", 400);
+  }
+
+  if (promo.fechaInicio) {
+    const start = new Date(promo.fechaInicio);
+    if (!Number.isNaN(start.getTime()) && now.getTime() < start.getTime()) {
+      throw new AppError("La promoción o cupón aún no inicia su vigencia", 400);
+    }
+  }
+  if (promo.fechaFin) {
+    const end = new Date(promo.fechaFin);
+    if (!Number.isNaN(end.getTime()) && now.getTime() > end.getTime()) {
+      throw new AppError("La promoción o cupón ya expiró", 400);
+    }
+  }
+
+  if (!promo.canales.includes("WEB")) {
+    throw new AppError("Este cupón no está habilitado para el canal WEB", 400);
+  }
+
+  if (promo.usoMaximoTotal !== null && promo.usoMaximoTotal !== undefined && promo.usosActuales >= promo.usoMaximoTotal) {
+    throw new AppError("Esta promoción alcanzó su límite máximo de usos", 400);
+  }
+
+  if (
+    rawCupon.usoMaximoTotal !== null &&
+    rawCupon.usoMaximoTotal !== undefined &&
+    Number(rawCupon.usosActuales || 0) >= Number(rawCupon.usoMaximoTotal)
+  ) {
+    throw new AppError("El cupón alcanzó su límite máximo de usos", 400);
+  }
+
+  if (promo.usoMaximoPorCliente !== null && promo.usoMaximoPorCliente !== undefined) {
+    const usosPromoCliente = await countCustomerUsages({ promocionId: promo._id }, customer, session);
+    if (usosPromoCliente >= promo.usoMaximoPorCliente) {
+      throw new AppError("Ya utilizaste esta promoción el máximo de veces permitido", 400);
+    }
+  }
+
+  if (rawCupon.usoMaximoPorCliente !== null && rawCupon.usoMaximoPorCliente !== undefined) {
+    const usosCuponCliente = await countCustomerUsages(
+      { cuponId: rawCupon._id.toString() },
+      customer,
+      session
+    );
+    if (usosCuponCliente >= Number(rawCupon.usoMaximoPorCliente)) {
+      throw new AppError("Ya utilizaste este cupón el máximo de veces permitido", 400);
+    }
+  }
+
+  if (promo.condiciones?.soloPrimeraCompra) {
+    const primeraCompra = await isCustomerFirstPurchase(customer, session);
+    if (!primeraCompra) {
+      throw new AppError("Esta promoción es válida únicamente para la primera compra", 400);
+    }
+  }
 }
 
 export async function evaluateWebResolvedItems(params: {
@@ -482,6 +584,23 @@ export async function reservePromotionsForOrder(
 }
 
 /**
+ * Marca los usos reservados de un pedido como APLICADO cuando se confirma el pago.
+ */
+export async function markPromotionsAppliedForOrder(
+  pedidoId: mongoose.Types.ObjectId | string,
+  session?: ClientSession
+) {
+  const pedidoObjectId =
+    typeof pedidoId === "string" ? new mongoose.Types.ObjectId(pedidoId) : pedidoId;
+
+  await UsoPromocion.updateMany(
+    { pedidoId: pedidoObjectId, estado: "RESERVADO" },
+    { $set: { estado: "APLICADO" } },
+    { session: session ?? undefined }
+  );
+}
+
+/**
  * Revierte usos de promociones/cupones de un pedido cancelado o con reserva expirada.
  * Idempotente: si ya estaban revertidos, no vuelve a decrementar contadores.
  */
@@ -590,6 +709,73 @@ export async function updateAdminPromocion(id: string, input: UpdatePromocionInp
   assertObjectId(id, "ID de promoción inválido");
   await connectDB();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existing = (await Promocion.findById(id).lean()) as any;
+  if (!existing) throw new AppError("Promoción no encontrada", 404);
+
+  const mergedCandidate = {
+    nombre: input.nombre ?? existing.nombre,
+    descripcion: input.descripcion ?? existing.descripcion ?? "",
+    estado: input.estado ?? existing.estado,
+    canales: input.canales ?? existing.canales ?? ["WEB"],
+    metodoActivacion: input.metodoActivacion ?? existing.metodoActivacion,
+    tipo: input.tipo ?? existing.tipo,
+    valor: input.valor !== undefined ? input.valor : Number(existing.valor || 0),
+    reglaNxM:
+      input.reglaNxM !== undefined
+        ? input.reglaNxM
+        : existing.reglaNxM
+          ? { lleva: Number(existing.reglaNxM.lleva), paga: Number(existing.reglaNxM.paga) }
+          : null,
+    descuentoMaximo:
+      input.descuentoMaximo !== undefined
+        ? input.descuentoMaximo
+        : existing.descuentoMaximo ?? null,
+    alcance: input.alcance ?? existing.alcance,
+    productosIncluidos:
+      input.productosIncluidos !== undefined
+        ? input.productosIncluidos
+        : (existing.productosIncluidos || []).map((pid: unknown) => String(pid)),
+    categoriasIncluidas:
+      input.categoriasIncluidas !== undefined
+        ? input.categoriasIncluidas
+        : existing.categoriasIncluidas || [],
+    productosExcluidos:
+      input.productosExcluidos !== undefined
+        ? input.productosExcluidos
+        : (existing.productosExcluidos || []).map((pid: unknown) => String(pid)),
+    condiciones:
+      input.condiciones !== undefined
+        ? input.condiciones
+        : {
+            montoMinimoCompra: Number(existing.condiciones?.montoMinimoCompra || 0),
+            cantidadMinimaPrendas: Number(existing.condiciones?.cantidadMinimaPrendas || 0),
+            soloPrimeraCompra: Boolean(existing.condiciones?.soloPrimeraCompra),
+          },
+    prioridad: input.prioridad !== undefined ? input.prioridad : Number(existing.prioridad ?? 10),
+    acumulable: input.acumulable !== undefined ? input.acumulable : Boolean(existing.acumulable),
+    acumulableConRebajasCatalogo:
+      input.acumulableConRebajasCatalogo !== undefined
+        ? input.acumulableConRebajasCatalogo
+        : Boolean(existing.acumulableConRebajasCatalogo),
+    fechaInicio: input.fechaInicio !== undefined ? input.fechaInicio : existing.fechaInicio ?? null,
+    fechaFin: input.fechaFin !== undefined ? input.fechaFin : existing.fechaFin ?? null,
+    usoMaximoTotal:
+      input.usoMaximoTotal !== undefined ? input.usoMaximoTotal : existing.usoMaximoTotal ?? null,
+    usoMaximoPorCliente:
+      input.usoMaximoPorCliente !== undefined
+        ? input.usoMaximoPorCliente
+        : existing.usoMaximoPorCliente ?? null,
+  };
+
+  const mergedValidation = createPromocionSchema.safeParse(mergedCandidate);
+  if (!mergedValidation.success) {
+    throw new AppError(
+      mergedValidation.error.issues[0]?.message || "Configuración de promoción inválida",
+      400
+    );
+  }
+
   const updatePayload: Record<string, unknown> = { ...input };
   if (input.fechaInicio !== undefined) {
     updatePayload.fechaInicio = input.fechaInicio ? new Date(input.fechaInicio) : null;
@@ -672,6 +858,12 @@ export async function createAdminCupon(
   if (!promo) {
     throw new AppError("La promoción asociada no existe", 404);
   }
+  if ((promo as { metodoActivacion?: string }).metodoActivacion !== "CUPON") {
+    throw new AppError(
+      "La promoción asociada debe tener activación por código de cupón (CUPON)",
+      400
+    );
+  }
 
   const existing = await Cupon.findOne({ codigo: input.codigo }).lean();
   if (existing) {
@@ -691,6 +883,19 @@ export async function createAdminCupon(
 export async function updateAdminCupon(id: string, input: UpdateCuponInput) {
   assertObjectId(id, "ID de cupón inválido");
   await connectDB();
+
+  if (input.promocionId) {
+    const promo = await Promocion.findById(input.promocionId).lean();
+    if (!promo) {
+      throw new AppError("La promoción asociada no existe", 404);
+    }
+    if ((promo as { metodoActivacion?: string }).metodoActivacion !== "CUPON") {
+      throw new AppError(
+        "La promoción asociada debe tener activación por código de cupón (CUPON)",
+        400
+      );
+    }
+  }
 
   if (input.codigo) {
     const duplicate = await Cupon.findOne({

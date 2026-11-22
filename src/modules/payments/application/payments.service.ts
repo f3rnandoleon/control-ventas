@@ -11,6 +11,10 @@ import {
 import { syncFulfillmentForOrder } from "@/modules/fulfillment/application/fulfillment.service";
 import { paymentsRepository } from "@/modules/payments/infrastructure/payments.repository";
 import { recordAuditEventSafe } from "@/modules/audit/application/audit.service";
+import {
+  markPromotionsAppliedForOrder,
+  revertPromotionsForOrder,
+} from "@/modules/promotions/application/promotions.service";
 import { findVariantByIdentity } from "@/utils/varianteIdentity";
 import type {
   ConfirmPaymentInput,
@@ -384,6 +388,7 @@ export async function confirmPaymentTransaction(
         : "NOT_APPLICABLE";
     }
     await pedido.save({ session });
+    await markPromotionsAppliedForOrder(pedido._id, session);
     await syncFulfillmentForOrder(pedido, session);
 
     await recordAuditEventSafe(
@@ -473,6 +478,7 @@ export async function failPaymentTransaction(
     pedido.reservaExpiraEn = null;
     pedido.motivoCancelacion = input.motivo || "Pago fallido";
     await pedido.save({ session });
+    await revertPromotionsForOrder(pedido._id, session);
     await syncFulfillmentForOrder(pedido, session);
 
     await recordAuditEventSafe(
@@ -567,6 +573,7 @@ export async function refundPaymentTransaction(
     pedido.reservaExpiraEn = null;
     pedido.motivoCancelacion = input.motivo || "Reembolsado";
     await pedido.save({ session });
+    await revertPromotionsForOrder(pedido._id, session);
     await syncFulfillmentForOrder(pedido, session);
 
     await recordAuditEventSafe(
@@ -762,6 +769,7 @@ export async function confirmPaymentByToken(
       pedido.estadoEntrega = pedido.snapshotEntrega?.metodo ? "PENDING" : "NOT_APPLICABLE";
     }
     await pedido.save({ session });
+    await markPromotionsAppliedForOrder(pedido._id, session);
     await syncFulfillmentForOrder(pedido, session);
     await recordAuditEventSafe({ accion: "PAYMENT_CONFIRMED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: actor.id, rolActor: actor.rol, estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision" } }, session);
     return { payment, pedido };
@@ -804,6 +812,7 @@ export async function rejectPaymentByToken(
     pedido.reservadoEn = null; pedido.reservaExpiraEn = null;
     pedido.motivoCancelacion = reason || "Comprobante rechazado";
     await pedido.save({ session });
+    await revertPromotionsForOrder(pedido._id, session);
     await syncFulfillmentForOrder(pedido, session);
     await recordAuditEventSafe({ accion: "PAYMENT_FAILED", tipoEntidad: "PAYMENT", idEntidad: payment._id.toString(), idActor: actor.id, rolActor: actor.rol, estado: "SUCCESS", metadata: { pedidoId: pedido._id.toString(), via: "token_revision", reason } }, session);
     return { payment, pedido };
@@ -852,6 +861,7 @@ export async function confirmCashOrder(pedidoId: string, actor: AuthActor) {
     pedido.estadoPedido = "DELIVERED";
     pedido.estadoEntrega = "DELIVERED";
     await pedido.save({ session });
+    await markPromotionsAppliedForOrder(pedido._id, session);
 
     await recordAuditEventSafe(
       {

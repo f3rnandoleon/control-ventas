@@ -28,6 +28,7 @@ import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sa
 import type { Variante, Producto } from "@/types/producto";
 
 import { getVariantPricing, getWebVariantPricing } from "@/utils/pricing";
+import { getProductWebDiscountIssues } from "@/schemas/producto.schema";
 
 type ProductoPayload = Partial<Producto> & {
   variantes?: Variante[];
@@ -311,6 +312,24 @@ export async function updateCatalogProduct(
     productoAntes.precioCosto && productoAntes.precioCosto > 0
       ? productoAntes.precioCosto
       : data.precioCosto || 0;
+
+  const precioVentaFinal =
+    data.precioVenta !== undefined ? Number(data.precioVenta) : Number(productoAntes.precioVenta || 0);
+  const rebajaWebFinal =
+    data.rebajaWeb !== undefined ? data.rebajaWeb : productoAntes.rebajaWeb;
+  const variantesParaValidar = (
+    Array.isArray(variantesProcesadas) ? variantesProcesadas : productoAntes.variantes
+  ) as Variante[];
+
+  const discountIssues = getProductWebDiscountIssues({
+    precioVenta: precioVentaFinal,
+    precioCosto: precioCostoSeguro,
+    rebajaWeb: rebajaWebFinal,
+    variantes: variantesParaValidar,
+  });
+  if (discountIssues.length > 0) {
+    throw new AppError(discountIssues[0].message, 400);
+  }
 
   const updatePayload = {
     ...data,

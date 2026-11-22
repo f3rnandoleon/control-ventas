@@ -51,7 +51,10 @@ import {
     reservePromotionsForOrder,
     revertPromotionsForOrder,
 } from "@/modules/promotions/application/promotions.service";
-import type { EngineLineInput } from "@/modules/promotions/domain/promotion-engine";
+import {
+  roundMoney,
+  type EngineLineInput,
+} from "@/modules/promotions/domain/promotion-engine";
 
 function createPedidoNumber(prefix = "P") {
     return generateOrderedId(prefix);
@@ -461,10 +464,10 @@ export async function crearPedidoCheckout(
             now: checkoutNow,
         });
 
-        if (payload.cuponCodigo && !pricingEvaluation.cuponValido) {
+        if (cuponCodigoFinal && !pricingEvaluation.cuponValido) {
             throw new AppError(
                 pricingEvaluation.cuponErrorMensaje ||
-                    `El cupón "${payload.cuponCodigo}" no es válido para este pedido`,
+                    `El cupón "${cuponCodigoFinal}" no es válido para este pedido`,
                 400
             );
         }
@@ -650,8 +653,7 @@ export async function crearVentaDirecta(
         }
 
         let subtotal = 0;
-        let gananciaTotal = 0;
-        const itemsProcesados = [];
+        const rawItemsProcesados = [];
 
         for (const item of payload.items) {
             const producto = await Producto.findById(item.productoId).session(session);
@@ -682,13 +684,11 @@ export async function crearVentaDirecta(
             const pricing = getVariantPricing(producto, variante);
             const precioUnitario = pricing.precioVenta;
             const precioCosto = pricing.precioCosto;
-            const totalLinea = precioUnitario * item.cantidad;
-            const ganancia = (precioUnitario - precioCosto) * item.cantidad;
+            const totalLinea = roundMoney(precioUnitario * item.cantidad);
 
-            subtotal += totalLinea;
-            gananciaTotal += ganancia;
+            subtotal = roundMoney(subtotal + totalLinea);
 
-            itemsProcesados.push({
+            rawItemsProcesados.push({
                 productoId: producto._id,
                 variante: {
                     varianteId: variante.varianteId,
@@ -708,12 +708,40 @@ export async function crearVentaDirecta(
                 precioUnitario,
                 totalLinea,
                 precioCosto,
-                ganancia
             });
         }
 
-        const descuentoAplicado = payload.descuento || 0;
-        const total = Math.max(0, subtotal - descuentoAplicado);
+        const descuentoAplicado = roundMoney(
+            Math.min(Math.max(0, Number(payload.descuento || 0)), subtotal)
+        );
+        let descuentoAsignado = 0;
+        const itemsProcesados = rawItemsProcesados.map((item, idx) => {
+            const isLast = idx === rawItemsProcesados.length - 1;
+            const descuentoProrrateado =
+                descuentoAplicado <= 0 || subtotal <= 0
+                    ? 0
+                    : isLast
+                        ? roundMoney(Math.min(item.totalLinea, descuentoAplicado - descuentoAsignado))
+                        : roundMoney(
+                            Math.min(item.totalLinea, (descuentoAplicado * item.totalLinea) / subtotal)
+                          );
+            descuentoAsignado = roundMoney(descuentoAsignado + descuentoProrrateado);
+            const totalLineaNeto = roundMoney(Math.max(0, item.totalLinea - descuentoProrrateado));
+            const costoLinea = roundMoney(item.precioCosto * item.cantidad);
+            const ganancia = roundMoney(totalLineaNeto - costoLinea);
+
+            return {
+                ...item,
+                descuentoProrrateado,
+                totalLineaNeto,
+                ganancia,
+            };
+        });
+
+        const total = roundMoney(Math.max(0, subtotal - descuentoAplicado));
+        const gananciaTotal = roundMoney(
+            itemsProcesados.reduce((sum, item) => sum + item.ganancia, 0)
+        );
 
         const pedido = await pedidosRepository.create({
             numeroPedido: createPedidoNumber(),
@@ -776,7 +804,14 @@ export async function crearVentaDirecta(
             idActor: actor.id,
             rolActor: actor.rol,
             estado: "SUCCESS",
-            metadata: { total: pedido.total, canal: pedido.canal, sucursalId: targetSucursalId.toString() }
+            metadata: {
+                subtotal,
+                descuento: descuentoAplicado,
+                total: pedido.total,
+                gananciaTotal,
+                canal: pedido.canal,
+                sucursalId: targetSucursalId.toString(),
+            }
         }, session);
 
         return pedido;
