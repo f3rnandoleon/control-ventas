@@ -10,6 +10,7 @@ import { updateProducto } from "@/services/producto.service";
 import { generarPDFQrs } from "@/utils/generarPDFQrs";
 import { generarPDFCodigosBarras } from "@/utils/generarPDFCodigosBarras";
 import GuiaTallasModal from "./GuiaTallasModal";
+import PreciosPorTallaModal from "./PreciosPorTallaModal";
 import ColorSwatch from "@/components/ui/ColorSwatch";
 import { buildEffectiveMedidasPorTalla, resolveMedidasForTalla } from "@/utils/medidas";
 
@@ -34,6 +35,7 @@ export default function VariantesManager({
   const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showGuiaTallas, setShowGuiaTallas] = useState(false);
+  const [showPreciosPorTalla, setShowPreciosPorTalla] = useState(false);
   const [search, setSearch] = useState("");
   const [filtroColor, setFiltroColor] = useState<string>("TODOS");
 
@@ -340,6 +342,17 @@ export default function VariantesManager({
               : "(Configurar)"}
           </span>
         </button>
+
+        <button
+          type="button"
+          disabled={totalVariantes === 0}
+          className="flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-xs px-3 py-2 transition active:scale-95 disabled:opacity-40 cursor-pointer shadow-sm"
+          onClick={() => setShowPreciosPorTalla(true)}
+          title="Asignar precios de venta por talla a todos los colores a la vez"
+        >
+          <span>💲</span>
+          <span>Precios por talla</span>
+        </button>
       </div>
 
       {/* Buscador y Filtro por Color (Ideal en pantallas móviles) */}
@@ -542,6 +555,14 @@ export default function VariantesManager({
         allProductos={allProductos}
         isOpen={showGuiaTallas}
         onClose={() => setShowGuiaTallas(false)}
+        onUpdated={onUpdated}
+      />
+
+      {/* Modal Precios por Talla (Editable de forma masiva por talla) */}
+      <PreciosPorTallaModal
+        producto={producto}
+        isOpen={showPreciosPorTalla}
+        onClose={() => setShowPreciosPorTalla(false)}
         onUpdated={onUpdated}
       />
     </div>

@@ -9,6 +9,7 @@ import ProductoModal from "@/components/productos/ProductoModal";
 import VariantesManager from "@/components/productos/VariantesManager";
 import ProductoFilters, { EMPTY_PRODUCT_FILTERS, type ProductoFilterValues } from "@/components/productos/ProductoFilters";
 import StockSucursalesModal from "@/components/productos/StockSucursalesModal";
+import PreciosPorTallaModal from "@/components/productos/PreciosPorTallaModal";
 import CloudinaryImage from "@/components/ui/CloudinaryImage";
 import { getVarianteImagenPrincipal, getVarianteSegundaImagen } from "@/utils/varianteImagen";
 import { getEstadoStock, getStockDisponibleVariante, getStockProducto } from "@/utils/stock";
@@ -31,6 +32,7 @@ export default function AdminProductosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Producto | null>(null);
   const [stockModalProduct, setStockModalProduct] = useState<Producto | null>(null);
+  const [priceModalProduct, setPriceModalProduct] = useState<Producto | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const [imageProduct, setImageProduct] = useState<Producto | null>(null);
@@ -48,6 +50,7 @@ export default function AdminProductosPage() {
       const fetched = await getProductos({ withStock: true });
       setProductos(fetched);
       setEditing((current) => current ? fetched.find((p) => p._id === current._id) || current : current);
+      setPriceModalProduct((current) => current ? fetched.find((p) => p._id === current._id) || current : current);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron cargar los productos");
     } finally { setLoading(false); }
@@ -419,6 +422,14 @@ export default function AdminProductosPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={!producto.variantes?.length}
+                  className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 active:scale-95 disabled:opacity-40 shadow-sm"
+                  onClick={() => setPriceModalProduct(producto)}
+                >
+                  💲 Precios talla
+                </button>
+                <button
+                  type="button"
                   className="flex min-h-[38px] items-center justify-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-gray-200 border border-slate-200 dark:border-white/10 active:scale-95 shadow-sm"
                   onClick={() => generarReporteProductoPDF(producto)}
                 >
@@ -482,6 +493,13 @@ export default function AdminProductosPage() {
                   <button className="btn-link mr-3 text-sky-400 font-medium" onClick={() => setStockModalProduct(producto)}>🏬 Stock Tiendas</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("PRODUCTO"); setModalOpen(true); }}>Editar</button>
                   <button className="btn-link mr-3" onClick={() => { setEditing(producto); setView("VARIANTES"); setModalOpen(true); }}>Variantes</button>
+                  <button
+                    className="btn-link mr-3 text-emerald-400 font-medium disabled:opacity-40"
+                    disabled={!producto.variantes?.length}
+                    onClick={() => setPriceModalProduct(producto)}
+                  >
+                    Precios talla
+                  </button>
                   <button className="btn-link mr-3" onClick={() => generarReporteProductoPDF(producto)}>Reporte</button>
                   <button className="btn-link mr-3" disabled={downloadingImageId === producto._id} onClick={() => openTallaSelector(producto)}>{downloadingImageId === producto._id ? "Generando..." : "Imagen variantes"}</button>
                   <button className="btn-danger" onClick={() => void handleDelete(producto)}>Eliminar</button>
@@ -518,6 +536,12 @@ export default function AdminProductosPage() {
         producto={stockModalProduct}
         open={Boolean(stockModalProduct)}
         onClose={() => setStockModalProduct(null)}
+      />
+      <PreciosPorTallaModal
+        producto={priceModalProduct}
+        isOpen={Boolean(priceModalProduct)}
+        onClose={() => setPriceModalProduct(null)}
+        onUpdated={loadProductos}
       />
       {imageProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/70 p-4 backdrop-blur-sm">
