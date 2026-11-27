@@ -5,7 +5,10 @@ import {
 } from "@/middleware/validate.middleware";
 import { resolveApiAuth } from "@/libs/resolveApiAuth";
 import { checkoutCartSchema } from "@/schemas/cart.schema";
-import { crearPedidoCheckout } from "@/modules/orders/application/pedidos.service";
+import {
+  crearPedidoCheckout,
+  sanitizePedidoForCustomer,
+} from "@/modules/orders/application/pedidos.service";
 import { sendTelegramMessage, escapeTelegramMd } from "@/libs/telegram";
 import { handleRouteError } from "@/shared/http/handleRouteError";
 
@@ -33,16 +36,18 @@ export async function POST(request: Request) {
       }
     }
 
-    const { pedido, pago } = await crearPedidoCheckout(
+    const { pedido, pago, reservationToken } = await crearPedidoCheckout(
       userAuth ? userAuth.id : null,
       payload
     );
 
-    // Notificación Telegram para métodos en efectivo, whatsapp o pedidos de invitados
+    // Notificación Telegram inmediata solo para pedidos NO-QR (efectivo / coordinación sin pago QR).
+    // Los pedidos QR notifican a Telegram cuando el cliente sube el comprobante.
     const isEfectivo = payload.metodoPago === "EFECTIVO";
-    const isWhatsapp = payload.entrega?.metodo === "WHATSAPP";
+    const isWhatsappNonQr =
+      payload.entrega?.metodo === "WHATSAPP" && payload.metodoPago !== "QR";
 
-    if (isEfectivo || isWhatsapp || isGuest) {
+    if (isEfectivo || isWhatsappNonQr) {
       try {
         const pedidoEscapado = escapeTelegramMd(pedido.numeroPedido);
         const montoEscapado = escapeTelegramMd(`Bs ${pedido.total.toFixed(2)}`);
@@ -70,15 +75,23 @@ export async function POST(request: Request) {
       }
     }
 
+    const pedidoRaw =
+      typeof pedido.toObject === "function" ? pedido.toObject() : pedido;
+    const pedidoSanitizado = sanitizePedidoForCustomer(
+      pedidoRaw as unknown as Record<string, unknown>
+    );
+
     return NextResponse.json(
       {
         ok: true,
         orderId: pedido._id.toString(),
-        paymentId: pago ? pago._id.toString() : null,
+        orderNumber: pedido.numeroPedido,
         codigo: pedido.numeroPedido,
+        paymentId: pago ? pago._id.toString() : null,
         expiresAt: pedido.reservaExpiraEn ? pedido.reservaExpiraEn.toISOString() : null,
+        reservationToken,
         message: "Pedido creado correctamente",
-        pedido,
+        pedido: pedidoSanitizado,
       },
       { status: 201 }
     );

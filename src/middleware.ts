@@ -31,7 +31,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers":
-    "Content-Type, Authorization, x-user-id, x-user-role, x-request-id",
+    "Content-Type, Authorization, x-user-id, x-user-role, x-request-id, x-reservation-token",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -71,6 +71,17 @@ export async function middleware(request: NextRequest) {
     pathname === "/register"
   ) {
     rlResult = checkRateLimit(`auth:${ip}`, RATE_LIMIT_CONFIGS.AUTH);
+  } else if (pathname === "/api/pedidos/checkout" && method === "POST") {
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const userId = token?.id as string | undefined;
+    const ipCheck = checkRateLimit(`checkout:ip:${ip}`, RATE_LIMIT_CONFIGS.CHECKOUT);
+    if (!ipCheck.allowed) {
+      rlResult = ipCheck;
+    } else if (userId) {
+      rlResult = checkRateLimit(`checkout:user:${userId}`, RATE_LIMIT_CONFIGS.CHECKOUT);
+    } else {
+      rlResult = ipCheck;
+    }
   } else if (pathname === "/api/public/promociones/evaluar" && method === "POST") {
     rlResult = checkRateLimit(`promo-eval:${ip}`, RATE_LIMIT_CONFIGS.WRITE);
   } else if (
@@ -194,6 +205,8 @@ export async function middleware(request: NextRequest) {
 
   const isGuestAllowedApiRoute =
     (pathname === "/api/pedidos/checkout" && method === "POST") ||
+    (/^\/api\/pedidos\/[^/]+\/reservation-status$/.test(pathname) && method === "GET") ||
+    (/^\/api\/pedidos\/[^/]+\/expire-reservation$/.test(pathname) && method === "POST") ||
     (/^\/api\/pagos\/[^/]+\/upload-comprobante$/.test(pathname) && method === "POST");
 
   if (!token) {
@@ -269,8 +282,18 @@ export async function middleware(request: NextRequest) {
       role === "CLIENTE" &&
       method === "POST" &&
       pathname.startsWith("/api/pedidos/checkout");
+    const isClientExpireReservation =
+      role === "CLIENTE" &&
+      method === "POST" &&
+      /^\/api\/pedidos\/[^/]+\/expire-reservation$/.test(pathname);
 
-    if (!isStaff && !isClientRead && !isClientUpdate && !isClientCheckout) {
+    if (
+      !isStaff &&
+      !isClientRead &&
+      !isClientUpdate &&
+      !isClientCheckout &&
+      !isClientExpireReservation
+    ) {
       return applyCorsHeaders(
         NextResponse.json(
           { message: "Acceso no autorizado" },

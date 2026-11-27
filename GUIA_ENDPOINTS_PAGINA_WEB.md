@@ -47,6 +47,14 @@
     - [10.4 Actualización de Datos de Entrega (`PATCH /api/pedidos/:id`)](#104-actualización-de-datos-de-entrega-patch-apipedidosid)
     - [10.5 Seguimiento de Guía Logística (`GET /api/entregas/:id`)](#105-seguimiento-de-guía-logística-get-apientregasid)
 11. [Guía de Integración Frontend (Snippets y Buenas Prácticas)](#11-guía-de-integración-frontend-snippets-y-buenas-prácticas)
+12. [Módulo 7: Rebajas de Catálogo ("Antes / Ahora"), Promociones y Cupones Web](#12-módulo-7-rebajas-de-catálogo-antes--ahora-promociones-y-cupones-web)
+13. [Módulo 8: Checkout Express de Promoción (Temporal / Reversible)](#13-módulo-8-checkout-express-de-promoción-temporal--reversible)
+    - [13.1 Variables de Entorno y Reversibilidad](#131-variables-de-entorno-y-reversibilidad)
+    - [13.2 Checkout Express (`POST /api/pedidos/checkout`)](#132-checkout-express-post-apipedidoscheckout)
+    - [13.3 Estado de Reserva (`GET /api/pedidos/:id/reservation-status`)](#133-estado-de-reserva-get-apipedidosidreservation-status)
+    - [13.4 Expiración Explícita (`POST /api/pedidos/:id/expire-reservation`)](#134-expiración-explícita-post-apipedidosidexpire-reservation)
+    - [13.5 Subida de Comprobante y Expiración Estricta (`410 RESERVATION_EXPIRED`)](#135-subida-de-comprobante-y-expiración-estricta-410-reservation_expired)
+    - [13.6 Anti-Abuso, Auto-Limpieza Lazy y Notas para `fitAndes`](#136-anti-abuso-auto-limpieza-lazy-y-notas-para-fitandes)
 
 ---
 
@@ -435,9 +443,16 @@ curl -X GET https://control-ventas-azure.vercel.app/api/delivery-options \
         }
       ]
     }
-  ]
+  ],
+  "shippingPolicy": {
+    "nationalFlatFee": 20,
+    "currency": "BOB",
+    "estimatedTime": null,
+    "promoExpressCheckout": true
+  }
 }
 ```
+> 💡 `shippingPolicy.nationalFlatFee` se lee desde la variable de entorno `NATIONAL_SHIPPING_FLAT_FEE` (default `10`; en promo `20`). `promoExpressCheckout` refleja `WEB_PROMO_EXPRESS_CHECKOUT`.
 
 ---
 
@@ -1092,21 +1107,37 @@ El cliente adjunta la captura de su transferencia bancaria.
 
 * **Método:** `POST`
 * **Ruta:** `/api/pagos/:id/upload-comprobante` (donde `:id` es el `_id` de la `TransaccionPago`).
+* **Auth:** Soporta clientes autenticados (`Authorization: Bearer <accessToken>` / cookie) **e invitados sin sesión** (se recomienda enviar `reservationToken` por FormData o cabecera `x-reservation-token`).
 * **Content-Type:** `multipart/form-data`
-* **Campo Form-Data:** `file` (archivo de imagen JPG/PNG, tamaño máximo **5 MB**).
+* **Campos Form-Data:**
+  * `file` (archivo de imagen JPG/PNG/WEBP, tamaño máximo **5 MB**) — obligatorio.
+  * `reservationToken` (string recibido en `POST /api/pedidos/checkout`) — opcional/recomendado.
+
+#### Validación de Expiración (Antes de Subir a Cloudinary):
+Antes de subir la imagen, el backend verifica que el pedido no esté cancelado, que `estadoReservaStock === "RESERVED"` y que no haya vencido `reservaExpiraEn` (+ `WEB_RESERVATION_GRACE_SECONDS`). Si ya expiró, libera el stock atómicamente (lazy expiration) y responde **`HTTP 410 Gone`**:
+```json
+{
+  "ok": false,
+  "code": "RESERVATION_EXPIRED",
+  "message": "El tiempo límite de reserva ha finalizado."
+}
+```
 
 #### Ejemplo de Petición cURL:
 ```bash
 curl -X POST "https://control-ventas-azure.vercel.app/api/pagos/670e3002f1b4c90011223345/upload-comprobante" \
-  -H "Authorization: Bearer <accessToken>" \
+  -H "x-reservation-token: <reservationToken>" \
   -F "file=@/ruta/captura_pago_bancosol.png"
 ```
 
 #### Respuesta Exitosa (`HTTP 201 Created`):
 ```json
 {
+  "ok": true,
   "message": "Comprobante subido correctamente. El administrador fue notificado.",
-  "urlComprobante": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864500/control-ventas/comprobantes/comp_x9123.jpg"
+  "urlComprobante": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864500/control-ventas/comprobantes/comp_x9123.jpg",
+  "orderId": "670e3001f1b4c90011223344",
+  "orderNumber": "WEB-MLK5T5B3-7EF4B7"
 }
 ```
 
@@ -1416,6 +1447,209 @@ Cada variante de producto en `GET /api/public/productos` cuenta con un arreglo d
 * `GET /api/admin/promociones/:id/usos`
 * `GET / POST /api/admin/cupones`
 * `PATCH / DELETE /api/admin/cupones/:id`
+
+---
+
+## 13. Módulo 8: Checkout Express de Promoción (Temporal / Reversible)
+
+Soporte temporal y 100% reversible en el backend central (`control-ventas`) para el **Checkout Express de Promoción** de `fitAndes` (tanto para **clientes invitados** como **clientes autenticados**), sin romper el checkout tradicional, el POS ni el Bot de WhatsApp.
+
+### 13.1 Variables de Entorno y Reversibilidad
+
+| Variable | Default (flujo normal) | Valor en Promo | Descripción |
+|---|---|---|---|
+| `WEB_PROMO_EXPRESS_CHECKOUT` | `false` | `true` | Flexibiliza Zod en `SHIPPING_NATIONAL` + `QR` (sin exigir `empresaEnvio`, `sucursal`, `nombreRemitente` ni `ciRemitente`). |
+| `WEB_RESERVATION_MINUTES` | `30` | `10` | Duración en minutos de la reserva de stock para todos los pedidos `QR` (La Paz y nacional). |
+| `WEB_RESERVATION_GRACE_SECONDS` | `0` | `30` (o `60`) | Segundos de gracia al subir el comprobante QR por latencia de red. |
+| `NATIONAL_SHIPPING_FLAT_FEE` | `10` | `20` | Tarifa plana nacional SSOT expuesta en `GET /api/delivery-options` y aplicada en `POST /api/pedidos/checkout`. |
+| `MAX_ACTIVE_RESERVATIONS_PER_CUSTOMER` | `3` | `3` | Máximo de reservas `PENDING_PAYMENT` activas simultáneas por cliente o teléfono (`429 TOO_MANY_ACTIVE_RESERVATIONS`). |
+
+> Al finalizar la promoción basta con borrar estas variables o volver a `WEB_PROMO_EXPRESS_CHECKOUT=false`, `WEB_RESERVATION_MINUTES=30` y `NATIONAL_SHIPPING_FLAT_FEE=10`.
+
+---
+
+### 13.2 Checkout Express (`POST /api/pedidos/checkout`)
+
+* **Tarifa SSOT de envío:**
+  * **La Paz** (`entrega.metodo: "WHATSAPP"`, `departamento: "La Paz"`): `costoEnvio = 0`.
+  * **Otro departamento** (`entrega.metodo: "SHIPPING_NATIONAL"` con `Oruro`, `Potosí`/`Potosi`, `Cochabamba`, `Sucre`/`Chuquisaca`, `Tarija`, `Pando`, `Beni`, `Santa Cruz`, insensible a mayúsculas/tildes): `costoEnvio = 20` (respetando `descuentoEnvio` si una promoción/cupón `ENVIO_GRATIS` aplica).
+* **Consistencia de totales:** `subtotal + costoEnvio - descuento === total` (idéntico a `POST /api/public/promociones/evaluar`).
+* **Notificación Telegram:** Para pedidos `QR`, la alerta a Telegram se envía únicamente al subir el comprobante (incluyendo nombre, celular, departamento y monto con envío) para evitar spam de reservas abandonadas.
+* **Carrito de clientes logeados:**
+  * Si el frontend **no** envía `items`, el backend lee y vacía el carrito en BD al crear el pedido.
+  * Si el frontend **sí** envía `items` también para clientes logeados, el carrito en BD no se borra al crear el pedido (evitando perder el carrito si la reserva de 10 min expira); la web debe limpiar el carrito tras recibir `201` en `upload-comprobante`.
+
+#### Request — Invitado La Paz (`costoEnvio = 0`):
+```json
+{
+  "esInvitado": true,
+  "clienteInvitado": {
+    "nombreCompleto": "Ana Pérez",
+    "telefono": "71234567"
+  },
+  "items": [
+    { "productoId": "65f...", "variantId": "var-1", "color": "Negro", "talla": "M", "cantidad": 1 }
+  ],
+  "metodoPago": "QR",
+  "cuponCodigo": "PROMO10",
+  "entrega": {
+    "metodo": "WHATSAPP",
+    "departamento": "La Paz",
+    "ciudad": "La Paz",
+    "nombreDestinatario": "Ana Pérez",
+    "telefono": "71234567"
+  }
+}
+```
+
+#### Request — Invitado Otro Departamento (`costoEnvio = 20`):
+```json
+{
+  "esInvitado": true,
+  "clienteInvitado": {
+    "nombreCompleto": "Luis Mamani",
+    "telefono": "76543210"
+  },
+  "items": [
+    { "productoId": "65f...", "variantId": "var-1", "color": "Azul", "talla": "L", "cantidad": 2 }
+  ],
+  "metodoPago": "QR",
+  "cuponCodigo": null,
+  "entrega": {
+    "metodo": "SHIPPING_NATIONAL",
+    "departamento": "Potosi",
+    "nombreDestinatario": "Luis Mamani",
+    "telefono": "76543210"
+  }
+}
+```
+
+#### Request — Cliente Logeado (`Authorization: Bearer <accessToken>`):
+Mismos payloads anteriores **omitiendo** `esInvitado` y `clienteInvitado` (el campo `precio` en `items` es opcional). Si `empresaEnvio` o `sucursal` no se envían con `WEB_PROMO_EXPRESS_CHECKOUT=true`, se guardan automáticamente como `"Por coordinar por WhatsApp"`.
+
+#### Respuesta Unificada (`HTTP 201 Created`, invitado y logeado):
+```json
+{
+  "ok": true,
+  "orderId": "674...",
+  "orderNumber": "WEB-20261127-XXXX",
+  "codigo": "WEB-20261127-XXXX",
+  "paymentId": "674...",
+  "expiresAt": "2026-11-27T22:15:00.000Z",
+  "reservationToken": "uuid-v4-seguro",
+  "message": "Pedido creado correctamente",
+  "pedido": {
+    "_id": "674...",
+    "numeroPedido": "WEB-20261127-XXXX",
+    "estadoPedido": "PENDING_PAYMENT",
+    "estadoPago": "PENDING",
+    "estadoReservaStock": "RESERVED",
+    "reservaExpiraEn": "2026-11-27T22:15:00.000Z",
+    "subtotal": 200,
+    "descuento": 20,
+    "descuentoCatalogo": 20,
+    "descuentoPromociones": 0,
+    "descuentoEnvio": 0,
+    "costoEnvio": 20,
+    "cuponCodigo": null,
+    "total": 200
+  }
+}
+```
+> El objeto `pedido` siempre retorna sanitizado (sin `precioCosto`, `ganancia`, `gananciaTotal` ni `reservationTokenHash`).
+
+---
+
+### 13.3 Estado de Reserva (`GET /api/pedidos/:id/reservation-status`)
+
+Permite al Paso 3 bloquear recargas si la reserva ya venció. Si `reservaExpiraEn <= now` y sigue `PENDING_PAYMENT` sin comprobante, ejecuta la liberación atómica del stock en ese mismo instante (lazy expiration).
+
+* **Método:** `GET`
+* **Ruta:** `/api/pedidos/:id/reservation-status?token=<reservationToken>`
+* **Autorización:** Query `?token=...`, cabecera `x-reservation-token`, o sesión `Bearer`/cookie del dueño.
+* **Cache:** `Cache-Control: no-store`.
+
+#### Respuesta (`HTTP 200 OK`, sin datos privados/PII):
+```json
+{
+  "ok": true,
+  "orderId": "674...",
+  "orderNumber": "WEB-20261127-XXXX",
+  "paymentId": "674...",
+  "valid": true,
+  "expired": false,
+  "hasReceipt": false,
+  "estadoPedido": "PENDING_PAYMENT",
+  "estadoPago": "PENDING",
+  "estadoReservaStock": "RESERVED",
+  "expiresAt": "2026-11-27T22:15:00.000Z",
+  "subtotal": 200,
+  "descuento": 20,
+  "descuentoEnvio": 0,
+  "costoEnvio": 20,
+  "total": 200
+}
+```
+
+---
+
+### 13.4 Expiración Explícita (`POST /api/pedidos/:id/expire-reservation`)
+
+Invocado por el frontend cuando el temporizador de 10:00 llega a `00:00`. En una transacción ACID idempotente: libera el stock en `Producto` y `NivelStock`, revierte los usos de cupón/promoción, marca `Pedido` como `CANCELLED`/`RELEASED`/`FAILED`, marca `TransaccionPago` como `FAILED` y sincroniza `Entrega`. Si el usuario ya subió comprobante o pagó, **no** cancela el pedido (`released: false, hasReceipt: true`).
+
+* **Método:** `POST`
+* **Ruta:** `/api/pedidos/:id/expire-reservation`
+* **Autorización:** Body `{ "token": "<reservationToken>" }`, cabecera `x-reservation-token`, o sesión del dueño.
+
+#### Respuesta (`HTTP 200 OK`):
+```json
+{
+  "ok": true,
+  "orderId": "674...",
+  "orderNumber": "WEB-20261127-XXXX",
+  "released": true,
+  "alreadyReleased": false,
+  "hasReceipt": false,
+  "estadoPedido": "CANCELLED",
+  "estadoPago": "FAILED",
+  "estadoReservaStock": "RELEASED"
+}
+```
+
+---
+
+### 13.5 Subida de Comprobante y Expiración Estricta (`410 RESERVATION_EXPIRED`)
+
+* Endpoint: `POST /api/pagos/:paymentId/upload-comprobante` (`multipart/form-data` con `file` y opcional `reservationToken` o header `x-reservation-token`).
+* Si la reserva ya venció (más allá de `WEB_RESERVATION_GRACE_SECONDS`), **no sube a Cloudinary**, libera el stock en ese instante y responde `HTTP 410`:
+  ```json
+  {
+    "ok": false,
+    "code": "RESERVATION_EXPIRED",
+    "message": "El tiempo límite de reserva ha finalizado."
+  }
+  ```
+* Si está vigente: sube a Cloudinary, re-valida atómicamente en transacción, extiende la reserva a 48h y notifica a Telegram con pedido, pago, nombre, celular, departamento y monto (incluyendo envío).
+
+---
+
+### 13.6 Anti-Abuso, Auto-Limpieza Lazy y Notas para `fitAndes`
+
+* **Protección anti-abuso:**
+  1. Rate limiting de **6 checkouts/min** por IP (y por usuario si está logeado) en `middleware.ts`.
+  2. Límite persistente en MongoDB de máximo `MAX_ACTIVE_RESERVATIONS_PER_CUSTOMER` reservas activas por cliente/teléfono (`HTTP 429` con `code: "TOO_MANY_ACTIVE_RESERVATIONS"`).
+* **CORS:** `x-reservation-token` está habilitado en `Access-Control-Allow-Headers`.
+* **Cron y Auto-Limpieza Lazy (sin servicios externos):**
+  * El cron de `vercel.json` (`/api/admin/cron/reservas-expiradas`) corre **1 vez al día** (`0 1 * * *` UTC).
+  * Adicionalmente, el backend ejecuta **auto-limpieza lazy gratuita**:
+    1. Barrido throttled cada **60 segundos** (vía `CronLock`) en `GET /api/productos/publicos` y `GET /api/productos/publicos/:id`.
+    2. Liberación inmediata de reservas vencidas de los productos solicitados antes de reservar stock en `POST /api/pedidos/checkout`.
+* **Checklist de integración para `fitAndes`:**
+  1. Guardar `{ orderId, orderNumber, paymentId, reservationToken, expiresAt }` en `sessionStorage` al crear el pedido en Paso 3.
+  2. Al montar o recargar Paso 3, consultar `GET /api/pedidos/:orderId/reservation-status?token=...`; si `expired === true` o `!valid`, limpiar `sessionStorage` y redirigir al catálogo.
+  3. Al llegar el timer a `00:00`, llamar `POST /api/pedidos/:orderId/expire-reservation`, limpiar `sessionStorage` y redirigir al catálogo.
+  4. Al recibir `HTTP 410` (`code === "RESERVATION_EXPIRED"`) en `upload-comprobante`, mostrar mensaje y redirigir al catálogo.
+  5. Al recibir `HTTP 201` en `upload-comprobante`, pasar al Paso 4 (WhatsApp `+591 67113105`) y limpiar el carrito.
 
 ---
 

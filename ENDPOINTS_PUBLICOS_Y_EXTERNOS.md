@@ -33,6 +33,8 @@
    - [6.2 Mis Pedidos (`GET /api/mis-pedidos`)](#62-mis-pedidos-get-apimis-pedidos)
    - [6.3 Detalle de Pedido Propio (`GET /api/mis-pedidos/:id`)](#63-detalle-de-pedido-propio-get-apimis-pedidosid)
    - [6.4 Cancelar o Editar Pedido Propio (`PATCH /api/pedidos/:id`)](#64-cancelar-o-editar-pedido-propio-patch-apipedidosid)
+   - [6.5 Estado de Reserva (`GET /api/pedidos/:id/reservation-status`)](#65-estado-de-reserva-get-apipedidosidreservation-status)
+   - [6.6 Expirar Reserva Explícitamente (`POST /api/pedidos/:id/expire-reservation`)](#66-expirar-reserva-explícitamente-post-apipedidosidexpire-reservation)
 7. [Pagos y Comprobantes QR](#7-pagos-y-comprobantes-qr)
    - [7.1 Crear Transacción de Pago (`POST /api/pagos`)](#71-crear-transacción-de-pago-post-apipagos)
    - [7.2 Subir Comprobante QR (`POST /api/pagos/:id/upload-comprobante`)](#72-subir-comprobante-qr-post-apipagosidupload-comprobante)
@@ -365,7 +367,13 @@ curl -X GET https://control-ventas-azure.vercel.app/api/delivery-options
         }
       ]
     }
-  ]
+  ],
+  "shippingPolicy": {
+    "nationalFlatFee": 20,
+    "currency": "BOB",
+    "estimatedTime": null,
+    "promoExpressCheckout": true
+  }
 }
 ```
 
@@ -798,6 +806,63 @@ Un cliente puede cancelar su pedido si aún se encuentra en `PENDING_PAYMENT`, l
 
 ---
 
+### 6.5 Estado de Reserva (`GET /api/pedidos/:id/reservation-status`)
+Permite consultar el estado vigente de la reserva de un pedido (invitado vía `reservationToken` o cliente dueño autenticado) sin exponer datos privados. Si el plazo expiró sin comprobante subido, libera el stock atómicamente (lazy expiration) y responde `expired: true`.
+
+- **Método:** `GET`
+- **Ruta:** `/api/pedidos/:id/reservation-status?token=<reservationToken>`
+- **Auth:** `?token=<reservationToken>`, header `x-reservation-token`, o `Authorization: Bearer <accessToken>` del dueño.
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "ok": true,
+  "orderId": "670e3001f1b4c90011223344",
+  "orderNumber": "WEB-20261127-XXXX",
+  "paymentId": "670e3002f1b4c90011223345",
+  "valid": true,
+  "expired": false,
+  "hasReceipt": false,
+  "estadoPedido": "PENDING_PAYMENT",
+  "estadoPago": "PENDING",
+  "estadoReservaStock": "RESERVED",
+  "expiresAt": "2026-11-27T22:15:00.000Z",
+  "subtotal": 200,
+  "descuento": 20,
+  "descuentoEnvio": 0,
+  "costoEnvio": 20,
+  "total": 200
+}
+```
+
+---
+
+### 6.6 Expirar Reserva Explícitamente (`POST /api/pedidos/:id/expire-reservation`)
+Libera atómicamente el stock, revierte usos de cupones/promociones y marca `Pedido` y `TransaccionPago` como expirados/fallidos cuando el contador del frontend llega a `00:00`. Es idempotente y nunca cancela un pedido que ya tiene comprobante subido o pago confirmado.
+
+- **Método:** `POST`
+- **Ruta:** `/api/pedidos/:id/expire-reservation`
+- **Auth:** Body `{ "token": "<reservationToken>" }`, header `x-reservation-token`, o sesión del dueño.
+
+#### Respuesta Exitosa (HTTP 200):
+```json
+{
+  "ok": true,
+  "orderId": "670e3001f1b4c90011223344",
+  "orderNumber": "WEB-20261127-XXXX",
+  "released": true,
+  "alreadyReleased": false,
+  "hasReceipt": false,
+  "estadoPedido": "CANCELLED",
+  "estadoPago": "FAILED",
+  "estadoReservaStock": "RELEASED"
+}
+```
+
+> 📌 Para el detalle completo del **Checkout Express de Promoción** (variables de entorno reversibles `WEB_PROMO_EXPRESS_CHECKOUT`, `WEB_RESERVATION_MINUTES`, `NATIONAL_SHIPPING_FLAT_FEE`, payloads simplificados de La Paz y envío nacional, anti-abuso `429` y auto-limpieza lazy), consulta el **Módulo 8** en [GUIA_ENDPOINTS_PAGINA_WEB.md](file:///c:/proyectos/control-ventas/GUIA_ENDPOINTS_PAGINA_WEB.md).
+
+---
+
 ## 7. Pagos y Comprobantes QR
 
 ### 7.1 Crear Transacción de Pago (`POST /api/pagos`)
@@ -828,21 +893,35 @@ Permite subir la foto de la transferencia o pago QR realizado por el cliente.
 
 - **Método:** `POST`
 - **Ruta:** `/api/pagos/:id/upload-comprobante` (donde `:id` es el ID de la `TransaccionPago`)
+- **Auth:** Cliente autenticado (`Bearer`/cookie) o **invitado** (acepta `reservationToken` en FormData o header `x-reservation-token`).
 - **Content-Type:** `multipart/form-data`
-- **Campo:** `file` (archivo de imagen JPG/PNG, máximo 5 MB)
+- **Campos:** `file` (archivo de imagen JPG/PNG/WEBP, máximo 5 MB), `reservationToken` (opcional/recomendado).
 
 #### Ejemplo con cURL:
 ```bash
 curl -X POST https://control-ventas-azure.vercel.app/api/pagos/670e3002f1b4c90011223345/upload-comprobante \
-  -H "Authorization: Bearer <accessToken>" \
+  -H "x-reservation-token: <reservationToken>" \
   -F "file=@/ruta/al/comprobante_bancosol.jpg"
 ```
 
-#### Respuesta Exitosa (HTTP 200):
+#### Respuesta Exitosa (HTTP 201):
 ```json
 {
+  "ok": true,
   "message": "Comprobante subido correctamente. El administrador fue notificado.",
-  "urlComprobante": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864500/control-ventas/comprobantes/comp_x9123.jpg"
+  "urlComprobante": "https://res.cloudinary.com/dq1jeikev/image/upload/v1728864500/control-ventas/comprobantes/comp_x9123.jpg",
+  "orderId": "670e3001f1b4c90011223344",
+  "orderNumber": "WEB-20261127-XXXX"
+}
+```
+
+#### Error si la Reserva Expiró (HTTP 410 Gone):
+Valida antes de subir a Cloudinary y libera el stock atómicamente en ese instante:
+```json
+{
+  "ok": false,
+  "code": "RESERVATION_EXPIRED",
+  "message": "El tiempo límite de reserva ha finalizado."
 }
 ```
 

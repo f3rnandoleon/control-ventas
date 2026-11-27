@@ -3,6 +3,10 @@ import { recordAuditEventSafe } from "@/modules/audit/application/audit.service"
 import { deliveryOptionsRepository } from "@/modules/delivery-options/infrastructure/delivery-options.repository";
 import type { DeliveryOptionsInput } from "@/schemas/delivery-options.schema";
 import { AppError } from "@/shared/errors/AppError";
+import {
+  getNationalShippingFlatFee,
+  isPromoExpressCheckoutEnabled,
+} from "@/shared/config/checkout-promo.config";
 
 type DeliveryOptionsDocument = DeliveryOptionsInput & {
   _id: { toString(): string };
@@ -12,17 +16,21 @@ export type ShippingPolicy = {
   nationalFlatFee: number;
   currency: string;
   estimatedTime: string | null;
+  promoExpressCheckout?: boolean;
 };
 
 export type DeliveryOptionsResponse = DeliveryOptionsInput & {
   shippingPolicy: ShippingPolicy;
 };
 
-const NATIONAL_SHIPPING_POLICY: ShippingPolicy = {
-  nationalFlatFee: 10,
-  currency: "BOB",
-  estimatedTime: null,
-};
+function buildShippingPolicy(): ShippingPolicy {
+  return {
+    nationalFlatFee: getNationalShippingFlatFee(),
+    currency: "BOB",
+    estimatedTime: null,
+    promoExpressCheckout: isPromoExpressCheckoutEnabled(),
+  };
+}
 
 function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse {
   const pickupPoints = (document.pickupPoints || []).map((point) => ({
@@ -76,7 +84,7 @@ function toResponse(document: DeliveryOptionsDocument): DeliveryOptionsResponse 
     pickupPoints,
     pickupSchedules: document.pickupSchedules,
     shippingCompanies,
-    shippingPolicy: NATIONAL_SHIPPING_POLICY,
+    shippingPolicy: buildShippingPolicy(),
   };
 }
 

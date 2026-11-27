@@ -4,6 +4,7 @@ import {
   objectIdSchema,
   positiveIntegerSchema,
 } from "./common.schema";
+import { isPromoExpressCheckoutEnabled } from "@/shared/config/checkout-promo.config";
 
 const optionalObjectIdSchema = z.preprocess(
   (value) => {
@@ -56,7 +57,7 @@ export const checkoutItemSchema = z.object({
   color: nonEmptyStringSchema.max(50, "El color no puede exceder 50 caracteres"),
   talla: nonEmptyStringSchema.max(20, "La talla no puede exceder 20 caracteres"),
   cantidad: positiveIntegerSchema.max(1000, "La cantidad no puede exceder 1000"),
-  precio: z.number().positive("El precio debe ser positivo"),
+  precio: z.number().positive("El precio debe ser positivo").optional(),
 });
 
 export const checkoutCartSchema = z
@@ -152,36 +153,75 @@ export const checkoutCartSchema = z
           path: ["entrega", "departamento"],
         });
       }
-      if (!data.entrega?.empresaEnvio) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "La empresa de transporte es obligatoria",
-          path: ["entrega", "empresaEnvio"],
-        });
-      }
-      const nombreDestino = data.entrega?.nombreRemitente || data.clienteInvitado?.nombreCompleto;
-      if (!nombreDestino) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El nombre del remitente es obligatorio",
-          path: ["entrega", "nombreRemitente"],
-        });
-      }
-      const ciDestino = data.entrega?.ciRemitente || data.clienteInvitado?.ci;
-      if (!ciDestino) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El carnet del remitente es obligatorio",
-          path: isGuest ? ["clienteInvitado", "ci"] : ["entrega", "ciRemitente"],
-        });
-      }
-      const telefonoDestino = data.entrega?.telefonoRemitente || data.clienteInvitado?.telefono;
-      if (!telefonoDestino) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El celular del remitente es obligatorio",
-          path: ["entrega", "telefonoRemitente"],
-        });
+
+      const promoExpress = isPromoExpressCheckoutEnabled();
+      if (!promoExpress) {
+        if (!data.entrega?.empresaEnvio) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "La empresa de transporte es obligatoria",
+            path: ["entrega", "empresaEnvio"],
+          });
+        }
+        const nombreDestino =
+          data.entrega?.nombreRemitente ||
+          data.entrega?.nombreDestinatario ||
+          data.clienteInvitado?.nombreCompleto;
+        if (!nombreDestino) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "El nombre del remitente es obligatorio",
+            path: ["entrega", "nombreRemitente"],
+          });
+        }
+        const ciDestino = data.entrega?.ciRemitente || data.clienteInvitado?.ci;
+        if (!ciDestino) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "El carnet del remitente es obligatorio",
+            path: isGuest ? ["clienteInvitado", "ci"] : ["entrega", "ciRemitente"],
+          });
+        }
+        const telefonoDestino =
+          data.entrega?.telefonoRemitente ||
+          data.entrega?.telefono ||
+          data.clienteInvitado?.telefono;
+        if (!telefonoDestino) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "El celular del remitente es obligatorio",
+            path: ["entrega", "telefonoRemitente"],
+          });
+        }
+      } else {
+        // En Checkout Express de promoción, empresaEnvio/sucursal/ciRemitente son opcionales.
+        // Para invitados, clienteInvitado ya exige nombreCompleto y telefono;
+        // para logeados, aceptamos nombreDestinatario/nombreRemitente y telefono/telefonoRemitente
+        // (o se resuelven desde su perfil en el servicio).
+        if (isGuest) {
+          const nombreContacto =
+            data.entrega?.nombreDestinatario ||
+            data.entrega?.nombreRemitente ||
+            data.clienteInvitado?.nombreCompleto;
+          if (!nombreContacto) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "El nombre completo es obligatorio",
+              path: ["entrega", "nombreDestinatario"],
+            });
+          }
+          const telefonoContacto =
+            data.entrega?.telefono ||
+            data.entrega?.telefonoRemitente ||
+            data.clienteInvitado?.telefono;
+          if (!telefonoContacto) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "El celular de contacto es obligatorio",
+              path: ["entrega", "telefono"],
+            });
+          }
+        }
       }
     }
   });

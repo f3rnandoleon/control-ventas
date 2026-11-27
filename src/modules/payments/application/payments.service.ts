@@ -25,6 +25,11 @@ import type {
 import type { Variante } from "@/types/producto";
 import { AppError } from "@/shared/errors/AppError";
 import { runInTransaction } from "@/shared/db/runTransaction";
+import { getWebReservationGraceSeconds } from "@/shared/config/checkout-promo.config";
+import {
+  expireOrderReservationIfNeeded,
+  verifyReservationToken,
+} from "@/modules/orders/application/pedidos.service";
 
 type AuthActor = {
   id: string;
@@ -40,7 +45,9 @@ type PaymentReviewPedido = {
   canal: string;
   metodoPago: string;
   subtotal: number;
+  costoEnvio?: number;
   descuento: number;
+  descuentoEnvio?: number;
   total: number;
   estadoPedido: string;
   estadoPago: string;
@@ -459,6 +466,7 @@ export async function failPaymentTransaction(
             producto,
             variante,
             cantidad: item.cantidad,
+            sucursalId: (pedido as unknown as { sucursalId?: mongoose.Types.ObjectId }).sucursalId,
           },
           session
         );
@@ -600,39 +608,176 @@ export async function refundPaymentTransaction(
 // FLUJO QR: COMPROBANTE + VERIFICACION POR LINK/TOKEN
 // ============================================================
 
-export async function uploadComprobanteAndGenerateToken(
+function assertProofUploadActorAccess(
+  payment: { cliente?: mongoose.Types.ObjectId | null },
+  pedido: { reservationTokenHash?: string | null },
+  idActor: string,
+  reservationToken?: string | null
+) {
+  const hasValidToken = verifyReservationToken(
+    reservationToken,
+    pedido.reservationTokenHash
+  );
+
+  if (reservationToken && !hasValidToken) {
+    throw new AppError("Token de reserva inválido", 403, "INVALID_RESERVATION_TOKEN");
+  }
+
+  if (payment.cliente) {
+    if (idActor !== "INVITADO" && payment.cliente.toString() === idActor) {
+      return;
+    }
+    if (hasValidToken) {
+      return;
+    }
+    if (idActor === "INVITADO") {
+      throw new AppError("No autenticado", 401);
+    }
+    throw new AppError("No autorizado", 403);
+  }
+}
+
+export async function validatePaymentBeforeProofUpload(
   paymentId: string,
-  comprobanteUrl: string,
-  idActor: string
+  idActor: string,
+  reservationToken?: string | null
 ) {
   assertObjectId(paymentId, "Pago invalido");
   await connectDB();
 
   const payment = await paymentsRepository.findById(paymentId);
   if (!payment) throw new AppError("Pago no encontrado", 404);
-  if (payment.cliente && payment.cliente.toString() !== idActor) throw new AppError("No autorizado", 403);
-  if (payment.estado !== "PENDING") throw new AppError("El pago ya fue procesado", 409);
-
-  const tokenRevision = randomUUID();
-  payment.urlComprobante = comprobanteUrl;
-  payment.tokenRevision = undefined;
-  payment.tokenRevisionHash = hashReviewToken(tokenRevision);
-  payment.tokenRevisionPurpose = REVIEW_TOKEN_PURPOSE;
-  payment.tokenRevisionExpiresAt = createReviewTokenExpirationDate();
-  payment.tokenRevisionUsedAt = null;
-  payment.tokenRevisionUsedBy = null;
-  payment.tokenRevisionUsado = false;
-  await payment.save();
 
   const pedido = await Pedido.findById(payment.pedidoId);
-  if (pedido && pedido.estadoReservaStock === "RESERVED") {
-    const extendedDate = new Date();
-    extendedDate.setHours(extendedDate.getHours() + 48);
-    pedido.reservaExpiraEn = extendedDate;
-    await pedido.save();
+  if (!pedido) throw new AppError("Pedido no encontrado", 404);
+
+  assertProofUploadActorAccess(payment, pedido, idActor, reservationToken);
+
+  if (payment.estado === "PAID") {
+    throw new AppError("El pago ya fue confirmado", 409, "PAYMENT_ALREADY_PROCESSED");
   }
 
-  return { payment, tokenRevision };
+  const graceSeconds = getWebReservationGraceSeconds();
+  const isExpiredByState =
+    pedido.estadoPedido === "CANCELLED" ||
+    pedido.estadoReservaStock === "RELEASED" ||
+    payment.estado === "FAILED";
+  const isExpiredByTime =
+    pedido.estadoReservaStock === "RESERVED" &&
+    !payment.urlComprobante &&
+    Boolean(pedido.reservaExpiraEn) &&
+    new Date(pedido.reservaExpiraEn).getTime() + graceSeconds * 1000 <= Date.now();
+
+  if (isExpiredByState || isExpiredByTime) {
+    if (pedido.estadoReservaStock === "RESERVED" && !payment.urlComprobante) {
+      await expireOrderReservationIfNeeded(pedido._id.toString(), {
+        force: true,
+        reason: "Reserva expirada al intentar subir comprobante",
+        actorId: idActor,
+        actorRole: idActor === "INVITADO" ? null : "CLIENTE",
+      });
+    }
+    throw new AppError(
+      "El tiempo límite de reserva ha finalizado.",
+      410,
+      "RESERVATION_EXPIRED"
+    );
+  }
+
+  if (pedido.estadoReservaStock !== "RESERVED") {
+    throw new AppError(
+      "El tiempo límite de reserva ha finalizado.",
+      410,
+      "RESERVATION_EXPIRED"
+    );
+  }
+
+  if (payment.estado !== "PENDING") {
+    throw new AppError("El pago ya fue procesado", 409);
+  }
+
+  return { payment, pedido };
+}
+
+export async function uploadComprobanteAndGenerateToken(
+  paymentId: string,
+  comprobanteUrl: string,
+  idActor: string,
+  reservationToken?: string | null
+) {
+  assertObjectId(paymentId, "Pago invalido");
+  await connectDB();
+
+  const graceSeconds = getWebReservationGraceSeconds();
+
+  try {
+    return await runInTransaction(async (session) => {
+      const payment = await paymentsRepository.findById(paymentId, session);
+      if (!payment) throw new AppError("Pago no encontrado", 404);
+
+      const pedido = await Pedido.findById(payment.pedidoId).session(session);
+      if (!pedido) throw new AppError("Pedido no encontrado", 404);
+
+      assertProofUploadActorAccess(payment, pedido, idActor, reservationToken);
+
+      if (payment.estado === "PAID") {
+        throw new AppError("El pago ya fue confirmado", 409, "PAYMENT_ALREADY_PROCESSED");
+      }
+
+      const isExpiredByState =
+        pedido.estadoPedido === "CANCELLED" ||
+        pedido.estadoReservaStock !== "RESERVED" ||
+        payment.estado === "FAILED";
+      const isExpiredByTime =
+        !payment.urlComprobante &&
+        Boolean(pedido.reservaExpiraEn) &&
+        new Date(pedido.reservaExpiraEn).getTime() + graceSeconds * 1000 <= Date.now();
+
+      if (isExpiredByState || isExpiredByTime) {
+        throw new AppError(
+          "El tiempo límite de reserva ha finalizado.",
+          410,
+          "RESERVATION_EXPIRED"
+        );
+      }
+
+      if (payment.estado !== "PENDING") {
+        throw new AppError("El pago ya fue procesado", 409);
+      }
+
+      const tokenRevision = randomUUID();
+      payment.urlComprobante = comprobanteUrl;
+      payment.tokenRevision = undefined;
+      payment.tokenRevisionHash = hashReviewToken(tokenRevision);
+      payment.tokenRevisionPurpose = REVIEW_TOKEN_PURPOSE;
+      payment.tokenRevisionExpiresAt = createReviewTokenExpirationDate();
+      payment.tokenRevisionUsedAt = null;
+      payment.tokenRevisionUsedBy = null;
+      payment.tokenRevisionUsado = false;
+      await payment.save({ session });
+
+      const extendedDate = new Date();
+      extendedDate.setHours(extendedDate.getHours() + 48);
+      pedido.reservaExpiraEn = extendedDate;
+      await pedido.save({ session });
+
+      return { payment, pedido, tokenRevision };
+    });
+  } catch (error) {
+    if (error instanceof AppError && error.code === "RESERVATION_EXPIRED") {
+      const payment = await paymentsRepository.findById(paymentId);
+      if (payment) {
+        await expireOrderReservationIfNeeded(payment.pedidoId.toString(), {
+          force: false,
+          graceSeconds,
+          reason: "Reserva expirada al intentar subir comprobante",
+          actorId: idActor,
+          actorRole: idActor === "INVITADO" ? null : "CLIENTE",
+        });
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getPaymentByReviewToken(
@@ -690,7 +835,9 @@ export async function getPaymentByReviewToken(
       canal: pedido.canal,
       metodoPago: pedido.metodoPago,
       subtotal: pedido.subtotal,
+      costoEnvio: pedido.costoEnvio || 0,
       descuento: pedido.descuento,
+      descuentoEnvio: pedido.descuentoEnvio || 0,
       total: pedido.total,
       estadoPedido: pedido.estadoPedido,
       estadoPago: pedido.estadoPago,

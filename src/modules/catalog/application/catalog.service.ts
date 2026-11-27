@@ -25,6 +25,7 @@ import Sucursal from "@/models/sucursal";
 import ProductoModel from "@/models/producto";
 import Pedido from "@/models/pedido";
 import { buildRecognizedSalesMatch } from "@/modules/orders/domain/recognized-sales";
+import { sweepExpiredReservationsThrottled } from "@/modules/orders/application/pedidos.service";
 import type { Variante, Producto } from "@/types/producto";
 
 import { getVariantPricing, getWebVariantPricing } from "@/utils/pricing";
@@ -565,6 +566,7 @@ export type PublicCatalogFilters = {
 
 export async function getPublicCatalog(filters: PublicCatalogFilters = {}) {
   await connectDB();
+  await sweepExpiredReservationsThrottled();
 
   const queryFilter: Record<string, unknown> = {};
 
@@ -700,6 +702,7 @@ export async function getPublicCatalogProductById(id: string) {
   }
 
   await connectDB();
+  await sweepExpiredReservationsThrottled();
   const producto = await catalogRepository.findPublicById(id, PUBLIC_PRODUCT_PROJECTION);
 
   if (!producto) {

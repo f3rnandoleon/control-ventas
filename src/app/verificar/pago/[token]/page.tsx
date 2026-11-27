@@ -27,7 +27,9 @@ type PaymentReviewData = {
     canal: string;
     metodoPago: string;
     subtotal: number;
+    costoEnvio?: number;
     descuento: number;
+    descuentoEnvio?: number;
     total: number;
     estadoPedido: string;
     estadoPago: string;
@@ -343,6 +345,12 @@ export default function VerificarPagoPage() {
                   <span>Subtotal acumulado</span>
                   <span className="font-mono">Bs {pedido.subtotal.toFixed(2)}</span>
                 </div>
+                {pedido.costoEnvio !== undefined && pedido.costoEnvio > 0 && (
+                  <div className="flex justify-between text-xs text-sky-400 font-medium">
+                    <span>Costo de envío</span>
+                    <span className="font-mono">+Bs {pedido.costoEnvio.toFixed(2)}</span>
+                  </div>
+                )}
                 {pedido.descuento > 0 && (
                   <div className="flex justify-between text-xs text-amber-500 font-medium">
                     <span>Bonificación / Descuento</span>

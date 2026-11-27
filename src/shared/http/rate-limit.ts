@@ -69,6 +69,7 @@ export function checkRateLimit(key: string, options: RateLimitOptions) {
  */
 export const RATE_LIMIT_CONFIGS = {
   AUTH: { windowMs: 60 * 1000, maxRequests: 5 },          // 5 req/min por IP
+  CHECKOUT: { windowMs: 60 * 1000, maxRequests: 6 },      // 6 checkouts/min por IP/usuario
   WRITE: { windowMs: 60 * 1000, maxRequests: 30 },        // 30 req/min por usuario
   READ: { windowMs: 60 * 1000, maxRequests: 60 },         // 60 req/min por usuario
   PUBLIC: { windowMs: 60 * 1000, maxRequests: 100 },      // 100 req/min por IP

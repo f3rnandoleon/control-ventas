@@ -263,6 +263,11 @@ const pedidoSchema = new Schema(
       default: 0,
       min: 0,
     },
+    descuentoEnvio: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     descuentoCatalogo: {
       type: Number,
       default: 0,
@@ -272,6 +277,10 @@ const pedidoSchema = new Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    cuponCodigo: {
+      type: String,
+      default: null,
     },
     promocionesAplicadas: {
       type: [promocionAplicadaSchema],
@@ -285,6 +294,13 @@ const pedidoSchema = new Schema(
     gananciaTotal: {
       type: Number,
       required: true,
+    },
+    reservationTokenHash: {
+      type: String,
+      default: null,
+      index: {
+        sparse: true,
+      },
     },
     idempotencyKey: {
       type: String,

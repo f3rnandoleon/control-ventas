@@ -1,6 +1,8 @@
+import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import CronLock from "@/models/cronLock";
+import Pedido from "@/models/pedido";
 import Producto from "@/models/producto";
 import User from "@/models/user";
 import Sucursal from "@/models/sucursal";
@@ -38,6 +40,14 @@ import {
 } from "@/modules/audit/application/audit.service";
 import { AppError } from "@/shared/errors/AppError";
 import { runInTransaction } from "@/shared/db/runTransaction";
+import {
+    getMaxActiveReservationsPerCustomer,
+    getWebReservationMinutes,
+    hashReservationToken,
+    isPromoExpressCheckoutEnabled,
+    resolveCheckoutShippingFee,
+    verifyReservationToken,
+} from "@/shared/config/checkout-promo.config";
 import type { CheckoutCartInput } from "@/schemas/cart.schema";
 import type { UpdateEstadoPedidoInput, UpdatePedidoEntregaInput, CreatePedidoInput } from "@/schemas/pedido.schema";
 import { generateOrderedId } from "@/utils/generarId";
@@ -48,6 +58,7 @@ import { getVariantPricing, getWebVariantPricing } from "@/utils/pricing";
 import type { SalesQueryInput } from "@/schemas/sales-query.schema";
 import {
     evaluateWebResolvedItems,
+    normalizePhone,
     reservePromotionsForOrder,
     revertPromotionsForOrder,
 } from "@/modules/promotions/application/promotions.service";
@@ -55,6 +66,12 @@ import {
   roundMoney,
   type EngineLineInput,
 } from "@/modules/promotions/domain/promotion-engine";
+
+export { hashReservationToken, verifyReservationToken };
+
+function buildPhoneMatchVariants(phone: string): string[] {
+    return Array.from(new Set([phone, `591${phone}`, `+591${phone}`]));
+}
 
 function createPedidoNumber(prefix = "P") {
     return generateOrderedId(prefix);
@@ -147,6 +164,141 @@ async function releaseCronLease(name: string) {
     );
 }
 
+export async function expireOrderReservationIfNeeded(
+    pedidoId: string,
+    options: {
+        force?: boolean;
+        graceSeconds?: number;
+        reason?: string;
+        actorId?: string | null;
+        actorRole?: AuditActorRole | null;
+    } = {}
+) {
+    await connectDB();
+
+    return runInTransaction(async (session) => {
+        const pedido = await pedidosRepository.findById(pedidoId, session);
+        if (!pedido) {
+            return {
+                released: false,
+                alreadyReleased: false,
+                hasReceipt: false,
+                pedido: null,
+            };
+        }
+
+        const latestPayment = await TransaccionPago.findOne({ pedidoId: pedido._id })
+            .sort({ createdAt: -1 })
+            .session(session);
+        const hasReceipt = Boolean(latestPayment?.urlComprobante);
+        const reason = options.reason || "Reserva expirada por tiempo límite";
+
+        if (
+            pedido.estadoReservaStock === "RELEASED" ||
+            pedido.estadoPedido === "CANCELLED"
+        ) {
+            if (latestPayment && latestPayment.estado === "PENDING" && !hasReceipt) {
+                await TransaccionPago.updateMany(
+                    { pedidoId: pedido._id, estado: "PENDING", urlComprobante: null },
+                    {
+                        $set: {
+                            estado: "FAILED",
+                            falladoEn: new Date(),
+                            motivoFallo: reason,
+                        },
+                    },
+                    { session }
+                );
+            }
+
+            return {
+                released: false,
+                alreadyReleased: true,
+                hasReceipt,
+                pedido,
+            };
+        }
+
+        if (
+            pedido.estadoPedido !== "PENDING_PAYMENT" ||
+            pedido.estadoReservaStock !== "RESERVED" ||
+            pedido.estadoPago === "PAID" ||
+            hasReceipt
+        ) {
+            return {
+                released: false,
+                alreadyReleased: false,
+                hasReceipt,
+                pedido,
+            };
+        }
+
+        if (!options.force) {
+            const expMs = pedido.reservaExpiraEn
+                ? new Date(pedido.reservaExpiraEn).getTime()
+                : null;
+            const graceMs = Math.max(0, Number(options.graceSeconds || 0)) * 1000;
+            if (!expMs || expMs + graceMs > Date.now()) {
+                return {
+                    released: false,
+                    alreadyReleased: false,
+                    hasReceipt: false,
+                    pedido,
+                };
+            }
+        }
+
+        await releasePedidoReservation(pedido, session);
+        await revertPromotionsForOrder(pedido._id, session);
+
+        pedido.estadoReservaStock = "RELEASED";
+        pedido.estadoPedido = "CANCELLED";
+        pedido.estadoPago = "FAILED";
+        pedido.estadoEntrega = "CANCELLED";
+        pedido.reservadoEn = null;
+        pedido.reservaExpiraEn = null;
+        pedido.motivoCancelacion = reason;
+        await pedido.save({ session });
+
+        await TransaccionPago.updateMany(
+            { pedidoId: pedido._id, estado: "PENDING" },
+            {
+                $set: {
+                    estado: "FAILED",
+                    falladoEn: new Date(),
+                    motivoFallo: reason,
+                },
+            },
+            { session }
+        );
+
+        await syncFulfillmentForOrder(pedido, session);
+
+        await recordAuditEventSafe(
+            {
+                accion: "RESERVATION_EXPIRED",
+                tipoEntidad: "PEDIDO",
+                idEntidad: pedido._id.toString(),
+                idActor: options.actorId || "SYSTEM",
+                rolActor: options.actorRole ?? null,
+                estado: "SUCCESS",
+                metadata: {
+                    force: Boolean(options.force),
+                    reason,
+                },
+            },
+            session
+        );
+
+        return {
+            released: true,
+            alreadyReleased: false,
+            hasReceipt: false,
+            pedido,
+        };
+    });
+}
+
 export async function releaseExpiredReservations(limit = 100) {
     await connectDB();
     const lockName = "release-expired-reservations";
@@ -172,45 +324,29 @@ export async function releaseExpiredReservations(limit = 100) {
             const expiredPedidos = await pedidosRepository.findExpiredReserved(limit);
             if (expiredPedidos.length === 0) break;
 
+            let releasedInBatch = 0;
             for (const expiredPedido of expiredPedidos) {
                 try {
-                    const wasReleased = await runInTransaction(async (session) => {
-                        const pedido = await pedidosRepository.findById(
-                            expiredPedido._id.toString(),
-                            session
-                        );
-
-                        if (
-                            !pedido ||
-                            pedido.estadoReservaStock !== "RESERVED" ||
-                            !pedido.reservaExpiraEn ||
-                            pedido.reservaExpiraEn >= new Date()
-                        ) {
-                            return false;
+                    const outcome = await expireOrderReservationIfNeeded(
+                        expiredPedido._id.toString(),
+                        {
+                            force: false,
+                            graceSeconds: 0,
+                            reason: "Reserva expirada automáticamente (cron)",
                         }
+                    );
 
-                        await releasePedidoReservation(pedido, session);
-                        await revertPromotionsForOrder(pedido._id, session);
-
-                        pedido.estadoReservaStock = "RELEASED";
-                        pedido.estadoPedido = "CANCELLED";
-                        pedido.estadoPago = "FAILED";
-                        pedido.estadoEntrega = "CANCELLED";
-                        pedido.reservadoEn = null;
-                        pedido.reservaExpiraEn = null;
-                        await pedido.save({ session });
-
-                        return true;
-                    });
-
-                    if (wasReleased) {
+                    if (outcome.released) {
                         releasedCount += 1;
+                        releasedInBatch += 1;
                         details.push(expiredPedido._id.toString());
                     }
                 } catch {
                     failedCount += 1;
                 }
             }
+
+            if (releasedInBatch === 0) break;
         }
 
         return {
@@ -223,6 +359,260 @@ export async function releaseExpiredReservations(limit = 100) {
     } finally {
         await releaseCronLease(lockName);
     }
+}
+
+/**
+ * Barrido ligero y throttled (sin cron externo) invocado desde consultas públicas de catálogo.
+ * El lease en CronLock actúa como ventana mínima de espera entre ejecuciones.
+ */
+export async function sweepExpiredReservationsThrottled(options?: {
+    minIntervalMs?: number;
+    limit?: number;
+    maxDurationMs?: number;
+}) {
+    const minIntervalMs = options?.minIntervalMs ?? 60_000;
+    const limit = options?.limit ?? 15;
+    const maxDurationMs = options?.maxDurationMs ?? 2_500;
+
+    try {
+        await connectDB();
+        const lockAcquired = await acquireCronLease(
+            "lazy-expired-reservations-sweep",
+            minIntervalMs
+        );
+        if (!lockAcquired) {
+            return { ran: false, releasedCount: 0 };
+        }
+
+        const startedAt = Date.now();
+        const expiredPedidos = await pedidosRepository.findExpiredReserved(limit);
+        let releasedCount = 0;
+
+        for (const expiredPedido of expiredPedidos) {
+            if (Date.now() - startedAt >= maxDurationMs) break;
+            try {
+                const outcome = await expireOrderReservationIfNeeded(
+                    expiredPedido._id.toString(),
+                    {
+                        force: false,
+                        graceSeconds: 0,
+                        reason: "Reserva expirada liberada automáticamente",
+                    }
+                );
+                if (outcome.released) {
+                    releasedCount += 1;
+                }
+            } catch {
+                // Fallo aislado en un pedido no debe afectar el catálogo público
+            }
+        }
+
+        return { ran: true, releasedCount };
+    } catch (error) {
+        console.warn("[LazySweep] Error al barrer reservas expiradas:", error);
+        return { ran: false, releasedCount: 0 };
+    }
+}
+
+/**
+ * Libera inmediatamente cualquier reserva expirada que esté bloqueando alguno de los productos
+ * solicitados en un nuevo checkout, eliminando el stock fantasma sin depender del cron.
+ */
+export async function releaseExpiredReservationsForProductIds(
+    productIds: string[],
+    limit = 10
+): Promise<number> {
+    const validIds = Array.from(
+        new Set(productIds.filter((id) => mongoose.Types.ObjectId.isValid(id)))
+    ).map((id) => new mongoose.Types.ObjectId(id));
+
+    if (validIds.length === 0) return 0;
+
+    try {
+        await connectDB();
+        const expiredDocs = await Pedido.find({
+            estadoReservaStock: "RESERVED",
+            estadoPedido: "PENDING_PAYMENT",
+            reservaExpiraEn: { $lt: new Date() },
+            "items.productoId": { $in: validIds },
+        })
+            .select("_id")
+            .sort({ reservaExpiraEn: 1 })
+            .limit(limit)
+            .lean();
+
+        let releasedCount = 0;
+        for (const doc of expiredDocs) {
+            try {
+                const outcome = await expireOrderReservationIfNeeded(
+                    String(doc._id),
+                    {
+                        force: false,
+                        graceSeconds: 0,
+                        reason: "Reserva expirada liberada automáticamente en checkout",
+                    }
+                );
+                if (outcome.released) releasedCount += 1;
+            } catch {
+                // Continuar con los demás
+            }
+        }
+        return releasedCount;
+    } catch (error) {
+        console.warn("[PreCheckoutSweep] Error liberando reservas expiradas:", error);
+        return 0;
+    }
+}
+
+type ReservationActor = {
+    userId?: string | null;
+    role?: string | null;
+    token?: string | null;
+};
+
+function resolvePedidoClienteId(pedido: { cliente?: unknown }): string | null {
+    if (!pedido.cliente) return null;
+    if (typeof pedido.cliente === "string") return pedido.cliente;
+    if (pedido.cliente instanceof mongoose.Types.ObjectId) {
+        return pedido.cliente.toString();
+    }
+    if (
+        typeof pedido.cliente === "object" &&
+        pedido.cliente !== null &&
+        "_id" in pedido.cliente &&
+        pedido.cliente._id
+    ) {
+        return String(pedido.cliente._id);
+    }
+    return null;
+}
+
+function assertReservationAccess(
+    pedido: { cliente?: unknown; reservationTokenHash?: string | null },
+    actor: ReservationActor
+) {
+    if (actor.role && ["ADMIN", "VENDEDOR"].includes(actor.role)) {
+        return;
+    }
+
+    const clienteId = resolvePedidoClienteId(pedido);
+    if (actor.userId && clienteId && clienteId === actor.userId) {
+        return;
+    }
+
+    if (verifyReservationToken(actor.token, pedido.reservationTokenHash)) {
+        return;
+    }
+
+    if (!actor.userId && !actor.token) {
+        throw new AppError(
+            "Se requiere autenticación o token de reserva válido",
+            401,
+            "RESERVATION_AUTH_REQUIRED"
+        );
+    }
+
+    throw new AppError(
+        "Token de reserva inválido o sin permisos para este pedido",
+        403,
+        "INVALID_RESERVATION_TOKEN"
+    );
+}
+
+export async function getOrderReservationStatus(
+    pedidoId: string,
+    actor: ReservationActor
+) {
+    assertObjectId(pedidoId, "ID de pedido invalido");
+    await connectDB();
+
+    const initialPedido = await pedidosRepository.findById(pedidoId);
+    if (!initialPedido) {
+        throw new AppError("Pedido no encontrado", 404);
+    }
+
+    assertReservationAccess(initialPedido, actor);
+
+    const expirationOutcome = await expireOrderReservationIfNeeded(pedidoId, {
+        force: false,
+        graceSeconds: 0,
+        reason: "Reserva expirada al consultar estado",
+        actorId: actor.userId || "INVITADO",
+        actorRole: actor.userId ? "CLIENTE" : null,
+    });
+
+    const pedido = expirationOutcome.pedido || initialPedido;
+    const latestPayment = await TransaccionPago.findOne({ pedidoId: pedido._id })
+        .sort({ createdAt: -1 })
+        .lean<{ _id: mongoose.Types.ObjectId; urlComprobante?: string | null; estado?: string } | null>();
+
+    const hasReceipt = Boolean(latestPayment?.urlComprobante);
+    const expiresAtDate = pedido.reservaExpiraEn ? new Date(pedido.reservaExpiraEn) : null;
+    const isPastExpiration =
+        !hasReceipt && expiresAtDate !== null && expiresAtDate.getTime() <= Date.now();
+    const expired =
+        pedido.estadoPedido === "CANCELLED" ||
+        pedido.estadoReservaStock === "RELEASED" ||
+        isPastExpiration;
+    const valid =
+        !expired &&
+        (pedido.estadoPedido === "PENDING_PAYMENT" || pedido.estadoPedido === "CONFIRMED") &&
+        (pedido.estadoReservaStock === "RESERVED" || pedido.estadoReservaStock === "CONSUMED");
+
+    return {
+        ok: true,
+        orderId: pedido._id.toString(),
+        orderNumber: pedido.numeroPedido,
+        paymentId: latestPayment ? latestPayment._id.toString() : null,
+        valid,
+        expired,
+        hasReceipt,
+        estadoPedido: pedido.estadoPedido,
+        estadoPago: pedido.estadoPago,
+        estadoReservaStock: pedido.estadoReservaStock,
+        expiresAt: expiresAtDate ? expiresAtDate.toISOString() : null,
+        subtotal: pedido.subtotal,
+        descuento: pedido.descuento,
+        descuentoEnvio: pedido.descuentoEnvio || 0,
+        costoEnvio: pedido.costoEnvio || 0,
+        total: pedido.total,
+    };
+}
+
+export async function expireOrderReservationByActor(
+    pedidoId: string,
+    actor: ReservationActor
+) {
+    assertObjectId(pedidoId, "ID de pedido invalido");
+    await connectDB();
+
+    const initialPedido = await pedidosRepository.findById(pedidoId);
+    if (!initialPedido) {
+        throw new AppError("Pedido no encontrado", 404);
+    }
+
+    assertReservationAccess(initialPedido, actor);
+
+    const outcome = await expireOrderReservationIfNeeded(pedidoId, {
+        force: true,
+        reason: "Reserva expirada por tiempo límite en checkout",
+        actorId: actor.userId || "INVITADO",
+        actorRole: actor.userId ? "CLIENTE" : null,
+    });
+
+    const pedido = outcome.pedido || initialPedido;
+
+    return {
+        ok: true,
+        orderId: pedido._id.toString(),
+        orderNumber: pedido.numeroPedido,
+        released: outcome.released || outcome.alreadyReleased,
+        alreadyReleased: outcome.alreadyReleased,
+        hasReceipt: outcome.hasReceipt,
+        estadoPedido: pedido.estadoPedido,
+        estadoPago: pedido.estadoPago,
+        estadoReservaStock: pedido.estadoReservaStock,
+    };
 }
 
 export async function crearPedidoCheckout(
@@ -240,11 +630,52 @@ export async function crearPedidoCheckout(
     }
 
     const isGuest = !customerId || Boolean(payload.esInvitado || payload.clienteInvitado);
+    const promoExpress = isPromoExpressCheckoutEnabled();
     const metodoEntrega = payload.entrega?.metodo ?? null;
+    const { costoEnvio: costoEnvioBase, department: resolvedDepartment } =
+        resolveCheckoutShippingFee({
+            metodoEntrega,
+            departamento: payload.entrega?.departamento,
+        });
+
     let snapshotEntrega: Record<string, unknown> | null = null;
 
     if (metodoEntrega === "WHATSAPP") {
-        snapshotEntrega = { metodo: "WHATSAPP" };
+        const nombreDestinatario =
+            payload.entrega?.nombreDestinatario ||
+            payload.clienteInvitado?.nombreCompleto ||
+            customer?.user.nombreCompleto ||
+            null;
+        const telefonoContacto =
+            payload.entrega?.telefono ||
+            payload.clienteInvitado?.telefono ||
+            customer?.profile?.telefono ||
+            customer?.defaultAddress?.telefono ||
+            null;
+
+        if (promoExpress && payload.metodoPago === "QR") {
+            if (!nombreDestinatario) {
+                throw new AppError("El nombre completo es obligatorio", 400);
+            }
+            if (!telefonoContacto) {
+                throw new AppError("El celular de contacto es obligatorio", 400);
+            }
+        }
+
+        snapshotEntrega = {
+            metodo: "WHATSAPP",
+            departamento:
+                resolvedDepartment.canonicalName ||
+                payload.entrega?.departamento ||
+                "La Paz",
+            ciudad:
+                payload.entrega?.ciudad ||
+                resolvedDepartment.canonicalName ||
+                payload.entrega?.departamento ||
+                "La Paz",
+            nombreDestinatario,
+            telefono: telefonoContacto,
+        };
     } else if (metodoEntrega === "PICKUP_POINT") {
         snapshotEntrega = {
             metodo: "PICKUP_POINT",
@@ -254,16 +685,53 @@ export async function crearPedidoCheckout(
             programadoPara: payload.entrega?.programadoPara ?? null,
         };
     } else if (metodoEntrega === "SHIPPING_NATIONAL") {
+        const nombreDestinatario =
+            payload.entrega?.nombreDestinatario ||
+            payload.entrega?.nombreRemitente ||
+            payload.clienteInvitado?.nombreCompleto ||
+            customer?.user.nombreCompleto ||
+            null;
+        const telefonoContacto =
+            payload.entrega?.telefono ||
+            payload.entrega?.telefonoRemitente ||
+            payload.clienteInvitado?.telefono ||
+            customer?.profile?.telefono ||
+            customer?.defaultAddress?.telefono ||
+            null;
+
+        if (promoExpress) {
+            if (!nombreDestinatario) {
+                throw new AppError("El nombre completo es obligatorio", 400);
+            }
+            if (!telefonoContacto) {
+                throw new AppError("El celular de contacto es obligatorio", 400);
+            }
+        }
+
+        const departamentoFinal =
+            resolvedDepartment.canonicalName || payload.entrega?.departamento || null;
+
         snapshotEntrega = {
             metodo: "SHIPPING_NATIONAL",
-            departamento: payload.entrega?.departamento ?? null,
-            ciudad: payload.entrega?.ciudad ?? null,
-            empresaEnvio: payload.entrega?.empresaEnvio ?? null,
-            sucursal: payload.entrega?.sucursal ?? null,
-            nombreRemitente: payload.entrega?.nombreRemitente || payload.clienteInvitado?.nombreCompleto || customer?.user.nombreCompleto || null,
-            ciRemitente: payload.entrega?.ciRemitente || payload.clienteInvitado?.ci || customer?.profile?.numeroDocumento || null,
-            telefonoRemitente: payload.entrega?.telefonoRemitente || payload.clienteInvitado?.telefono || customer?.profile?.telefono || null,
-            nombreDestinatario: payload.entrega?.nombreDestinatario || payload.clienteInvitado?.nombreCompleto || customer?.user.nombreCompleto || null,
+            departamento: departamentoFinal,
+            ciudad: payload.entrega?.ciudad || departamentoFinal,
+            empresaEnvio:
+                payload.entrega?.empresaEnvio ||
+                (promoExpress ? "Por coordinar por WhatsApp" : null),
+            sucursal:
+                payload.entrega?.sucursal ||
+                (promoExpress ? "Por coordinar por WhatsApp" : null),
+            telefono: telefonoContacto,
+            nombreRemitente:
+                payload.entrega?.nombreRemitente || nombreDestinatario,
+            ciRemitente:
+                payload.entrega?.ciRemitente ||
+                payload.clienteInvitado?.ci ||
+                customer?.profile?.numeroDocumento ||
+                null,
+            telefonoRemitente:
+                payload.entrega?.telefonoRemitente || telefonoContacto,
+            nombreDestinatario,
         };
     } else if (payload.direccionId && customerId) {
         const address = await obtenerDireccionClientePorUsuario(customerId, payload.direccionId);
@@ -282,8 +750,58 @@ export async function crearPedidoCheckout(
         };
     }
 
+    // Liberar reservas vencidas antes de validar límites/stock (auto-limpieza sin cron externo)
+    if (payload.items && payload.items.length > 0) {
+        await releaseExpiredReservationsForProductIds(
+            payload.items.map((item) => item.productoId)
+        );
+    } else {
+        await sweepExpiredReservationsThrottled({ minIntervalMs: 30_000, limit: 10 });
+    }
+
+    // Protección anti-abuso persistente en MongoDB: limitar reservas activas simultáneas por cliente/teléfono
+    const telefonoAntiAbuse =
+        (snapshotEntrega?.telefono as string) ||
+        (snapshotEntrega?.telefonoRemitente as string) ||
+        payload.clienteInvitado?.telefono ||
+        customer?.profile?.telefono ||
+        customer?.defaultAddress?.telefono ||
+        null;
+    const normalizedPhoneAntiAbuse = normalizePhone(telefonoAntiAbuse);
+    const activeReservationIdentityOr: Record<string, unknown>[] = [];
+    if (customer?.user._id) {
+        activeReservationIdentityOr.push({ cliente: customer.user._id });
+    }
+    if (normalizedPhoneAntiAbuse) {
+        const phoneVariants = buildPhoneMatchVariants(normalizedPhoneAntiAbuse);
+        activeReservationIdentityOr.push({
+            "snapshotCliente.telefono": { $in: phoneVariants },
+        });
+        activeReservationIdentityOr.push({
+            "datosClienteInvitado.telefono": { $in: phoneVariants },
+        });
+    }
+    if (activeReservationIdentityOr.length > 0) {
+        const activeReservationsCount = await Pedido.countDocuments({
+            canal: "WEB",
+            estadoPedido: "PENDING_PAYMENT",
+            estadoReservaStock: "RESERVED",
+            reservaExpiraEn: { $gt: new Date() },
+            $or: activeReservationIdentityOr,
+        });
+        if (activeReservationsCount >= getMaxActiveReservationsPerCustomer()) {
+            throw new AppError(
+                "Ya tienes reservas pendientes activas. Completa tu pago o espera a que expiren antes de crear otro pedido.",
+                429,
+                "TOO_MANY_ACTIVE_RESERVATIONS"
+            );
+        }
+    }
+
     const reservationMinutes =
-        (metodoEntrega === "WHATSAPP" || payload.metodoPago === "EFECTIVO") ? 60 * 48 : 30;
+        payload.metodoPago === "QR" ? getWebReservationMinutes() : 60 * 48;
+    const reservationToken = randomUUID();
+    const reservationTokenHash = hashReservationToken(reservationToken);
 
     const result = await runInTransaction(async (session) => {
         const webDispatchBranchId = await getWebDispatchBranchId(session);
@@ -447,6 +965,7 @@ export async function crearPedidoCheckout(
 
         const telefonoContactoEvaluacion =
             (snapshotEntrega?.telefono as string) ||
+            (snapshotEntrega?.telefonoRemitente as string) ||
             payload.clienteInvitado?.telefono ||
             customer?.profile?.telefono ||
             customer?.defaultAddress?.telefono ||
@@ -456,7 +975,7 @@ export async function crearPedidoCheckout(
 
         const pricingEvaluation = await evaluateWebResolvedItems({
             items: rawPreparedItems.map((item) => item.engineLine),
-            costoEnvio: 0,
+            costoEnvio: costoEnvioBase,
             cuponCodigo: cuponCodigoFinal,
             clienteId: customer ? customer.user._id.toString() : null,
             telefonoInvitado: telefonoContactoEvaluacion,
@@ -492,6 +1011,8 @@ export async function crearPedidoCheckout(
         });
 
         const subtotal = pricingEvaluation.subtotalLista;
+        const costoEnvio = pricingEvaluation.costoEnvioOriginal;
+        const descuentoEnvio = pricingEvaluation.descuentoEnvio;
         const descuento = pricingEvaluation.descuentoTotal;
         const total = pricingEvaluation.totalFinal;
         const gananciaTotal = pricingEvaluation.gananciaTotalNeta;
@@ -500,17 +1021,31 @@ export async function crearPedidoCheckout(
         const snapshotCliente = customer
             ? {
                 usuarioId: customer.user._id,
-                nombreCompleto: customer.user.nombreCompleto,
+                nombreCompleto:
+                    (snapshotEntrega?.nombreDestinatario as string) ||
+                    customer.user.nombreCompleto,
                 email: customer.user.email,
-                telefono: (snapshotEntrega?.telefono as string) || customer.profile?.telefono || customer.defaultAddress?.telefono || null,
+                telefono:
+                    (snapshotEntrega?.telefono as string) ||
+                    (snapshotEntrega?.telefonoRemitente as string) ||
+                    customer.profile?.telefono ||
+                    customer.defaultAddress?.telefono ||
+                    null,
                 tipoDocumento: customer.profile?.tipoDocumento || null,
                 numeroDocumento: customer.profile?.numeroDocumento || null,
             }
             : {
                 usuarioId: null,
-                nombreCompleto: payload.clienteInvitado!.nombreCompleto,
+                nombreCompleto:
+                    payload.clienteInvitado?.nombreCompleto ||
+                    (snapshotEntrega?.nombreDestinatario as string) ||
+                    "Cliente Invitado",
                 email: payload.clienteInvitado?.email || null,
-                telefono: payload.clienteInvitado!.telefono,
+                telefono:
+                    payload.clienteInvitado?.telefono ||
+                    (snapshotEntrega?.telefono as string) ||
+                    (snapshotEntrega?.telefonoRemitente as string) ||
+                    null,
                 tipoDocumento: payload.clienteInvitado?.ci ? "CI" : null,
                 numeroDocumento: payload.clienteInvitado?.ci || null,
             };
@@ -543,12 +1078,16 @@ export async function crearPedidoCheckout(
             snapshotEntrega,
             items: itemsProcesados,
             subtotal,
+            costoEnvio,
             descuento,
+            descuentoEnvio,
             descuentoCatalogo: pricingEvaluation.descuentoCatalogo,
             descuentoPromociones: pricingEvaluation.descuentoPromociones,
+            cuponCodigo: pricingEvaluation.cuponValido ? pricingEvaluation.cuponCodigo : null,
             promocionesAplicadas: pricingEvaluation.promocionesAplicadas,
             total,
             gananciaTotal,
+            reservationTokenHash,
             notas: payload.notas || null,
         }, session);
 
@@ -602,7 +1141,7 @@ export async function crearPedidoCheckout(
             session
         );
 
-        return { pedido, pago: nuevaTransaccion };
+        return { pedido, pago: nuevaTransaccion, reservationToken };
     });
 
     return result;
@@ -818,7 +1357,7 @@ export async function crearVentaDirecta(
     });
 }
 
-function sanitizePedidoForCustomer(pedido: Record<string, unknown>) {
+export function sanitizePedidoForCustomer(pedido: Record<string, unknown>) {
     const sanitized = { ...pedido };
     if (Array.isArray(sanitized.items)) {
         sanitized.items = sanitized.items.map((item: Record<string, unknown>) => {
@@ -829,6 +1368,7 @@ function sanitizePedidoForCustomer(pedido: Record<string, unknown>) {
         });
     }
     delete sanitized.gananciaTotal;
+    delete sanitized.reservationTokenHash;
     return sanitized;
 }
 

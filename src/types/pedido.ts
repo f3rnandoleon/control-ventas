@@ -63,8 +63,10 @@ export interface Pedido {
   subtotal: number;
   costoEnvio?: number;
   descuento: number;
+  descuentoEnvio?: number;
   descuentoCatalogo?: number;
   descuentoPromociones?: number;
+  cuponCodigo?: string | null;
   promocionesAplicadas?: PromocionAplicadaSnapshot[];
   total: number;
   gananciaTotal: number;
