@@ -150,15 +150,39 @@ export async function getWebStockMapForProducts(
 /**
  * Obtiene el stock disponible para tienda web (stockFisico - stockReservado) de una variante
  * sumando las existencias de todas las sucursales autorizadas para despacho web.
+ * Si el producto no tiene control en NivelStock (legacy), aplica el mismo fallback del catálogo público.
  */
 export async function getAvailableWebStockForVariant(
   productoId: string | mongoose.Types.ObjectId,
   varianteId: string,
-  session?: ClientSession
+  session?: ClientSession,
+  fallbackAvailable?: number
 ): Promise<number> {
   const stockMap = await getWebStockMapForProducts([productoId], session);
   const prodMap = stockMap.get(productoId.toString());
-  if (!prodMap) return 0;
+  if (!prodMap) {
+    if (typeof fallbackAvailable === "number") {
+      return Math.max(0, fallbackAvailable);
+    }
+    const producto = await Producto.findById(productoId)
+      .select("variantes")
+      .session(session ?? null)
+      .lean<{
+        variantes?: Array<{
+          _id?: unknown;
+          varianteId?: string;
+          stock?: number;
+          stockReservado?: number;
+        }>;
+      } | null>();
+    const variante = producto?.variantes?.find(
+      (v) =>
+        v.varianteId === varianteId ||
+        (v._id !== undefined && String(v._id) === varianteId)
+    );
+    if (!variante) return 0;
+    return Math.max(0, Number(variante.stock || 0) - Number(variante.stockReservado || 0));
+  }
   const varStock = prodMap.get(varianteId);
   return varStock ? varStock.stockDisponible : 0;
 }

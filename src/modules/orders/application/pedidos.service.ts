@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 import { connectDB } from "@/libs/mongodb";
 import CronLock from "@/models/cronLock";
+import Carrito from "@/models/carrito";
 import Pedido from "@/models/pedido";
 import Producto from "@/models/producto";
 import User from "@/models/user";
@@ -755,6 +756,18 @@ export async function crearPedidoCheckout(
         await releaseExpiredReservationsForProductIds(
             payload.items.map((item) => item.productoId)
         );
+    } else if (customerId) {
+        const cartDoc = await Carrito.findOne({ cliente: customerId })
+            .select("items.productoId")
+            .lean<{ items?: Array<{ productoId?: mongoose.Types.ObjectId }> } | null>();
+        const cartProductIds = (cartDoc?.items || [])
+            .map((it) => (it.productoId ? it.productoId.toString() : ""))
+            .filter(Boolean);
+        if (cartProductIds.length > 0) {
+            await releaseExpiredReservationsForProductIds(cartProductIds);
+        } else {
+            await sweepExpiredReservationsThrottled({ minIntervalMs: 30_000, limit: 10 });
+        }
     } else {
         await sweepExpiredReservationsThrottled({ minIntervalMs: 30_000, limit: 10 });
     }
@@ -849,15 +862,14 @@ export async function crearPedidoCheckout(
                 }
 
                 const varId = variante.varianteId || String((variante as unknown as { _id?: unknown })._id || "");
-                const stockDisponibleWeb = await getAvailableWebStockForVariant(producto._id, varId, session);
-                if (stockDisponibleWeb < itemInput.cantidad) {
-                    throw new AppError(
-                        `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
-                        400
-                    );
-                }
-
-                if (getAvailableStockForVariant(variante) < itemInput.cantidad) {
+                const variantAvailable = getAvailableStockForVariant(variante);
+                const stockDisponibleWeb = await getAvailableWebStockForVariant(
+                    producto._id,
+                    varId,
+                    session,
+                    variantAvailable
+                );
+                if (stockDisponibleWeb < itemInput.cantidad || variantAvailable < itemInput.cantidad) {
                     throw new AppError(
                         `Stock insuficiente para ${producto.nombre} ${variante.color}/${variante.talla}`,
                         400

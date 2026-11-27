@@ -74,9 +74,17 @@ export const checkoutCartSchema = z
       .transform((val) => (val ? val.toUpperCase() : null))
       .nullable()
       .optional(),
-    notas: nonEmptyStringSchema
-      .max(300, "Las notas no pueden exceder 300 caracteres")
-      .optional(),
+    notas: z.preprocess(
+      (value) => {
+        if (typeof value !== "string") return value;
+        const trimmed = value.trim();
+        return trimmed === "" ? undefined : trimmed;
+      },
+      nonEmptyStringSchema
+        .max(300, "Las notas no pueden exceder 300 caracteres")
+        .optional()
+        .nullable()
+    ),
 
     entrega: z
       .object({
